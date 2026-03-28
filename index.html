@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Axentro | الحضور بالوجه</title>
+    <!-- face-api.js من CDN -->
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -26,46 +27,40 @@
             margin-bottom: 5px;
         }
         .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
-        .camera-card {
-            background: rgba(15, 23, 42, 0.7);
-            backdrop-filter: blur(10px);
-            border-radius: 32px;
-            padding: 16px;
-            margin-bottom: 24px;
-            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.3);
-            display: none;
-        }
-        .camera-card.active { display: block; }
-        .camera-wrapper {
-            position: relative;
+        .camera-container {
+            background: #000;
             border-radius: 24px;
             overflow: hidden;
-            background: #000;
-            margin-bottom: 15px;
-            aspect-ratio: 4 / 3;
+            margin-bottom: 20px;
+            display: none;
+            position: relative;
+            aspect-ratio: 4/3;
         }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        .camera-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
+        .camera-container.active { display: block; }
+        video {
             width: 100%;
             height: 100%;
-            border: 2px solid rgba(59,130,246,0.5);
-            border-radius: 24px;
-            pointer-events: none;
-            animation: borderPulse 2s infinite;
+            object-fit: cover;
         }
-        @keyframes borderPulse {
-            0% { border-color: rgba(59,130,246,0.3); box-shadow: inset 0 0 10px rgba(59,130,246,0.2); }
-            50% { border-color: rgba(59,130,246,0.8); box-shadow: inset 0 0 25px rgba(59,130,246,0.5); }
-            100% { border-color: rgba(59,130,246,0.3); box-shadow: inset 0 0 10px rgba(59,130,246,0.2); }
+        .capture-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #3b82f6;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
         .status-card, .location-card {
             background: rgba(0,0,0,0.5);
             border-radius: 40px;
             padding: 12px 20px;
-            margin-top: 12px;
+            margin: 12px 0;
             font-size: 14px;
             display: flex;
             align-items: center;
@@ -114,19 +109,11 @@
             gap: 8px;
         }
         button:active { transform: scale(0.97); }
-        .btn-register { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+        .btn-register { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; width: 100%; }
         .btn-attendance { background: linear-gradient(135deg, #10b981, #059669); color: white; flex: 1; }
         .btn-leave { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; flex: 1; }
         .action-card { display: flex; gap: 16px; }
         .register-hint { font-size: 12px; color: #94a3b8; margin-top: 12px; }
-        .name-badge {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            display: inline-block;
-            padding: 10px 24px;
-            border-radius: 60px;
-            font-size: 18px;
-            margin-top: 20px;
-        }
         footer {
             background: rgba(0,0,0,0.7);
             backdrop-filter: blur(8px);
@@ -171,18 +158,17 @@
     <h1>نظام الحضور والانصراف</h1>
     <p class="subtitle">Axentro Attendance System</p>
 
-    <div class="camera-card" id="cameraCard">
-        <div class="camera-wrapper">
-            <video id="video" autoplay muted playsinline></video>
-            <div class="camera-overlay"></div>
-        </div>
-        <div class="status-card" id="status">
-            <div class="spinner"></div>
-            <span>جاري تحميل النماذج...</span>
-        </div>
-        <div class="location-card" id="location">
-            <span>📍 جاري الحصول على الموقع...</span>
-        </div>
+    <div class="camera-container" id="cameraContainer">
+        <video id="video" autoplay muted playsinline></video>
+        <button class="capture-btn" id="captureBtn" style="display: none;">📸</button>
+    </div>
+
+    <div class="status-card" id="status">
+        <div class="spinner"></div>
+        <span>جاري تحميل النماذج...</span>
+    </div>
+    <div class="location-card" id="location">
+        <span>📍 جاري الحصول على الموقع...</span>
     </div>
 
     <div class="admin-card">
@@ -191,19 +177,12 @@
             <input type="text" id="empName" placeholder="اسم الموظف" autocomplete="off">
             <button id="registerBtn" class="btn-register">📸 التقاط الوجه وتسجيل</button>
         </div>
-        <div class="register-hint">أدخل الاسم ثم اضغط الزر، وسيتم فتح الكاميرا تلقائياً</div>
+        <div class="register-hint">أدخل الاسم ثم اضغط الزر، سيتم فتح الكاميرا لالتقاط وجهك.</div>
     </div>
 
     <div class="action-card">
         <button id="attendanceBtn" class="btn-attendance">✅ تسجيل حضور</button>
         <button id="leaveBtn" class="btn-leave">🚪 تسجيل انصراف</button>
-    </div>
-
-    <div id="recognizedName" style="display: none;">
-        <div class="name-badge">
-            <span>مرحباً</span>
-            <strong id="recognizedUserName">---</strong>
-        </div>
     </div>
 </div>
 
@@ -225,18 +204,17 @@
     const registerBtn = document.getElementById('registerBtn');
     const attendanceBtn = document.getElementById('attendanceBtn');
     const leaveBtn = document.getElementById('leaveBtn');
-    const recognizedDiv = document.getElementById('recognizedName');
-    const recognizedSpan = document.getElementById('recognizedUserName');
-    const cameraCard = document.getElementById('cameraCard');
+    const cameraContainer = document.getElementById('cameraContainer');
+    const captureBtn = document.getElementById('captureBtn');
 
     // ------------------- متغيرات -------------------
     let modelsLoaded = false;
     let stream = null;
-    let labeledDescriptors = [];
+    let labeledDescriptors = [];   // قائمة الموظفين المخزنين
     let currentLocation = null;
-    let currentName = null;
-    let recognitionInterval = null;
-    let cameraActive = false;
+    let currentAction = null;      // 'register', 'attendance', 'leave'
+    let tempName = null;           // اسم الموظف الجديد أثناء التسجيل
+    let isCapturing = false;
 
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
@@ -258,48 +236,126 @@
         statusDiv.innerHTML = isLoading ? `<div class="spinner"></div><span>${text}</span>` : `<span>${text}</span>`;
     }
 
-    // ------------------- تحميل النماذج من CDN (بدون ملفات محلية!) -------------------
-    async function loadModelsFromCDN() {
-        updateStatus('جاري تحميل النماذج من السحابة...', true);
+    // ------------------- تحميل النماذج من CDN (بدون مجلد محلي) -------------------
+    async function loadModels() {
+        updateStatus('جاري تحميل نماذج الوجه...', true);
         try {
-            // استخدام CDN مباشر لتحميل النماذج - لا تحتاج إلى أي ملفات محلية!
-            await faceapi.nets.ssdMobilenetv1.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
-            await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
-            await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
+            // استخدام CDN يحتوي على النماذج الرسمية
+            const modelUrl = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
+            await faceapi.nets.ssdMobilenetv1.loadFromUri(modelUrl);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl);
             modelsLoaded = true;
-            updateStatus('النماذج جاهزة!', false);
+            updateStatus('النماذج جاهزة ✅', false);
             showToast('تم تحميل نماذج الوجه بنجاح', 'success');
-            return true;
         } catch (err) {
             updateStatus('فشل تحميل النماذج: ' + err.message, false);
             showToast('فشل تحميل النماذج، تأكد من الاتصال بالإنترنت', 'error');
-            return false;
         }
     }
 
     // ------------------- تشغيل الكاميرا -------------------
-    async function startCamera() {
-        if (cameraActive) return;
+    async function openCamera() {
+        if (stream) closeCamera();
         try {
             stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
             await video.play();
-            cameraActive = true;
-            cameraCard.classList.add('active');
-            updateStatus('الكاميرا تعمل. جاري تحميل النماذج...', true);
-            
-            // تحميل النماذج من CDN
-            const loaded = await loadModelsFromCDN();
-            if (loaded) {
-                startRecognition();
-            }
+            cameraContainer.classList.add('active');
+            return true;
         } catch (err) {
-            updateStatus('فشل تشغيل الكاميرا: ' + err.message, false);
             showToast('تعذر الوصول إلى الكاميرا', 'error');
+            return false;
         }
     }
 
-    // ------------------- تحميل الموظفين المخزنين -------------------
+    function closeCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        video.srcObject = null;
+        cameraContainer.classList.remove('active');
+    }
+
+    // ------------------- التقاط الوجه والتعرف عليه -------------------
+    async function captureAndProcess() {
+        if (!modelsLoaded) {
+            showToast('النماذج لم تُحمل بعد، انتظر قليلاً', 'warning');
+            return false;
+        }
+        if (!video.srcObject) {
+            showToast('الكاميرا غير جاهزة', 'error');
+            return false;
+        }
+
+        updateStatus('جاري معالجة الوجه...', true);
+        try {
+            // اكتشاف الوجه في الإطار الحالي
+            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+            if (!detection) {
+                updateStatus('لم يتم اكتشاف وجه', false);
+                showToast('لم يتم اكتشاف وجه، حاول مرة أخرى', 'error');
+                return false;
+            }
+
+            const descriptor = detection.descriptor;
+
+            if (currentAction === 'register') {
+                // تسجيل موظف جديد
+                if (!tempName) {
+                    showToast('يرجى إدخال الاسم أولاً', 'warning');
+                    return false;
+                }
+                const existing = labeledDescriptors.find(ld => ld.label === tempName);
+                if (existing) {
+                    existing.descriptors.push(descriptor);
+                    showToast(`تم تحديث بيانات ${tempName}`, 'success');
+                } else {
+                    labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(tempName, [descriptor]));
+                    showToast(`تم تسجيل ${tempName} بنجاح`, 'success');
+                }
+                saveEmployees();
+                updateStatus('تم التسجيل بنجاح', false);
+                return true;
+            } 
+            else {
+                // حضور / انصراف: مقارنة الوجه مع المخزن
+                if (labeledDescriptors.length === 0) {
+                    showToast('لا يوجد موظفون مسجلون', 'warning');
+                    return false;
+                }
+                const matcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+                const bestMatch = matcher.findBestMatch(descriptor);
+                if (bestMatch.label === 'unknown') {
+                    showToast('وجه غير مسجل', 'error');
+                    return false;
+                }
+                const name = bestMatch.label;
+                const type = currentAction === 'attendance' ? 'حضور' : 'انصراف';
+                // إرسال البيانات إلى Google Sheets
+                await sendAttendance(name, type);
+                return true;
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('حدث خطأ أثناء المعالجة', 'error');
+            return false;
+        } finally {
+            updateStatus('جاهز', false);
+        }
+    }
+
+    // ------------------- حفظ واسترجاع الموظفين -------------------
+    function saveEmployees() {
+        const data = labeledDescriptors.map(ld => ({
+            label: ld.label,
+            descriptors: ld.descriptors.map(d => Array.from(d))
+        }));
+        localStorage.setItem('axentro_face_descriptors', JSON.stringify(data));
+        updateStatus(`تم حفظ ${labeledDescriptors.length} موظف`, false);
+    }
+
     function loadEmployees() {
         const stored = localStorage.getItem('axentro_face_descriptors');
         if (stored) {
@@ -310,50 +366,53 @@
             ));
             updateStatus(`تم تحميل ${labeledDescriptors.length} موظف`, false);
         } else {
-            updateStatus('لا يوجد موظفون مسجلون. سجل موظفاً أولاً', false);
+            updateStatus('لا يوجد موظفون مسجلون', false);
         }
     }
 
-    function saveEmployees() {
-        const data = labeledDescriptors.map(ld => ({
-            label: ld.label,
-            descriptors: ld.descriptors.map(d => Array.from(d))
-        }));
-        localStorage.setItem('axentro_face_descriptors', JSON.stringify(data));
-        updateStatus(`تم حفظ ${labeledDescriptors.length} موظف`, false);
+    // ------------------- إرسال البيانات إلى Google Apps Script -------------------
+    async function sendAttendance(name, type) {
+        if (!currentLocation) {
+            showToast('جاري الحصول على الموقع... حاول مرة أخرى', 'info');
+            setTimeout(() => sendAttendance(name, type), 1000);
+            return;
+        }
+
+        // التقاط صورة للإطار الحالي
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg');
+        const now = new Date();
+        const timeStr = now.toLocaleString('ar-EG');
+
+        const payload = {
+            name: name,
+            type: type,
+            location: currentLocation,
+            time: timeStr,
+            imageData: imageData
+        };
+
+        updateStatus('جاري الإرسال...', true);
+        try {
+            await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            updateStatus(`تم تسجيل ${type}`, false);
+            showToast(`✅ تم تسجيل ${type} للموظف ${name}`, 'success');
+        } catch (err) {
+            updateStatus('خطأ في الإرسال', false);
+            showToast('حدث خطأ أثناء الإرسال', 'error');
+        }
     }
 
-    // ------------------- التعرف المستمر -------------------
-    async function startRecognition() {
-        if (recognitionInterval) clearInterval(recognitionInterval);
-        const displaySize = { width: video.videoWidth, height: video.videoHeight };
-        faceapi.matchDimensions(video, displaySize);
-        recognitionInterval = setInterval(async () => {
-            if (!modelsLoaded || video.videoWidth === 0 || !cameraActive) return;
-            const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
-            const resized = faceapi.resizeResults(detections, displaySize);
-            if (resized.length > 0 && labeledDescriptors.length > 0) {
-                const matcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
-                const best = matcher.findBestMatch(resized[0].descriptor);
-                if (best.label !== 'unknown') {
-                    currentName = best.label;
-                    recognizedSpan.textContent = currentName;
-                    recognizedDiv.style.display = 'block';
-                    updateStatus(`مرحباً ${currentName}`, false);
-                } else {
-                    currentName = null;
-                    recognizedDiv.style.display = 'none';
-                    updateStatus('وجه غير مسجل', false);
-                }
-            } else if (resized.length === 0) {
-                currentName = null;
-                recognizedDiv.style.display = 'none';
-                updateStatus('لم يتم اكتشاف وجه', false);
-            }
-        }, 1500);
-    }
-
-    // ------------------- الموقع -------------------
+    // ------------------- الحصول على الموقع -------------------
     function getLocation() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -377,106 +436,42 @@
     getLocation();
     setInterval(getLocation, 30000);
 
-    // ------------------- التقاط صورة -------------------
-    function captureImage() {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL('image/jpeg');
-    }
-
-    // ------------------- إرسال البيانات -------------------
-    async function sendAttendance(name, type) {
-        if (!name) {
-            showToast('لم يتم التعرف على الوجه', 'warning');
-            return;
-        }
-        if (!currentLocation) {
-            showToast('جاري الحصول على الموقع... حاول مرة أخرى', 'info');
-            setTimeout(() => sendAttendance(name, type), 1000);
-            return;
-        }
-        const imgData = captureImage();
-        const now = new Date();
-        const timeStr = now.toLocaleString('ar-EG');
-        const payload = { name, type, location: currentLocation, time: timeStr, imageData: imgData };
-
-        updateStatus('جاري الإرسال...', true);
-        try {
-            await fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            updateStatus(`تم تسجيل ${type}`, false);
-            showToast(`✅ تم تسجيل ${type}`, 'success');
-        } catch (err) {
-            updateStatus('خطأ في الإرسال', false);
-            showToast('حدث خطأ أثناء الإرسال', 'error');
-        }
-    }
-
-    // ------------------- تسجيل موظف جديد -------------------
-    async function registerEmployee() {
+    // ------------------- معالجة الأزرار -------------------
+    async function handleRegister() {
         const name = empNameInput.value.trim();
         if (!name) {
             showToast('يرجى إدخال اسم الموظف', 'warning');
             return;
         }
-        if (!cameraActive) {
-            await startCamera();
-            if (!modelsLoaded) {
-                showToast('جاري تجهيز الكاميرا، حاول مرة أخرى بعد لحظة', 'info');
-                return;
-            }
+        tempName = name;
+        currentAction = 'register';
+        const opened = await openCamera();
+        if (opened) {
+            // بعد فتح الكاميرا، نلتقط الصورة مباشرة
+            await captureAndProcess();
+            closeCamera();
+            tempName = null;
+            currentAction = null;
         }
-        updateStatus('جاري التقاط الوجه...', true);
-        const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
-        if (!detection) {
-            updateStatus('لم يتم اكتشاف وجه', false);
-            showToast('لم يتم اكتشاف وجه، حاول مرة أخرى', 'error');
-            return;
-        }
-        const descriptor = detection.descriptor;
-        const existing = labeledDescriptors.find(ld => ld.label === name);
-        if (existing) {
-            existing.descriptors.push(descriptor);
-            updateStatus(`تم تحديث ${name}`, false);
-            showToast(`تم تحديث بيانات ${name}`, 'success');
-        } else {
-            labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(name, [descriptor]));
-            updateStatus(`تم تسجيل ${name}`, false);
-            showToast(`تم تسجيل ${name}`, 'success');
-        }
-        saveEmployees();
-        empNameInput.value = '';
     }
 
-    // ------------------- التعامل مع الحضور/الانصراف -------------------
     async function handleAttendance(type) {
-        if (!cameraActive) {
-            await startCamera();
-            if (!modelsLoaded) {
-                showToast('جاري تجهيز الكاميرا، حاول مرة أخرى بعد لحظة', 'info');
-                return;
-            }
+        currentAction = type;
+        const opened = await openCamera();
+        if (opened) {
+            await captureAndProcess();
+            closeCamera();
+            currentAction = null;
         }
-        if (!currentName) {
-            showToast('الرجاء التوجه نحو الكاميرا للتعرف على الوجه', 'warning');
-            return;
-        }
-        sendAttendance(currentName, type);
     }
 
     // ------------------- ربط الأزرار -------------------
-    registerBtn.onclick = registerEmployee;
-    attendanceBtn.onclick = () => handleAttendance('حضور');
-    leaveBtn.onclick = () => handleAttendance('انصراف');
+    registerBtn.onclick = handleRegister;
+    attendanceBtn.onclick = () => handleAttendance('attendance');
+    leaveBtn.onclick = () => handleAttendance('leave');
 
-    // ------------------- بدء التطبيق (بدون كاميرا) -------------------
+    // ------------------- بدء التشغيل -------------------
+    loadModels();
     loadEmployees();
 </script>
 </body>
