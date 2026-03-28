@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Axentro - نظام الحضور بالوجه</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>نظام الحضور والانصراف</h1>
+        <p class="subtitle">Axentro Attendance System</p>
+        
+        <div class="camera-container">
+            <video id="video" autoplay muted playsinline></video>
+            <canvas id="overlay" style="display:none;"></canvas>
+        </div>
+        
+        <div id="status">جاري تحميل النماذج...</div>
+        <div id="location">جاري الحصول على الموقع...</div>
+        
+        <div class="admin-panel">
+            <h3>تسجيل موظف جديد</h3>
+            <input type="text" id="empName" placeholder="اسم الموظف">
+            <button id="registerBtn">التقاط صورة الوجه وتسجيل</button>
+        </div>
+        
+        <div class="action-buttons">
+            <button id="attendanceBtn" class="btn-success">تسجيل حضور</button>
+            <button id="leaveBtn" class="btn-danger">تسجيل انصراف</button>
+        </div>
+    </div>
+    
+    <footer>
+        <div class="footer-content">
+            <p>© 2024 Axentro - All Rights Reserved</p>
+            <p>Powered by Axentro System</p>
+            <div class="qr-container">
+                <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
+                    <img src="qr-links.png" alt="QR Code" class="qr-image">
+                </a>
+                <span>Scan Me</span>
+            </div>
+        </div>
+    </footer>
+    
+    <script src="script.js"></script>
+</body>
+</html>
