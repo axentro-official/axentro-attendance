@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Axentro | الحضور بالوجه</title>
+    <title>Axentro | نظام الحضور والانصراف</title>
+    <!-- Font Awesome 6 (أيقونات احترافية) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -327,34 +329,35 @@
             animation: slideUp 0.5s forwards;
         }
         @keyframes slideUp { to { transform: translateY(0); } }
-        .login-card h2 {
-            margin-bottom: 24px;
-            font-size: 28px;
-            background: linear-gradient(135deg, #fff, #a5f3fc);
+        .login-icon {
+            font-size: 64px;
+            background: linear-gradient(135deg, #3b82f6, #a5f3fc);
             background-clip: text;
             -webkit-background-clip: text;
             color: transparent;
-        }
-        .login-card input {
-            width: 100%;
             margin-bottom: 16px;
-            transition: all 0.2s;
         }
-        .login-card input:focus { transform: scale(1.02); }
-        .login-btn {
-            width: 100%;
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            margin-top: 8px;
-            transition: all 0.2s;
+        .login-card h2 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            color: #f1f5f9;
         }
-        .login-btn:hover { transform: scale(1.02); filter: brightness(1.05); }
-        .password-wrapper {
+        .input-with-icon {
             position: relative;
             width: 100%;
             margin-bottom: 16px;
         }
-        .password-wrapper input {
+        .input-with-icon i {
+            position: absolute;
+            right: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 18px;
+        }
+        .input-with-icon input {
             width: 100%;
+            padding-right: 45px;
             padding-left: 45px;
         }
         .toggle-password {
@@ -380,6 +383,13 @@
             color: #3b82f6;
             background: rgba(255,255,255,0.1);
         }
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            margin-top: 8px;
+            transition: all 0.2s;
+        }
+        .login-btn:hover { transform: scale(1.02); filter: brightness(1.05); }
         .login-footer {
             margin-top: 24px;
             padding-top: 16px;
@@ -476,18 +486,26 @@
 <!-- زر تسجيل الخروج -->
 <div class="logout-btn" id="logoutBtn" style="display: none;">🚪 تسجيل خروج</div>
 
-<!-- شاشة تسجيل الدخول مع الفوتر -->
+<!-- شاشة تسجيل الدخول المحسنة -->
 <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
-        <h2>🔐 تسجيل الدخول</h2>
-        <input type="text" id="loginCode" placeholder="الكود (مثال: EMP001)" autocomplete="off">
-        <div class="password-wrapper">
-            <input type="password" id="loginPassword" placeholder="كلمة السر">
-            <button type="button" class="toggle-password" id="togglePasswordBtn">👁️</button>
+        <div class="login-icon">
+            <i class="fas fa-user-check"></i>
         </div>
-        <button id="doLoginBtn" class="login-btn">دخول</button>
+        <h2>نظام إدارة الحضور والانصراف</h2>
+        <div class="input-with-icon">
+            <i class="fas fa-id-card"></i>
+            <input type="text" id="loginCode" placeholder="الكود (مثال: EMP001)" autocomplete="off">
+        </div>
+        <div class="input-with-icon">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="loginPassword" placeholder="كلمة السر">
+            <button type="button" class="toggle-password" id="togglePasswordBtn">
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+        <button id="doLoginBtn" class="login-btn">دخول <i class="fas fa-arrow-left"></i></button>
         <p style="margin-top: 12px; font-size: 12px;">للموظفين: الكود وكلمة السر المرسلة على البريد</p>
-
         <div class="login-footer">
             <p>© 2025 Axentro - All Rights Reserved</p>
             <p>Powered by Axentro System</p>
@@ -534,7 +552,7 @@
             </div>
             <div style="overflow-x: auto;">
                 <table class="report-table" id="reportTable">
-                    <thead><tr><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th></tr></thead>
+                    <thead><tr><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th> </thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -622,6 +640,7 @@
     let loggedInUser = null;
     let currentReportCode = null;
 
+    // تأكد من استخدام الرابط الصحيح بعد النشر
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
     // ---------- دوال مساعدة ----------
@@ -1110,11 +1129,11 @@
         if (!code || !password) { showToast('يرجى إدخال الكود وكلمة السر', 'warning'); return; }
         const loginBtn = document.getElementById('doLoginBtn');
         const originalText = loginBtn.innerHTML;
-        loginBtn.innerHTML = 'جاري التحقق...';
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> جاري التحقق...';
         loginBtn.disabled = true;
         try {
             const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=verifyLogin&code=${encodeURIComponent(code)}&password=${encodeURIComponent(password)}`);
-            if (!response.ok) throw new Error('فشل الاتصال بالخادم');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             if (data.success) {
                 loggedInUser = {
@@ -1149,7 +1168,7 @@
             }
         } catch (err) {
             console.error(err);
-            showToast('فشل الاتصال بالخادم، تأكد من الإنترنت', 'error');
+            showToast(`فشل الاتصال بالخادم: ${err.message}. تأكد من الإنترنت وأن الرابط صحيح.`, 'error');
         } finally {
             loginBtn.innerHTML = originalText;
             loginBtn.disabled = false;
@@ -1198,7 +1217,9 @@
     togglePasswordBtn.addEventListener('click', function() {
         const type = loginPassword.getAttribute('type') === 'password' ? 'text' : 'password';
         loginPassword.setAttribute('type', type);
-        this.textContent = type === 'password' ? '👁️' : '🙈';
+        const icon = this.querySelector('i');
+        icon.classList.toggle('fa-eye');
+        icon.classList.toggle('fa-eye-slash');
     });
 
     // ربط الأزرار الرئيسية
