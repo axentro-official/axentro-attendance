@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Axentro | نظام الحضور والانصراف</title>
-    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
@@ -484,7 +483,6 @@
 </head>
 <body>
 
-<!-- زر تسجيل الخروج -->
 <div class="logout-btn" id="logoutBtn" style="display: none;">🚪 تسجيل خروج</div>
 
 <!-- شاشة تسجيل الدخول -->
@@ -553,7 +551,7 @@
             </div>
             <div style="overflow-x: auto;">
                 <table class="report-table" id="reportTable">
-                    <thead> <tr><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th></tr> </thead>
+                    <thead>  <th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th> </thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -578,11 +576,12 @@
         <h3>📝 تسجيل موظف جديد</h3>
         <div class="input-group">
             <input type="text" id="empName" placeholder="اسم الموظف" autocomplete="off">
+            <input type="email" id="empEmail" placeholder="البريد الإلكتروني" autocomplete="off">
             <div class="query-group">
                 <button id="registerBtn" class="btn-register">📸 التقاط الوجه وتسجيل</button>
             </div>
         </div>
-        <div class="register-hint">أدخل الاسم ثم اضغط الزر، سيتم فتح الكاميرا لالتقاط وجهك وحفظه مع كود تلقائي وكلمة سر ترسل على البريد.</div>
+        <div class="register-hint">أدخل الاسم والبريد الإلكتروني ثم اضغط الزر، سيتم فتح الكاميرا لالتقاط وجهك وحفظه مع كود تلقائي وكلمة سر ترسل على البريد.</div>
     </div>
 
     <div class="action-card">
@@ -606,6 +605,7 @@
     const statusDiv = document.getElementById('status');
     const locationDiv = document.getElementById('location');
     const empNameInput = document.getElementById('empName');
+    const empEmailInput = document.getElementById('empEmail');
     const registerBtn = document.getElementById('registerBtn');
     const attendanceBtn = document.getElementById('attendanceBtn');
     const leaveBtn = document.getElementById('leaveBtn');
@@ -636,12 +636,13 @@
     let currentLocation = null;
     let currentAction = null;
     let tempName = null;
+    let tempEmail = null;
     let employeesList = [];
     let currentEmployee = null;
     let loggedInUser = null;
     let currentReportCode = null;
 
-    // الرابط - تأكد من صحته
+    // الرابط الصحيح بعد النشر
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
     // ---------- دوال مساعدة ----------
@@ -838,8 +839,8 @@
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageData = canvas.toDataURL('image/jpeg');
 
-            if (currentAction === 'register' && tempName) {
-                const success = await registerNewEmployee(tempName, descriptor, imageData);
+            if (currentAction === 'register' && tempName && tempEmail) {
+                const success = await registerNewEmployee(tempName, tempEmail, descriptor, imageData);
                 if (success) {
                     showModal('✅ تم التسجيل', `تم إرسال طلب تسجيل الموظف ${tempName} بنجاح.\nسيظهر الكود وكلمة السر على البريد.`, '📸');
                 }
@@ -855,16 +856,18 @@
             closeCamera();
             currentAction = null;
             tempName = null;
+            tempEmail = null;
         }
     }
 
     // ---------- تسجيل موظف جديد ----------
-    async function registerNewEmployee(name, descriptor, imageData) {
+    async function registerNewEmployee(name, email, descriptor, imageData) {
         updateStatus('جاري تسجيل الموظف...', true);
         try {
             const payload = {
                 action: 'register',
                 name: name,
+                email: email,
                 descriptor: Array.from(descriptor),
                 imageData: imageData
             };
@@ -990,10 +993,10 @@
                 data.report.forEach(day => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${day.date}</td>
-                        <td>${day.checkIn || '---'}</td>
-                        <td>${day.checkOut || '---'}</td>
-                        <td>${day.hours || '---'}</td>
+                         <td>${day.date}</td>
+                         <td>${day.checkIn || '---'}</td>
+                         <td>${day.checkOut || '---'}</td>
+                         <td>${day.hours || '---'}</td>
                     `;
                     reportTableBody.appendChild(row);
                 });
@@ -1047,9 +1050,12 @@
     // ---------- معالجة الأزرار ----------
     async function handleRegister() {
         const name = empNameInput.value.trim();
+        const email = empEmailInput.value.trim();
         if (!name) { showToast('يرجى إدخال اسم الموظف', 'warning'); return; }
+        if (!email) { showToast('يرجى إدخال البريد الإلكتروني', 'warning'); return; }
         if (employeesList.some(emp => emp.name === name)) { showToast('هذا الاسم مسجل مسبقاً', 'warning'); return; }
         tempName = name;
+        tempEmail = email;
         currentAction = 'register';
         const opened = await openCamera();
         if (opened) {
@@ -1123,7 +1129,7 @@
         showToast('تم تحديث القائمة', 'success');
     }
 
-    // ---------- تسجيل الدخول (محسن) ----------
+    // ---------- تسجيل الدخول (محسن مع Enter) ----------
     async function login() {
         const code = document.getElementById('loginCode').value.trim();
         const password = document.getElementById('loginPassword').value.trim();
@@ -1133,18 +1139,10 @@
         loginBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> جاري التحقق...';
         loginBtn.disabled = true;
         try {
-            // اختبار الاتصال بالخادم
-            const testResponse = await fetch(GOOGLE_SCRIPT_URL);
-            if (!testResponse.ok) throw new Error(`الخادم لا يستجيب (${testResponse.status})`);
-            console.log('الاتصال بالخادم ناجح');
-
             const url = `${GOOGLE_SCRIPT_URL}?action=verifyLogin&code=${encodeURIComponent(code)}&password=${encodeURIComponent(password)}`;
-            console.log('إرسال طلب إلى:', url);
             const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-            console.log('الاستجابة:', data);
-
             if (data.success) {
                 loggedInUser = {
                     name: data.name || '',
@@ -1177,7 +1175,7 @@
                 showToast(data.error || 'كود أو كلمة سر غير صحيحة', 'error');
             }
         } catch (err) {
-            console.error('خطأ في تسجيل الدخول:', err);
+            console.error(err);
             showToast(`فشل الاتصال بالخادم: ${err.message}. تأكد من الرابط ومن أن الخادم يعمل.`, 'error');
         } finally {
             loginBtn.innerHTML = originalText;
@@ -1197,6 +1195,7 @@
         reportContainer.style.display = 'none';
         searchInput.value = '';
         empNameInput.value = '';
+        empEmailInput.value = '';
     }
 
     // ---------- أحداث البحث ----------
@@ -1231,6 +1230,13 @@
         icon.classList.toggle('fa-eye');
         icon.classList.toggle('fa-eye-slash');
     });
+
+    // تسجيل الدخول بالضغط على Enter
+    const loginCodeInput = document.getElementById('loginCode');
+    const loginPassInput = document.getElementById('loginPassword');
+    const doLogin = () => login();
+    loginCodeInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
+    loginPassInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
 
     // ربط الأزرار الرئيسية
     registerBtn.onclick = handleRegister;
