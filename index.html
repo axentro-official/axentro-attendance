@@ -6,11 +6,8 @@
     <title>Axentro | الحضور بالوجه</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        /* جميع الأنماط كما هي - لم يتم تغييرها */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
@@ -20,10 +17,7 @@
             min-height: 100vh;
             padding: 20px;
         }
-        .container {
-            max-width: 550px;
-            margin: auto;
-        }
+        .container { max-width: 550px; margin: auto; }
         h1 {
             font-size: 28px;
             background: linear-gradient(135deg, #fff, #a5f3fc);
@@ -32,11 +26,7 @@
             color: transparent;
             margin-bottom: 5px;
         }
-        .subtitle {
-            color: #94a3b8;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
+        .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
         .camera-card {
             background: rgba(15, 23, 42, 0.7);
             backdrop-filter: blur(10px);
@@ -44,11 +34,9 @@
             padding: 16px;
             margin-bottom: 24px;
             box-shadow: 0 20px 35px -10px rgba(0,0,0,0.3);
-            display: none; /* إخفاء بطاقة الكاميرا حتى يتم تشغيلها */
+            display: none;
         }
-        .camera-card.active {
-            display: block;
-        }
+        .camera-card.active { display: block; }
         .camera-wrapper {
             position: relative;
             border-radius: 24px;
@@ -57,11 +45,7 @@
             margin-bottom: 15px;
             aspect-ratio: 4 / 3;
         }
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        video { width: 100%; height: 100%; object-fit: cover; }
         .camera-overlay {
             position: absolute;
             top: 0;
@@ -98,10 +82,7 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .admin-card, .action-card {
             background: rgba(30, 41, 59, 0.8);
             backdrop-filter: blur(10px);
@@ -109,11 +90,7 @@
             padding: 20px;
             margin-bottom: 20px;
         }
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
+        .input-group { display: flex; flex-direction: column; gap: 12px; }
         input {
             background: rgba(0,0,0,0.5);
             border: 1px solid #334155;
@@ -123,10 +100,7 @@
             color: white;
             outline: none;
         }
-        input:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
-        }
+        input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.3); }
         button {
             padding: 14px 20px;
             border: none;
@@ -140,32 +114,12 @@
             justify-content: center;
             gap: 8px;
         }
-        button:active {
-            transform: scale(0.97);
-        }
-        .btn-register {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: white;
-        }
-        .btn-attendance {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            flex: 1;
-        }
-        .btn-leave {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-            flex: 1;
-        }
-        .action-card {
-            display: flex;
-            gap: 16px;
-        }
-        .register-hint {
-            font-size: 12px;
-            color: #94a3b8;
-            margin-top: 12px;
-        }
+        button:active { transform: scale(0.97); }
+        .btn-register { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+        .btn-attendance { background: linear-gradient(135deg, #10b981, #059669); color: white; flex: 1; }
+        .btn-leave { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; flex: 1; }
+        .action-card { display: flex; gap: 16px; }
+        .register-hint { font-size: 12px; color: #94a3b8; margin-top: 12px; }
         .name-badge {
             background: linear-gradient(135deg, #3b82f6, #2563eb);
             display: inline-block;
@@ -206,9 +160,7 @@
             text-align: center;
             direction: rtl;
         }
-        .toast-message.show {
-            transform: translateX(-50%) translateY(0);
-        }
+        .toast-message.show { transform: translateX(-50%) translateY(0); }
         .toast-message.success { background: linear-gradient(135deg, #10b981, #059669); }
         .toast-message.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
         .toast-message.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
@@ -317,7 +269,7 @@
             cameraActive = true;
             cameraCard.classList.add('active');
             updateStatus('الكاميرا تعمل. جاري تحميل النماذج...', true);
-            await loadModels(); // تأكد من تحميل النماذج بعد تشغيل الكاميرا
+            await loadModels();
             startRecognition();
         } catch (err) {
             updateStatus('فشل تشغيل الكاميرا: ' + err.message, false);
@@ -325,13 +277,14 @@
         }
     }
 
-    // ------------------- تحميل النماذج -------------------
+    // ------------------- تحميل النماذج (بمسار نسبي) -------------------
     async function loadModels() {
         if (modelsLoaded) return;
         try {
-            await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
-            await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-            await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+            // استخدام المسار النسبي ./models بدلاً من /models
+            await faceapi.nets.ssdMobilenetv1.loadFromUri('./models');
+            await faceapi.nets.faceLandmark68Net.loadFromUri('./models');
+            await faceapi.nets.faceRecognitionNet.loadFromUri('./models');
             modelsLoaded = true;
             updateStatus('النماذج جاهزة. جاري التعرف...', false);
         } catch (err) {
@@ -467,10 +420,8 @@
             showToast('يرجى إدخال اسم الموظف', 'warning');
             return;
         }
-        // إذا لم تكن الكاميرا نشطة، افتحها
         if (!cameraActive) {
             await startCamera();
-            // ننتظر قليلاً حتى تكتمل بدء الكاميرا وتحميل النماذج
             if (!modelsLoaded) {
                 showToast('جاري تجهيز الكاميرا، حاول مرة أخرى بعد لحظة', 'info');
                 return;
@@ -507,7 +458,6 @@
                 return;
             }
         }
-        // ننتظر قليلاً حتى يتم التعرف
         if (!currentName) {
             showToast('الرجاء التوجه نحو الكاميرا للتعرف على الوجه', 'warning');
             return;
@@ -521,7 +471,6 @@
     leaveBtn.onclick = () => handleAttendance('انصراف');
 
     // ------------------- بدء التطبيق (بدون كاميرا) -------------------
-    // نحمّل الموظفين فقط، والكاميرا ستُفتح عند الحاجة
     loadEmployees();
 </script>
 </body>
