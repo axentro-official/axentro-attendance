@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
@@ -89,8 +89,10 @@
             backdrop-filter: blur(4px);
             border: 1px solid rgba(255,255,255,0.2);
             z-index: 20;
+            color: white;
         }
         .capture-btn:active { transform: translateX(-50%) scale(0.96); }
+        .capture-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .status-card, .location-card {
             background: rgba(15, 23, 42, 0.7);
@@ -245,7 +247,7 @@
         .modal.active .modal-content { transform: scale(1); }
         .modal-icon { font-size: 48px; margin-bottom: 16px; }
         .modal-content h3 { font-size: 26px; margin-bottom: 12px; color: white; }
-        .modal-content p { color: #cbd5e1; margin-bottom: 24px; line-height: 1.5; }
+        .modal-content p { color: #cbd5e1; margin-bottom: 24px; line-height: 1.5; white-space: pre-line; }
         .modal-btn {
             background: linear-gradient(135deg, #3b82f6, #2563eb);
             padding: 12px 28px;
@@ -319,6 +321,7 @@
             width: 100%;
             background: linear-gradient(135deg, #3b82f6, #2563eb);
             margin-top: 8px;
+            color: white;
         }
         .back-to-login {
             background: transparent;
@@ -337,6 +340,8 @@
             font-size: 14px;
             cursor: pointer;
             z-index: 100;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
         }
         .search-section {
             background: rgba(30, 41, 59, 0.6);
@@ -361,6 +366,7 @@
             cursor: pointer;
             text-align: right;
         }
+        .datalist-item:hover { background: rgba(59,130,246,0.2); }
         .report-table {
             width: 100%;
             border-collapse: collapse;
@@ -372,6 +378,7 @@
             padding: 8px;
             text-align: center;
         }
+        .report-table th { background: rgba(59,130,246,0.2); }
         .admin-buttons {
             display: flex;
             gap: 12px;
@@ -381,6 +388,11 @@
         .btn-admin {
             background: #475569;
             flex: 1;
+            color: white;
+        }
+        .btn-query {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
         }
         @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -392,7 +404,7 @@
 
 <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
-        <div class="login-icon"><i class="fas fa-user-check"></i></div>
+        <div class="login-icon" style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-user-check"></i></div>
         <h2>نظام إدارة الحضور والانصراف</h2>
         <div class="input-with-icon">
             <i class="fas fa-id-card"></i>
@@ -406,13 +418,13 @@
         <button id="doLoginBtn" class="login-btn">دخول <i class="fas fa-arrow-left"></i></button>
         <button id="showRegisterBtn" class="login-btn back-to-login" style="background: linear-gradient(135deg, #f59e0b, #d97706);">تسجيل موظف جديد</button>
         <p style="margin-top: 12px; font-size: 12px;">للموظفين: الكود وكلمة السر المرسلة على البريد<br>للمدير: كود ADMIN وكلمة سر 1407</p>
-        <div class="login-footer">© 2025 Axentro - All Rights Reserved</div>
+        <div style="margin-top: 12px; font-size: 12px; color: #64748b;">© 2025 Axentro - All Rights Reserved</div>
     </div>
 </div>
 
 <div id="registerOverlay" class="register-overlay" style="display: none;">
     <div class="register-card">
-        <div class="register-icon"><i class="fas fa-user-plus"></i></div>
+        <div class="register-icon" style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-user-plus"></i></div>
         <h2>تسجيل موظف جديد</h2>
         <div class="input-with-icon">
             <i class="fas fa-user"></i>
@@ -424,7 +436,7 @@
         </div>
         <button id="doRegisterBtn" class="register-btn">📸 التقاط الوجه وتسجيل <i class="fas fa-camera"></i></button>
         <button id="backToLoginBtn" class="register-btn back-to-login">عودة إلى تسجيل الدخول</button>
-        <div class="register-footer">© 2025 Axentro - All Rights Reserved</div>
+        <div style="margin-top: 12px; font-size: 12px; color: #64748b;">© 2025 Axentro - All Rights Reserved</div>
     </div>
 </div>
 
@@ -442,7 +454,7 @@
     <div class="location-card" id="location"><span>📍 جاري الحصول على الموقع...</span></div>
 
     <div class="search-section">
-        <div style="display: flex; justify-content: space-between;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
             <h3>🔍 بحث عن موظف</h3>
             <button id="changePasswordBtn" class="btn-query" style="padding: 8px 16px;">🔑 تغيير كلمة السر</button>
         </div>
@@ -526,7 +538,6 @@
     let animationFrameId = null;
 
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
-    
 
     // -------------------- دوال مساعدة --------------------
     let toastTimeout = null;
@@ -567,24 +578,91 @@
         modal.classList.add('active');
     }
 
-    // -------------------- رسم إطار الوجه --------------------
+    // -------------------- رسم إطار الوجه (مُصلح) --------------------
     async function startFaceDetection() {
         if (!modelsLoaded || !video.srcObject) return;
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        
         const detectAndDraw = async () => {
-            if (!video.srcObject || video.paused || video.ended) { animationFrameId = null; return; }
+            if (!video.srcObject || video.paused || video.ended) { 
+                animationFrameId = null; 
+                return; 
+            }
+            
             if (modelsLoaded && video.videoWidth > 0) {
+                // تحديث حجم الكانفاس
                 if (faceCanvas.width !== video.videoWidth || faceCanvas.height !== video.videoHeight) {
                     faceCanvas.width = video.videoWidth;
                     faceCanvas.height = video.videoHeight;
                 }
-                const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
-                canvasCtx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
-                if (detection) {
-                    const dims = { width: video.videoWidth, height: video.videoHeight };
-                    const resized = faceapi.resizeResults(detection, dims);
-                    faceapi.draw.drawDetections(canvasCtx, resized);
-                    faceapi.draw.drawFaceLandmarks(canvasCtx, resized);
+                
+                try {
+                    const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
+                    
+                    // مسح الكانفاس
+                    canvasCtx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
+                    
+                    if (detection) {
+                        const dims = { width: video.videoWidth, height: video.videoHeight };
+                        const resized = faceapi.resizeResults(detection, dims);
+                        
+                        // رسم مربع الوجه
+                        const box = resized.detection.box;
+                        canvasCtx.strokeStyle = '#10b981';
+                        canvasCtx.lineWidth = 3;
+                        canvasCtx.strokeRect(box.x, box.y, box.width, box.height);
+                        
+                        // رسم الزوايا
+                        const cornerLength = 20;
+                        canvasCtx.strokeStyle = '#38bdf8';
+                        canvasCtx.lineWidth = 4;
+                        
+                        // الزاوية العلوية اليسرى
+                        canvasCtx.beginPath();
+                        canvasCtx.moveTo(box.x, box.y + cornerLength);
+                        canvasCtx.lineTo(box.x, box.y);
+                        canvasCtx.lineTo(box.x + cornerLength, box.y);
+                        canvasCtx.stroke();
+                        
+                        // الزاوية العلوية اليمنى
+                        canvasCtx.beginPath();
+                        canvasCtx.moveTo(box.x + box.width - cornerLength, box.y);
+                        canvasCtx.lineTo(box.x + box.width, box.y);
+                        canvasCtx.lineTo(box.x + box.width, box.y + cornerLength);
+                        canvasCtx.stroke();
+                        
+                        // الزاوية السفلية اليسرى
+                        canvasCtx.beginPath();
+                        canvasCtx.moveTo(box.x, box.y + box.height - cornerLength);
+                        canvasCtx.lineTo(box.x, box.y + box.height);
+                        canvasCtx.lineTo(box.x + cornerLength, box.y + box.height);
+                        canvasCtx.stroke();
+                        
+                        // الزاوية السفلية اليمنى
+                        canvasCtx.beginPath();
+                        canvasCtx.moveTo(box.x + box.width - cornerLength, box.y + box.height);
+                        canvasCtx.lineTo(box.x + box.width, box.y + box.height);
+                        canvasCtx.lineTo(box.x + box.width, box.y + box.height - cornerLength);
+                        canvasCtx.stroke();
+                        
+                        // رسم نقاط الوجه (العيون، الأنف، الفم)
+                        const landmarks = resized.landmarks;
+                        canvasCtx.fillStyle = '#38bdf8';
+                        landmarks.positions.forEach(point => {
+                            canvasCtx.beginPath();
+                            canvasCtx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+                            canvasCtx.fill();
+                        });
+                        
+                        // نص "وجه مكتشف"
+                        canvasCtx.fillStyle = '#10b981';
+                        canvasCtx.font = 'bold 16px Cairo, sans-serif';
+                        canvasCtx.direction = 'rtl';
+                        const textWidth = canvasCtx.measureText('✓ وجه مكتشف').width;
+                        canvasCtx.fillText('✓ وجه مكتشف', box.x + box.width - textWidth - 10, box.y - 15);
+                    }
+                } catch (err) {
+                    console.error('Face detection error:', err);
                 }
             }
             animationFrameId = requestAnimationFrame(detectAndDraw);
@@ -665,19 +743,51 @@
         return storedImages ? JSON.parse(storedImages) : [];
     }
 
-    // -------------------- الكاميرا --------------------
+    // -------------------- الكاميرا (مُصلح) --------------------
     async function openCamera() {
         if (stream) closeCamera();
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'user',
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                } 
+            });
             video.srcObject = stream;
-            await video.play();
+            
+            // انتظار تحميل الفيديو بالكامل
+            await new Promise((resolve, reject) => {
+                video.onloadedmetadata = () => {
+                    video.play()
+                        .then(resolve)
+                        .catch(reject);
+                };
+                video.onerror = reject;
+            });
+            
+            // التأكد من أن الفيديو جاهز
+            if (video.readyState < 2) {
+                await new Promise(resolve => {
+                    video.onloadeddata = resolve;
+                });
+            }
+            
             faceCanvas.width = video.videoWidth || 640;
             faceCanvas.height = video.videoHeight || 480;
             cameraContainer.classList.add('active');
-            if (modelsLoaded) startFaceDetection();
+            
+            if (modelsLoaded) {
+                startFaceDetection();
+            }
+            
+            showToast('تم تشغيل الكاميرا بنجاح', 'success');
             return true;
-        } catch (err) { showToast('تعذر الوصول إلى الكاميرا', 'error'); return false; }
+        } catch (err) { 
+            console.error('Camera error:', err);
+            showToast('تعذر الوصول إلى الكاميرا: ' + err.message, 'error'); 
+            return false; 
+        }
     }
 
     function closeCamera() {
@@ -687,33 +797,67 @@
         cameraContainer.classList.remove('active');
     }
 
-    // -------------------- التقاط الوجه للتسجيل --------------------
+    // -------------------- التقاط الوجه للتسجيل (مُصلح) --------------------
     async function captureAndRegister() {
-        if (!modelsLoaded) { showToast('النماذج لم تُحمل بعد', 'warning'); return false; }
-        if (!video.srcObject) { showToast('الكاميرا غير جاهزة', 'error'); return false; }
+        if (!modelsLoaded) { 
+            showToast('النماذج لم تُحمل بعد، يرجى الانتظار', 'warning'); 
+            return false; 
+        }
+        if (!video.srcObject) { 
+            showToast('الكاميرا غير جاهزة', 'error'); 
+            return false; 
+        }
+        
         updateStatus('جاري معالجة الوجه...', true);
+        
         try {
-            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
-            if (!detection) { updateStatus('لم يتم اكتشاف وجه', false); showToast('لم يتم اكتشاف وجه', 'error'); return false; }
+            const detection = await faceapi.detectSingleFace(video)
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+                
+            if (!detection) { 
+                updateStatus('لم يتم اكتشاف وجه، حاول مرة أخرى', false); 
+                showToast('❌ لم يتم اكتشاف وجه', 'error'); 
+                return false; 
+            }
+            
             const descriptor = detection.descriptor;
+            
+            // التقاط الصورة
             const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
-            const imageData = canvas.toDataURL('image/jpeg');
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            
             if (currentAction === 'register' && tempName && tempEmail) {
                 const success = await registerNewEmployee(tempName, tempEmail, descriptor, imageData);
                 if (success) {
-                    showModal('✅ تم التسجيل', `تم تسجيل ${tempName} بنجاح. سيصلك الكود وكلمة السر على البريد.`, '📸', () => {
-                        registerOverlay.style.display = 'none';
-                        loginOverlay.style.display = 'flex';
-                        regNameInput.value = ''; regEmailInput.value = '';
-                    });
+                    showModal('✅ تم التسجيل بنجاح', 
+                        `تم تسجيل الموظف: ${tempName}\nسيصلك كود الموظف وكلمة السر على البريد الإلكتروني.`, 
+                        '📸', 
+                        () => {
+                            registerOverlay.style.display = 'none';
+                            loginOverlay.style.display = 'flex';
+                            regNameInput.value = ''; 
+                            regEmailInput.value = '';
+                        });
                 }
                 return success;
             }
             return false;
-        } catch (err) { console.error(err); showToast('خطأ أثناء معالجة الوجه', 'error'); return false; }
-        finally { updateStatus('جاهز', false); closeCamera(); currentAction = null; tempName = null; tempEmail = null; }
+        } catch (err) { 
+            console.error(err); 
+            showToast('خطأ أثناء معالجة الوجه: ' + err.message, 'error'); 
+            return false; 
+        }
+        finally { 
+            updateStatus('جاهز', false); 
+            closeCamera(); 
+            currentAction = null; 
+            tempName = null; 
+            tempEmail = null; 
+        }
     }
 
     async function registerNewEmployee(name, email, descriptor, imageData) {
@@ -839,7 +983,7 @@
     function getLocation() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-                pos => { currentLocation = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`; locationDiv.innerHTML = `<span>📍 <a href="${currentLocation}" target="_blank">الموقع الحالي</a></span>`; },
+                pos => { currentLocation = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`; locationDiv.innerHTML = `<span>📍 <a href="${currentLocation}" target="_blank" style="color:#38bdf8;">الموقع الحالي</a></span>`; },
                 err => { locationDiv.innerHTML = `<span>⚠️ فشل الحصول على الموقع</span>`; currentLocation = 'غير متوفر'; },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
