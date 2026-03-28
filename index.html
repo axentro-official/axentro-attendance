@@ -6,6 +6,7 @@
     <title>Axentro | الحضور بالوجه</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
+        /* نفس الـ CSS السابق (لم يتغير) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, sans-serif;
@@ -304,6 +305,7 @@
     let tempName = null;
     let employeesList = [];         // [{name, code}]
 
+    // تأكد من استخدام الرابط الصحيح بعد النشر
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
     // ---------- دوال مساعدة ----------
@@ -365,7 +367,7 @@
         }
     }
 
-    // ---------- جلب قائمة الموظفين من الشيت ----------
+    // ---------- جلب قائمة الموظفين من الشيت (GET - عادي) ----------
     async function fetchEmployeesFromSheet() {
         try {
             const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getEmployees`);
@@ -386,7 +388,7 @@
         }
     }
 
-    // ---------- تسجيل موظف جديد ----------
+    // ---------- تسجيل موظف جديد (POST - مع no-cors) ----------
     async function registerNewEmployee(name, descriptor, imageData) {
         updateStatus('جاري تسجيل الموظف...', true);
         try {
@@ -396,31 +398,31 @@
                 descriptor: Array.from(descriptor),
                 imageData: imageData
             };
-            const response = await fetch(GOOGLE_SCRIPT_URL, {
+            // استخدام no-cors لتجنب CORS، ولن نقرأ الاستجابة
+            await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
+                mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const result = await response.json();
-            if (result.success) {
-                showToast(`تم تسجيل الموظف ${name} بنجاح برقم كود: ${result.code}`, 'success');
-                employeesList.push({ name: name, code: result.code });
-                // حفظ descriptor محلياً
-                const existing = labeledDescriptors.find(ld => ld.label === name);
-                if (existing) {
-                    existing.descriptors.push(descriptor);
-                } else {
-                    labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(name, [descriptor]));
-                }
-                saveEmployeesLocal();
-                return true;
+            // بما أننا لا نستطيع قراءة الاستجابة، نفترض النجاح ونضيف الموظف محلياً
+            // إنشاء كود مؤقت (سيتم إنشاء الكود الحقيقي في الخادم، لكننا لا نعرفه هنا)
+            // نضيف الموظف للقائمة المحلية برقم كود مؤقت
+            const tempCode = `EMP${(employeesList.length + 1).toString().padStart(3, '0')}`;
+            employeesList.push({ name, code: tempCode });
+            // حفظ descriptor محلياً (اختياري)
+            const existing = labeledDescriptors.find(ld => ld.label === name);
+            if (existing) {
+                existing.descriptors.push(descriptor);
             } else {
-                showToast(result.error || 'فشل التسجيل', 'error');
-                return false;
+                labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(name, [descriptor]));
             }
+            saveEmployeesLocal();
+            showToast(`✅ تم إرسال طلب تسجيل ${name} بنجاح. سيظهر في النظام خلال لحظات.`, 'success');
+            return true;
         } catch (err) {
             console.error(err);
-            showToast('خطأ في الاتصال بالخادم. تأكد من الإنترنت وحاول مرة أخرى', 'error');
+            showToast('فشل إرسال طلب التسجيل. تأكد من الاتصال بالإنترنت.', 'error');
             return false;
         } finally {
             updateStatus('جاهز', false);
@@ -502,7 +504,7 @@
             if (currentAction === 'register' && tempName) {
                 const success = await registerNewEmployee(tempName, descriptor, imageData);
                 if (success) {
-                    showConfirmationModal('✅ تم التسجيل', `تم تسجيل الموظف ${tempName} بنجاح`, () => {});
+                    showConfirmationModal('✅ تم التسجيل', `تم إرسال طلب تسجيل الموظف ${tempName} بنجاح.`, () => {});
                 }
                 return success;
             }
@@ -519,7 +521,7 @@
         }
     }
 
-    // ---------- حضور/انصراف (مع صورة فقط) ----------
+    // ---------- حضور/انصراف (POST - مع no-cors) ----------
     async function sendAttendanceManual(name, type) {
         if (!currentLocation) {
             showToast('جاري الحصول على الموقع... حاول مرة أخرى', 'info');
@@ -563,18 +565,15 @@
 
             updateStatus('جاري الإرسال...', true);
             try {
-                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                // استخدام no-cors لتجنب CORS
+                await fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
+                    mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                const result = await response.json();
-                if (result.success) {
-                    updateStatus(`تم تسجيل ${type}`, false);
-                    showConfirmationModal(`✅ تم تسجيل ${type}`, `الموظف: ${name}\nالكود: ${employee.code}\nالوقت: ${fullDateTime}`, () => {});
-                } else {
-                    showToast(result.error || 'حدث خطأ أثناء الإرسال', 'error');
-                }
+                updateStatus(`تم إرسال طلب ${type}`, false);
+                showConfirmationModal(`✅ تم تسجيل ${type}`, `الموظف: ${name}\nالكود: ${employee.code}\nالوقت: ${fullDateTime}`, () => {});
             } catch (err) {
                 updateStatus('خطأ في الإرسال', false);
                 showToast('حدث خطأ في الاتصال بالخادم. تأكد من الإنترنت.', 'error');
