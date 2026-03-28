@@ -4,15 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Axentro | الحضور بالوجه</title>
-    <!-- face-api.js من CDN -->
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, sans-serif;
             background: linear-gradient(145deg, #0a0f1e 0%, #0f172a 100%);
@@ -23,27 +17,7 @@
             padding: 20px;
             position: relative;
         }
-
-        /* أنيميشن خلفية متحركة */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle at 20% 50%, rgba(59,130,246,0.1) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: -1;
-        }
-
-        .container {
-            max-width: 550px;
-            margin: auto;
-            position: relative;
-            z-index: 1;
-        }
-
+        .container { max-width: 550px; margin: auto; position: relative; z-index: 1; }
         h1 {
             font-size: 32px;
             background: linear-gradient(135deg, #ffffff, #a5f3fc, #38bdf8);
@@ -51,16 +25,9 @@
             -webkit-background-clip: text;
             color: transparent;
             margin-bottom: 8px;
-            letter-spacing: -0.5px;
             animation: fadeInDown 0.6s ease;
         }
-
-        .subtitle {
-            color: #94a3b8;
-            font-size: 14px;
-            margin-bottom: 24px;
-            animation: fadeInUp 0.6s ease;
-        }
+        .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 24px; animation: fadeInUp 0.6s ease; }
 
         /* كاميرا */
         .camera-container {
@@ -75,24 +42,14 @@
             transform: scale(0.98);
             transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
         }
-
-        .camera-container.active {
-            display: block;
-            transform: scale(1);
-        }
-
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
+        .camera-container.active { display: block; transform: scale(1); }
+        video { width: 100%; height: 100%; object-fit: cover; }
         .capture-btn {
             position: absolute;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: #3b82f6;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
             border: none;
             border-radius: 60px;
             padding: 12px 28px;
@@ -103,12 +60,11 @@
             transition: all 0.2s;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.2);
         }
-
-        .capture-btn:active {
-            transform: translateX(-50%) scale(0.96);
-        }
+        .capture-btn:active { transform: translateX(-50%) scale(0.96); }
 
         /* كروت */
         .status-card, .location-card {
@@ -123,9 +79,7 @@
             justify-content: center;
             gap: 10px;
             border: 1px solid rgba(59,130,246,0.3);
-            transition: all 0.2s;
         }
-
         .spinner {
             width: 20px;
             height: 20px;
@@ -134,7 +88,6 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .admin-card, .action-card {
@@ -146,18 +99,11 @@
             border: 1px solid rgba(59,130,246,0.2);
             transition: transform 0.2s, box-shadow 0.2s;
         }
-
         .admin-card:hover, .action-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 20px 30px -15px rgba(0,0,0,0.3);
         }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
+        .input-group { display: flex; flex-direction: column; gap: 16px; }
         input {
             background: rgba(0,0,0,0.5);
             border: 1px solid #334155;
@@ -168,12 +114,7 @@
             outline: none;
             transition: all 0.2s;
         }
-
-        input:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
-        }
-
+        input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
         button {
             padding: 14px 20px;
             border: none;
@@ -187,43 +128,27 @@
             justify-content: center;
             gap: 8px;
         }
-
-        button:active {
-            transform: scale(0.97);
-        }
-
+        button:active { transform: scale(0.97); }
         .btn-register {
             background: linear-gradient(135deg, #f59e0b, #d97706);
             color: white;
             width: 100%;
             box-shadow: 0 8px 16px -6px rgba(245,158,11,0.3);
         }
-
         .btn-attendance {
             background: linear-gradient(135deg, #10b981, #059669);
             color: white;
             flex: 1;
             box-shadow: 0 8px 16px -6px rgba(16,185,129,0.3);
         }
-
         .btn-leave {
             background: linear-gradient(135deg, #ef4444, #dc2626);
             color: white;
             flex: 1;
             box-shadow: 0 8px 16px -6px rgba(239,68,68,0.3);
         }
-
-        .action-card {
-            display: flex;
-            gap: 16px;
-        }
-
-        .register-hint {
-            font-size: 12px;
-            color: #94a3b8;
-            margin-top: 12px;
-        }
-
+        .action-card { display: flex; gap: 16px; }
+        .register-hint { font-size: 12px; color: #94a3b8; margin-top: 12px; }
         footer {
             background: rgba(0,0,0,0.5);
             backdrop-filter: blur(12px);
@@ -232,7 +157,6 @@
             border-top: 1px solid rgba(255,255,255,0.1);
             border-radius: 32px 32px 0 0;
         }
-
         .qr-image {
             width: 70px;
             height: auto;
@@ -242,12 +166,9 @@
             margin-top: 10px;
             transition: transform 0.2s;
         }
+        .qr-image:hover { transform: scale(1.05); }
 
-        .qr-image:hover {
-            transform: scale(1.05);
-        }
-
-        /* Toast Notifications */
+        /* Toast */
         .toast-message {
             position: fixed;
             bottom: 30px;
@@ -268,26 +189,11 @@
             border: 1px solid rgba(255,255,255,0.2);
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
         }
-
-        .toast-message.show {
-            transform: translateX(-50%) translateY(0);
-        }
-
-        .toast-message.success {
-            background: linear-gradient(135deg, #10b981, #059669);
-        }
-
-        .toast-message.error {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-        }
-
-        .toast-message.warning {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-        }
-
-        .toast-message.info {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-        }
+        .toast-message.show { transform: translateX(-50%) translateY(0); }
+        .toast-message.success { background: linear-gradient(135deg, #10b981, #059669); }
+        .toast-message.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .toast-message.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .toast-message.info { background: linear-gradient(135deg, #3b82f6, #2563eb); }
 
         /* Modal تأكيد */
         .modal {
@@ -306,12 +212,7 @@
             visibility: hidden;
             transition: all 0.3s ease;
         }
-
-        .modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
+        .modal.active { opacity: 1; visibility: visible; }
         .modal-content {
             background: linear-gradient(145deg, #1e293b, #0f172a);
             border-radius: 48px;
@@ -324,11 +225,7 @@
             transform: scale(0.9);
             transition: transform 0.2s;
         }
-
-        .modal.active .modal-content {
-            transform: scale(1);
-        }
-
+        .modal.active .modal-content { transform: scale(1); }
         .modal-content h3 {
             font-size: 26px;
             margin-bottom: 12px;
@@ -337,28 +234,11 @@
             -webkit-background-clip: text;
             color: transparent;
         }
+        .modal-content p { color: #cbd5e1; margin-bottom: 24px; }
+        .modal-btn { background: #3b82f6; padding: 12px 24px; border-radius: 40px; font-weight: bold; }
 
-        .modal-content p {
-            color: #cbd5e1;
-            margin-bottom: 24px;
-        }
-
-        .modal-btn {
-            background: #3b82f6;
-            padding: 12px 24px;
-            border-radius: 40px;
-            font-weight: bold;
-        }
-
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -368,7 +248,7 @@
 
     <div class="camera-container" id="cameraContainer">
         <video id="video" autoplay muted playsinline></video>
-        <button class="capture-btn" id="captureBtn" style="display: none;">📸 التقاط الوجه</button>
+        <button class="capture-btn" id="captureBtn">📸 التقاط الوجه</button>
     </div>
 
     <div class="status-card" id="status">
@@ -404,7 +284,7 @@
 </footer>
 
 <script>
-    // ------------------- عناصر DOM -------------------
+    // ---------- العناصر ----------
     const video = document.getElementById('video');
     const statusDiv = document.getElementById('status');
     const locationDiv = document.getElementById('location');
@@ -415,18 +295,18 @@
     const cameraContainer = document.getElementById('cameraContainer');
     const captureBtn = document.getElementById('captureBtn');
 
-    // ------------------- متغيرات -------------------
+    // ---------- المتغيرات ----------
     let modelsLoaded = false;
     let stream = null;
-    let labeledDescriptors = [];   // لتخزين الـ descriptors محلياً (للتسجيل فقط)
+    let labeledDescriptors = [];
     let currentLocation = null;
     let currentAction = null;      // 'register'
-    let tempName = null;           // اسم الموظف الجديد أثناء التسجيل
-    let employeesList = [];        // قائمة الموظفين من الشيت [{name, code}]
+    let tempName = null;
+    let employeesList = [];         // [{name, code}]
 
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
-    // ------------------- دوال مساعدة -------------------
+    // ---------- دوال مساعدة ----------
     function showToast(message, type = 'info') {
         let toast = document.getElementById('customToast');
         if (!toast) {
@@ -437,14 +317,13 @@
         }
         toast.textContent = message;
         toast.classList.add('show', type);
-        setTimeout(() => toast.classList.remove('show', type), 3500);
+        setTimeout(() => toast.classList.remove('show', type), 4000);
     }
 
     function updateStatus(text, isLoading = false) {
         statusDiv.innerHTML = isLoading ? `<div class="spinner"></div><span>${text}</span>` : `<span>${text}</span>`;
     }
 
-    // Modal تأكيد
     function showConfirmationModal(title, message, onClose) {
         let modal = document.getElementById('confirmationModal');
         if (!modal) {
@@ -469,7 +348,7 @@
         modal.classList.add('active');
     }
 
-    // ------------------- تحميل النماذج -------------------
+    // ---------- تحميل النماذج ----------
     async function loadModels() {
         updateStatus('جاري تحميل نماذج الوجه...', true);
         try {
@@ -486,13 +365,14 @@
         }
     }
 
-    // ------------------- جلب قائمة الموظفين من Google Sheets -------------------
+    // ---------- جلب قائمة الموظفين من الشيت ----------
     async function fetchEmployeesFromSheet() {
         try {
             const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getEmployees`);
+            if (!response.ok) throw new Error('فشل الاتصال بالخادم');
             const data = await response.json();
             if (data.success && data.employees) {
-                employeesList = data.employees; // [{name, code}]
+                employeesList = data.employees;
                 updateStatus(`تم تحميل ${employeesList.length} موظف من السجل`, false);
             } else {
                 employeesList = [];
@@ -501,11 +381,12 @@
         } catch (err) {
             console.error(err);
             employeesList = [];
-            updateStatus('فشل تحميل قائمة الموظفين', false);
+            updateStatus('فشل تحميل قائمة الموظفين - حاول مرة أخرى', false);
+            showToast('تعذر الاتصال بالخادم لجلب الموظفين', 'error');
         }
     }
 
-    // ------------------- تسجيل موظف جديد (إرسال إلى الشيت مع الوجه) -------------------
+    // ---------- تسجيل موظف جديد ----------
     async function registerNewEmployee(name, descriptor, imageData) {
         updateStatus('جاري تسجيل الموظف...', true);
         try {
@@ -523,9 +404,8 @@
             const result = await response.json();
             if (result.success) {
                 showToast(`تم تسجيل الموظف ${name} بنجاح برقم كود: ${result.code}`, 'success');
-                // تحديث القائمة المحلية
                 employeesList.push({ name: name, code: result.code });
-                // حفظ الـ descriptor محلياً
+                // حفظ descriptor محلياً
                 const existing = labeledDescriptors.find(ld => ld.label === name);
                 if (existing) {
                     existing.descriptors.push(descriptor);
@@ -540,14 +420,14 @@
             }
         } catch (err) {
             console.error(err);
-            showToast('خطأ في الاتصال بالخادم', 'error');
+            showToast('خطأ في الاتصال بالخادم. تأكد من الإنترنت وحاول مرة أخرى', 'error');
             return false;
         } finally {
             updateStatus('جاهز', false);
         }
     }
 
-    // ------------------- حفظ الـ descriptors محلياً -------------------
+    // ---------- حفظ/تحميل الـ descriptors محلياً ----------
     function saveEmployeesLocal() {
         const data = labeledDescriptors.map(ld => ({
             label: ld.label,
@@ -567,7 +447,7 @@
         }
     }
 
-    // ------------------- تشغيل الكاميرا -------------------
+    // ---------- الكاميرا ----------
     async function openCamera() {
         if (stream) closeCamera();
         try {
@@ -575,7 +455,6 @@
             video.srcObject = stream;
             await video.play();
             cameraContainer.classList.add('active');
-            captureBtn.style.display = 'flex'; // إظهار زر الالتقاط
             return true;
         } catch (err) {
             showToast('تعذر الوصول إلى الكاميرا', 'error');
@@ -590,10 +469,9 @@
         }
         video.srcObject = null;
         cameraContainer.classList.remove('active');
-        captureBtn.style.display = 'none';
     }
 
-    // ------------------- التقاط الوجه ومعالجته للتسجيل -------------------
+    // ---------- التقاط الوجه للتسجيل ----------
     async function captureAndRegister() {
         if (!modelsLoaded) {
             showToast('النماذج لم تُحمل بعد، انتظر قليلاً', 'warning');
@@ -614,8 +492,6 @@
             }
 
             const descriptor = detection.descriptor;
-
-            // التقاط صورة للإطار الحالي
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -626,9 +502,7 @@
             if (currentAction === 'register' && tempName) {
                 const success = await registerNewEmployee(tempName, descriptor, imageData);
                 if (success) {
-                    showConfirmationModal('✅ تم التسجيل', `تم تسجيل الموظف ${tempName} بنجاح`, () => {
-                        // لا حاجة لإعادة توجيه
-                    });
+                    showConfirmationModal('✅ تم التسجيل', `تم تسجيل الموظف ${tempName} بنجاح`, () => {});
                 }
                 return success;
             }
@@ -645,7 +519,7 @@
         }
     }
 
-    // ------------------- إرسال حضور/انصراف (بدون مقارنة وجه) -------------------
+    // ---------- حضور/انصراف (مع صورة فقط) ----------
     async function sendAttendanceManual(name, type) {
         if (!currentLocation) {
             showToast('جاري الحصول على الموقع... حاول مرة أخرى', 'info');
@@ -653,18 +527,16 @@
             return;
         }
 
-        // التحقق من وجود الموظف في القائمة
         const employee = employeesList.find(emp => emp.name === name);
         if (!employee) {
             showToast('الموظف غير مسجل في النظام. يرجى التسجيل أولاً.', 'error');
-            return false;
+            return;
         }
 
-        // فتح الكاميرا لالتقاط صورة للحضور/الانصراف
         const opened = await openCamera();
-        if (!opened) return false;
+        if (!opened) return;
 
-        // انتظر لحظة حتى تظهر الكاميرا ثم التقط الصورة
+        // انتظر لحظة لظهور الكاميرا ثم التقط الصورة
         setTimeout(async () => {
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
@@ -699,29 +571,27 @@
                 const result = await response.json();
                 if (result.success) {
                     updateStatus(`تم تسجيل ${type}`, false);
-                    showConfirmationModal(`✅ تم تسجيل ${type}`, `الموظف: ${name}\nالكود: ${employee.code}\nالوقت: ${fullDateTime}`, () => {
-                        // رجوع
-                    });
+                    showConfirmationModal(`✅ تم تسجيل ${type}`, `الموظف: ${name}\nالكود: ${employee.code}\nالوقت: ${fullDateTime}`, () => {});
                 } else {
                     showToast(result.error || 'حدث خطأ أثناء الإرسال', 'error');
                 }
             } catch (err) {
                 updateStatus('خطأ في الإرسال', false);
-                showToast('حدث خطأ أثناء الإرسال', 'error');
+                showToast('حدث خطأ في الاتصال بالخادم. تأكد من الإنترنت.', 'error');
+                console.error(err);
             } finally {
                 updateStatus('جاهز', false);
             }
         }, 500);
     }
 
-    // ------------------- معالجة الأزرار -------------------
+    // ---------- معالجة الأزرار ----------
     async function handleRegister() {
         const name = empNameInput.value.trim();
         if (!name) {
             showToast('يرجى إدخال اسم الموظف', 'warning');
             return;
         }
-        // التأكد من أن الاسم غير موجود مسبقاً
         if (employeesList.some(emp => emp.name === name)) {
             showToast('هذا الاسم مسجل مسبقاً', 'warning');
             return;
@@ -730,7 +600,6 @@
         currentAction = 'register';
         const opened = await openCamera();
         if (opened) {
-            // بعد فتح الكاميرا ننتظر المستخدم يضغط زر الالتقاط
             captureBtn.onclick = async () => {
                 captureBtn.disabled = true;
                 await captureAndRegister();
@@ -748,7 +617,7 @@
         sendAttendanceManual(name, type);
     }
 
-    // ------------------- الحصول على الموقع -------------------
+    // ---------- الموقع ----------
     function getLocation() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -770,16 +639,16 @@
         }
     }
 
-    // ------------------- ربط الأزرار -------------------
+    // ---------- ربط الأزرار ----------
     registerBtn.onclick = handleRegister;
     attendanceBtn.onclick = () => handleAttendance('حضور');
     leaveBtn.onclick = () => handleAttendance('انصراف');
 
-    // ------------------- بدء التشغيل -------------------
+    // ---------- بدء التشغيل ----------
     async function init() {
         await loadModels();
         loadEmployeesLocal();
-        await fetchEmployeesFromSheet(); // تحميل قائمة الموظفين من الشيت
+        await fetchEmployeesFromSheet();
         getLocation();
         setInterval(getLocation, 30000);
     }
