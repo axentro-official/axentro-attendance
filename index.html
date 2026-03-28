@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Axentro | نظام الحضور والانصراف</title>
-    <!-- Font Awesome 6 (أيقونات احترافية) -->
+    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
+        /* جميع الأنماط السابقة كما هي (لم تتغير) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, sans-serif;
@@ -486,7 +487,7 @@
 <!-- زر تسجيل الخروج -->
 <div class="logout-btn" id="logoutBtn" style="display: none;">🚪 تسجيل خروج</div>
 
-<!-- شاشة تسجيل الدخول المحسنة -->
+<!-- شاشة تسجيل الدخول -->
 <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
         <div class="login-icon">
@@ -552,7 +553,7 @@
             </div>
             <div style="overflow-x: auto;">
                 <table class="report-table" id="reportTable">
-                    <thead><tr><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th> </thead>
+                    <thead> <tr><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th></tr> </thead>
                     <tbody></tbody>
                 </table>
             </div>
@@ -640,7 +641,7 @@
     let loggedInUser = null;
     let currentReportCode = null;
 
-    // تأكد من استخدام الرابط الصحيح بعد النشر
+    // الرابط - تأكد من صحته
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
     // ---------- دوال مساعدة ----------
@@ -1122,7 +1123,7 @@
         showToast('تم تحديث القائمة', 'success');
     }
 
-    // ---------- تسجيل الدخول ----------
+    // ---------- تسجيل الدخول (محسن) ----------
     async function login() {
         const code = document.getElementById('loginCode').value.trim();
         const password = document.getElementById('loginPassword').value.trim();
@@ -1132,9 +1133,18 @@
         loginBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> جاري التحقق...';
         loginBtn.disabled = true;
         try {
-            const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=verifyLogin&code=${encodeURIComponent(code)}&password=${encodeURIComponent(password)}`);
+            // اختبار الاتصال بالخادم
+            const testResponse = await fetch(GOOGLE_SCRIPT_URL);
+            if (!testResponse.ok) throw new Error(`الخادم لا يستجيب (${testResponse.status})`);
+            console.log('الاتصال بالخادم ناجح');
+
+            const url = `${GOOGLE_SCRIPT_URL}?action=verifyLogin&code=${encodeURIComponent(code)}&password=${encodeURIComponent(password)}`;
+            console.log('إرسال طلب إلى:', url);
+            const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
+            console.log('الاستجابة:', data);
+
             if (data.success) {
                 loggedInUser = {
                     name: data.name || '',
@@ -1167,8 +1177,8 @@
                 showToast(data.error || 'كود أو كلمة سر غير صحيحة', 'error');
             }
         } catch (err) {
-            console.error(err);
-            showToast(`فشل الاتصال بالخادم: ${err.message}. تأكد من الإنترنت وأن الرابط صحيح.`, 'error');
+            console.error('خطأ في تسجيل الدخول:', err);
+            showToast(`فشل الاتصال بالخادم: ${err.message}. تأكد من الرابط ومن أن الخادم يعمل.`, 'error');
         } finally {
             loginBtn.innerHTML = originalText;
             loginBtn.disabled = false;
