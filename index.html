@@ -300,7 +300,7 @@
         .modal-btn:hover { transform: scale(1.02); }
 
         /* Login Overlay */
-        .login-overlay {
+        .login-overlay, .register-overlay {
             position: fixed;
             top: 0;
             left: 0;
@@ -314,8 +314,9 @@
             z-index: 3000;
             animation: fadeIn 0.5s ease;
         }
+        .register-overlay { z-index: 3001; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .login-card {
+        .login-card, .register-card {
             background: rgba(30, 41, 59, 0.8);
             backdrop-filter: blur(16px);
             border-radius: 48px;
@@ -329,7 +330,7 @@
             animation: slideUp 0.5s forwards;
         }
         @keyframes slideUp { to { transform: translateY(0); } }
-        .login-icon {
+        .login-icon, .register-icon {
             font-size: 64px;
             background: linear-gradient(135deg, #3b82f6, #a5f3fc);
             background-clip: text;
@@ -337,7 +338,7 @@
             color: transparent;
             margin-bottom: 16px;
         }
-        .login-card h2 {
+        .login-card h2, .register-card h2 {
             font-size: 24px;
             margin-bottom: 24px;
             color: #f1f5f9;
@@ -383,28 +384,38 @@
             color: #3b82f6;
             background: rgba(255,255,255,0.1);
         }
-        .login-btn {
+        .login-btn, .register-btn {
             width: 100%;
             background: linear-gradient(135deg, #3b82f6, #2563eb);
             margin-top: 8px;
             transition: all 0.2s;
         }
-        .login-btn:hover { transform: scale(1.02); filter: brightness(1.05); }
-        .login-footer {
+        .login-btn:hover, .register-btn:hover { transform: scale(1.02); filter: brightness(1.05); }
+        .register-footer, .login-footer {
             margin-top: 24px;
             padding-top: 16px;
             border-top: 1px solid rgba(255,255,255,0.2);
             font-size: 12px;
             color: #94a3b8;
         }
-        .login-footer img {
+        .register-footer img, .login-footer img {
             width: 60px;
             margin-top: 8px;
             border-radius: 12px;
             background: white;
             padding: 4px;
         }
-
+        .back-to-login {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            margin-top: 12px;
+            width: 100%;
+        }
+        .back-to-login:hover {
+            background: rgba(255,255,255,0.1);
+            transform: scale(1.02);
+        }
         .logout-btn {
             position: fixed;
             top: 20px;
@@ -504,8 +515,39 @@
             </button>
         </div>
         <button id="doLoginBtn" class="login-btn">دخول <i class="fas fa-arrow-left"></i></button>
+        <button id="showRegisterBtn" class="login-btn back-to-login" style="background: linear-gradient(135deg, #f59e0b, #d97706); margin-top: 12px;">
+            <i class="fas fa-user-plus"></i> تسجيل موظف جديد
+        </button>
         <p style="margin-top: 12px; font-size: 12px;">للموظفين: الكود وكلمة السر المرسلة على البريد</p>
         <div class="login-footer">
+            <p>© 2025 Axentro - All Rights Reserved</p>
+            <p>Powered by Axentro System</p>
+            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
+                <img src="qr-links.png" alt="QR Code">
+            </a>
+            <p>Scan Me</p>
+        </div>
+    </div>
+</div>
+
+<!-- شاشة تسجيل موظف جديد منفصلة -->
+<div id="registerOverlay" class="register-overlay" style="display: none;">
+    <div class="register-card">
+        <div class="register-icon">
+            <i class="fas fa-user-plus"></i>
+        </div>
+        <h2>تسجيل موظف جديد</h2>
+        <div class="input-with-icon">
+            <i class="fas fa-user"></i>
+            <input type="text" id="regName" placeholder="اسم الموظف" autocomplete="off">
+        </div>
+        <div class="input-with-icon">
+            <i class="fas fa-envelope"></i>
+            <input type="email" id="regEmail" placeholder="البريد الإلكتروني" autocomplete="off">
+        </div>
+        <button id="doRegisterBtn" class="register-btn">📸 التقاط الوجه وتسجيل <i class="fas fa-camera"></i></button>
+        <button id="backToLoginBtn" class="register-btn back-to-login">عودة إلى تسجيل الدخول</button>
+        <div class="register-footer">
             <p>© 2025 Axentro - All Rights Reserved</p>
             <p>Powered by Axentro System</p>
             <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
@@ -553,7 +595,7 @@
                 <table class="report-table" id="reportTable">
                     <thead>  <th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th> </thead>
                     <tbody></tbody>
-                </table>
+                 </table>
             </div>
         </div>
     </div>
@@ -572,16 +614,8 @@
         </div>
     </div>
 
-    <div class="admin-card">
-        <h3>📝 تسجيل موظف جديد</h3>
-        <div class="input-group">
-            <input type="text" id="empName" placeholder="اسم الموظف" autocomplete="off">
-            <input type="email" id="empEmail" placeholder="البريد الإلكتروني" autocomplete="off">
-            <div class="query-group">
-                <button id="registerBtn" class="btn-register">📸 التقاط الوجه وتسجيل</button>
-            </div>
-        </div>
-        <div class="register-hint">أدخل الاسم والبريد الإلكتروني ثم اضغط الزر، سيتم فتح الكاميرا لالتقاط وجهك وحفظه مع كود تلقائي وكلمة سر ترسل على البريد.</div>
+    <div class="admin-card" id="registerInMain" style="display: none;">
+        <!-- هذا الكارد موجود مسبقاً في الواجهة ولكننا نخفيه لأنه صار منفصلاً -->
     </div>
 
     <div class="action-card">
@@ -604,14 +638,19 @@
     const video = document.getElementById('video');
     const statusDiv = document.getElementById('status');
     const locationDiv = document.getElementById('location');
-    const empNameInput = document.getElementById('empName');
-    const empEmailInput = document.getElementById('empEmail');
-    const registerBtn = document.getElementById('registerBtn');
+    // عناصر التسجيل المنفصل
+    const regNameInput = document.getElementById('regName');
+    const regEmailInput = document.getElementById('regEmail');
+    const doRegisterBtn = document.getElementById('doRegisterBtn');
+    const backToLoginBtn = document.getElementById('backToLoginBtn');
+    const showRegisterBtn = document.getElementById('showRegisterBtn');
+    const registerOverlay = document.getElementById('registerOverlay');
+    const loginOverlay = document.getElementById('loginOverlay');
+    // باقي العناصر الرئيسية
     const attendanceBtn = document.getElementById('attendanceBtn');
     const leaveBtn = document.getElementById('leaveBtn');
     const cameraContainer = document.getElementById('cameraContainer');
     const captureBtn = document.getElementById('captureBtn');
-    const loginOverlay = document.getElementById('loginOverlay');
     const mainContent = document.getElementById('mainContent');
     const footer = document.getElementById('footer');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -842,7 +881,13 @@
             if (currentAction === 'register' && tempName && tempEmail) {
                 const success = await registerNewEmployee(tempName, tempEmail, descriptor, imageData);
                 if (success) {
-                    showModal('✅ تم التسجيل', `تم إرسال طلب تسجيل الموظف ${tempName} بنجاح.\nسيظهر الكود وكلمة السر على البريد.`, '📸');
+                    showModal('✅ تم التسجيل', `تم إرسال طلب تسجيل الموظف ${tempName} بنجاح.\nسيظهر الكود وكلمة السر على البريد.\nيمكنك الآن تسجيل الدخول.`, '📸', () => {
+                        // بعد إغلاق المودال، نعود لشاشة الدخول وننظف الحقول
+                        registerOverlay.style.display = 'none';
+                        loginOverlay.style.display = 'flex';
+                        if (regNameInput) regNameInput.value = '';
+                        if (regEmailInput) regEmailInput.value = '';
+                    });
                 }
                 return success;
             }
@@ -993,10 +1038,10 @@
                 data.report.forEach(day => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                         <td>${day.date}</td>
-                         <td>${day.checkIn || '---'}</td>
-                         <td>${day.checkOut || '---'}</td>
-                         <td>${day.hours || '---'}</td>
+                          <td>${day.date}</td>
+                          <td>${day.checkIn || '---'}</td>
+                          <td>${day.checkOut || '---'}</td>
+                          <td>${day.hours || '---'}</td>
                     `;
                     reportTableBody.appendChild(row);
                 });
@@ -1047,10 +1092,10 @@
         return results;
     }
 
-    // ---------- معالجة الأزرار ----------
-    async function handleRegister() {
-        const name = empNameInput.value.trim();
-        const email = empEmailInput.value.trim();
+    // ---------- معالجة أزرار التسجيل المنفصل ----------
+    async function handleRegisterFromOverlay() {
+        const name = regNameInput.value.trim();
+        const email = regEmailInput.value.trim();
         if (!name) { showToast('يرجى إدخال اسم الموظف', 'warning'); return; }
         if (!email) { showToast('يرجى إدخال البريد الإلكتروني', 'warning'); return; }
         if (employeesList.some(emp => emp.name === name)) { showToast('هذا الاسم مسجل مسبقاً', 'warning'); return; }
@@ -1194,8 +1239,9 @@
         adminPanel.style.display = 'none';
         reportContainer.style.display = 'none';
         searchInput.value = '';
-        empNameInput.value = '';
-        empEmailInput.value = '';
+        // تنظيف حقول التسجيل المنفصل
+        if (regNameInput) regNameInput.value = '';
+        if (regEmailInput) regEmailInput.value = '';
     }
 
     // ---------- أحداث البحث ----------
@@ -1238,8 +1284,24 @@
     loginCodeInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
     loginPassInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
 
+    // ربط أزرار التسجيل المنفصل
+    if (doRegisterBtn) doRegisterBtn.onclick = handleRegisterFromOverlay;
+    if (backToLoginBtn) {
+        backToLoginBtn.onclick = () => {
+            registerOverlay.style.display = 'none';
+            loginOverlay.style.display = 'flex';
+            if (regNameInput) regNameInput.value = '';
+            if (regEmailInput) regEmailInput.value = '';
+        };
+    }
+    if (showRegisterBtn) {
+        showRegisterBtn.onclick = () => {
+            loginOverlay.style.display = 'none';
+            registerOverlay.style.display = 'flex';
+        };
+    }
+
     // ربط الأزرار الرئيسية
-    registerBtn.onclick = handleRegister;
     attendanceBtn.onclick = () => handleAttendance('حضور');
     leaveBtn.onclick = () => handleAttendance('انصراف');
     changePasswordBtn.onclick = changePassword;
