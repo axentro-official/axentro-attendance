@@ -16,8 +16,25 @@ let labeledDescriptors = [];
 let currentLocation = null;
 let currentRecognizedName = null;
 
-// رابط Web App من Google Apps Script
+// رابط Web App
 const googleScriptURL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
+
+// دالة عرض رسالة منبثقة (Toast) بدلاً من alert
+function showToast(message, type = 'info') {
+    // إنشاء عنصر toast إذا لم يكن موجوداً
+    let toast = document.getElementById('customToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'customToast';
+        toast.className = 'toast-message';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add('show', type);
+    setTimeout(() => {
+        toast.classList.remove('show', type);
+    }, 3000);
+}
 
 // تحميل النماذج
 async function loadModels() {
@@ -31,6 +48,7 @@ async function loadModels() {
     } catch (err) {
         updateStatus('خطأ في تحميل النماذج: ' + err.message, false);
         console.error(err);
+        showToast('فشل تحميل نماذج التعرف', 'error');
     }
 }
 
@@ -38,10 +56,11 @@ function updateStatus(text, isLoading) {
     statusDiv.innerHTML = isLoading ? `<div class="spinner"></div><span>${text}</span>` : `<span>${text}</span>`;
 }
 
-// تشغيل الكاميرا
+// تشغيل الكاميرا (تطلب الكاميرا الأمامية)
 async function startVideo() {
     try {
-        currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        // طلب الكاميرا الأمامية
+        currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'user' } } });
         video.srcObject = currentStream;
         video.play();
         updateStatus('الكاميرا تعمل. انتظر التعرف...', false);
@@ -49,8 +68,21 @@ async function startVideo() {
             recognizeFaceContinuously();
         };
     } catch (err) {
-        updateStatus('خطأ في الكاميرا: يرجى السماح بالوصول إلى الكاميرا', false);
-        console.error(err);
+        // إذا فشلت الكاميرا الأمامية، جرب أي كاميرا
+        console.warn('فشل طلب الكاميرا الأمامية، نحاول أي كاميرا:', err);
+        try {
+            currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = currentStream;
+            video.play();
+            updateStatus('الكاميرا تعمل (كاميرا خلفية). انتظر التعرف...', false);
+            video.onloadedmetadata = () => {
+                recognizeFaceContinuously();
+            };
+        } catch (err2) {
+            updateStatus('خطأ في الكاميرا: يرجى السماح بالوصول إلى الكاميرا', false);
+            console.error(err2);
+            showToast('تعذر الوصول إلى الكاميرا. تأكد من منح الإذن.', 'error');
+        }
     }
 }
 
@@ -67,6 +99,7 @@ function getLocation() {
             (error) => {
                 locationDiv.innerHTML = `<span>⚠️ فشل الحصول على الموقع: ${error.message}</span>`;
                 currentLocation = 'غير متوفر';
+                showToast('تعذر الحصول على الموقع', 'warning');
             },
             { enableHighAccuracy: true, timeout: 10000 }
         );
@@ -76,7 +109,7 @@ function getLocation() {
     }
 }
 
-// تحميل الموظفين من localStorage
+// تحميل الموظفين
 function loadEmployees() {
     const stored = localStorage.getItem('axentro_face_descriptors');
     if (stored) {
@@ -103,7 +136,7 @@ function saveEmployees() {
     updateStatus(`تم حفظ ${labeledDescriptors.length} موظف`, false);
 }
 
-// التعرف المستمر على الوجه
+// التعرف المستمر
 async function recognizeFaceContinuously() {
     if (!modelsLoaded) return;
     const displaySize = { width: video.videoWidth, height: video.videoHeight };
@@ -147,14 +180,14 @@ function captureImage() {
     return canvas.toDataURL('image/jpeg');
 }
 
-// إرسال البيانات إلى Google Apps Script
+// إرسال البيانات
 async function sendAttendance(name, type) {
     if (!name) {
-        alert('لم يتم التعرف على الوجه. تأكد من وضوح وجهك أمام الكاميرا.');
+        showToast('لم يتم التعرف على الوجه. تأكد من وضوح وجهك أمام الكاميرا.', 'warning');
         return;
     }
     if (!currentLocation) {
-        alert('جاري الحصول على الموقع... حاول مرة أخرى بعد ثانية');
+        showToast('جاري الحصول على الموقع... حاول مرة أخرى بعد ثانية', 'info');
         getLocation();
         setTimeout(() => sendAttendance(name, type), 1000);
         return;
@@ -181,11 +214,11 @@ async function sendAttendance(name, type) {
             body: JSON.stringify(payload)
         });
         updateStatus(`تم تسجيل ${type} بنجاح للموظف ${name}`, false);
-        alert(`✅ تم تسجيل ${type}`);
+        showToast(`✅ تم تسجيل ${type}`, 'success');
     } catch (err) {
         updateStatus('خطأ في الإرسال', false);
         console.error(err);
-        alert('حدث خطأ أثناء الإرسال، حاول مرة أخرى');
+        showToast('حدث خطأ أثناء الإرسال، حاول مرة أخرى', 'error');
     }
 }
 
@@ -193,14 +226,18 @@ async function sendAttendance(name, type) {
 async function registerEmployee() {
     const name = empNameInput.value.trim();
     if (!name) {
-        alert('يرجى إدخال اسم الموظف');
+        showToast('يرجى إدخال اسم الموظف', 'warning');
+        return;
+    }
+    if (!video.srcObject) {
+        showToast('الكاميرا غير جاهزة. انتظر قليلاً', 'warning');
         return;
     }
     updateStatus('جاري التقاط الوجه...', true);
     const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
     if (!detection) {
         updateStatus('لم يتم اكتشاف وجه. تأكد من وجود وجه أمام الكاميرا', false);
-        alert('لم يتم اكتشاف وجه، حاول مرة أخرى');
+        showToast('لم يتم اكتشاف وجه، حاول مرة أخرى', 'error');
         return;
     }
     const descriptor = detection.descriptor;
@@ -208,16 +245,17 @@ async function registerEmployee() {
     if (existing) {
         existing.descriptors.push(descriptor);
         updateStatus(`تمت إضافة واصف جديد للموظف ${name}`, false);
+        showToast(`تم تحديث بيانات ${name}`, 'success');
     } else {
         labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(name, [descriptor]));
         updateStatus(`تم تسجيل الموظف ${name} بنجاح`, false);
+        showToast(`تم تسجيل ${name} بنجاح`, 'success');
     }
     saveEmployees();
     empNameInput.value = '';
-    alert(`تم تسجيل ${name} بنجاح`);
 }
 
-// ربط الأزرار
+// الأحداث
 attendanceBtn.onclick = () => sendAttendance(currentRecognizedName, 'حضور');
 leaveBtn.onclick = () => sendAttendance(currentRecognizedName, 'انصراف');
 registerBtn.onclick = registerEmployee;
