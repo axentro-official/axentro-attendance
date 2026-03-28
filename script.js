@@ -16,7 +16,7 @@ let labeledDescriptors = [];
 let currentLocation = null;
 let currentRecognizedName = null;
 
-// رابط Web App الجديد
+// رابط Web App من Google Apps Script
 const googleScriptURL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
 // تحميل النماذج
@@ -76,7 +76,7 @@ function getLocation() {
     }
 }
 
-// تحميل الموظفين
+// تحميل الموظفين من localStorage
 function loadEmployees() {
     const stored = localStorage.getItem('axentro_face_descriptors');
     if (stored) {
@@ -103,7 +103,7 @@ function saveEmployees() {
     updateStatus(`تم حفظ ${labeledDescriptors.length} موظف`, false);
 }
 
-// التعرف المستمر
+// التعرف المستمر على الوجه
 async function recognizeFaceContinuously() {
     if (!modelsLoaded) return;
     const displaySize = { width: video.videoWidth, height: video.videoHeight };
@@ -115,7 +115,6 @@ async function recognizeFaceContinuously() {
         const resizedDetections = faceapi.resizeResults(detections, displaySize);
         
         if (resizedDetections.length > 0 && labeledDescriptors.length > 0) {
-            // إظهار مؤشر الوجه
             faceIndicator.classList.add('active');
             const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
             const bestMatch = faceMatcher.findBestMatch(resizedDetections[0].descriptor);
@@ -148,7 +147,7 @@ function captureImage() {
     return canvas.toDataURL('image/jpeg');
 }
 
-// إرسال البيانات
+// إرسال البيانات إلى Google Apps Script
 async function sendAttendance(name, type) {
     if (!name) {
         alert('لم يتم التعرف على الوجه. تأكد من وضوح وجهك أمام الكاميرا.');
@@ -229,5 +228,5 @@ registerBtn.onclick = registerEmployee;
     modelsLoaded = true;
     loadEmployees();
     getLocation();
-    setInterval(getLocation, 30000); // تحديث الموقع كل 30 ثانية
+    setInterval(getLocation, 30000);
 })();
