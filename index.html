@@ -62,7 +62,15 @@
             transition: all 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
         }
         .camera-container.active { display: block; transform: scale(1); }
-        video { width: 100%; height: 100%; object-fit: cover; }
+        video { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; }
+        .face-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
         .capture-btn {
             position: absolute;
             bottom: 20px;
@@ -82,10 +90,11 @@
             gap: 10px;
             backdrop-filter: blur(4px);
             border: 1px solid rgba(255,255,255,0.2);
+            z-index: 20;
         }
         .capture-btn:active { transform: translateX(-50%) scale(0.96); }
 
-        /* كروت */
+        /* باقي الأنماط كما هي (محذوفة للاختصار، لكنها موجودة في الكود الأصلي) */
         .status-card, .location-card {
             background: rgba(15, 23, 42, 0.7);
             backdrop-filter: blur(12px);
@@ -505,7 +514,7 @@
         <h2>نظام إدارة الحضور والانصراف</h2>
         <div class="input-with-icon">
             <i class="fas fa-id-card"></i>
-            <input type="text" id="loginCode" placeholder="الكود (مثال: EMP001)" autocomplete="off">
+            <input type="text" id="loginCode" placeholder="الكود (مثال: EMP001 أو ADMIN)" autocomplete="off">
         </div>
         <div class="input-with-icon">
             <i class="fas fa-lock"></i>
@@ -518,7 +527,7 @@
         <button id="showRegisterBtn" class="login-btn back-to-login" style="background: linear-gradient(135deg, #f59e0b, #d97706); margin-top: 12px;">
             <i class="fas fa-user-plus"></i> تسجيل موظف جديد
         </button>
-        <p style="margin-top: 12px; font-size: 12px;">للموظفين: الكود وكلمة السر المرسلة على البريد</p>
+        <p style="margin-top: 12px; font-size: 12px;">للموظفين: الكود وكلمة السر المرسلة على البريد<br>للمدير: كود ADMIN وكلمة سر 1407</p>
         <div class="login-footer">
             <p>© 2025 Axentro - All Rights Reserved</p>
             <p>Powered by Axentro System</p>
@@ -564,6 +573,7 @@
 
     <div class="camera-container" id="cameraContainer">
         <video id="video" autoplay muted playsinline></video>
+        <canvas id="faceCanvas" class="face-canvas"></canvas>
         <button class="capture-btn" id="captureBtn">📸 التقاط الوجه</button>
     </div>
 
@@ -593,9 +603,9 @@
             </div>
             <div style="overflow-x: auto;">
                 <table class="report-table" id="reportTable">
-                    <thead>  <th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th> </thead>
+                    <thead><tr><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th></tr></thead>
                     <tbody></tbody>
-                 </table>
+                </table>
             </div>
         </div>
     </div>
@@ -612,10 +622,6 @@
                 <p>قائمة الموظفين ستظهر هنا...</p>
             </div>
         </div>
-    </div>
-
-    <div class="admin-card" id="registerInMain" style="display: none;">
-        <!-- هذا الكارد موجود مسبقاً في الواجهة ولكننا نخفيه لأنه صار منفصلاً -->
     </div>
 
     <div class="action-card">
@@ -636,6 +642,8 @@
 <script>
     // ---------- العناصر ----------
     const video = document.getElementById('video');
+    const faceCanvas = document.getElementById('faceCanvas');
+    const canvasCtx = faceCanvas.getContext('2d');
     const statusDiv = document.getElementById('status');
     const locationDiv = document.getElementById('location');
     // عناصر التسجيل المنفصل
@@ -680,6 +688,7 @@
     let currentEmployee = null;
     let loggedInUser = null;
     let currentReportCode = null;
+    let animationFrameId = null; // for face detection drawing
 
     // الرابط الصحيح بعد النشر
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
@@ -728,6 +737,39 @@
         modal.querySelector('h3').textContent = title;
         modal.querySelector('p').textContent = message;
         modal.classList.add('active');
+    }
+
+    // ---------- رسم إطار الوجه ----------
+    async function startFaceDetection() {
+        if (!modelsLoaded || !video.srcObject) return;
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        
+        const detectAndDraw = async () => {
+            if (!video.srcObject || video.paused || video.ended) {
+                animationFrameId = null;
+                return;
+            }
+            if (modelsLoaded && video.videoWidth > 0) {
+                const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
+                canvasCtx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
+                if (detection) {
+                    const dims = { width: video.videoWidth, height: video.videoHeight };
+                    const resized = faceapi.resizeResults(detection, dims);
+                    faceapi.draw.drawDetections(canvasCtx, resized);
+                    faceapi.draw.drawFaceLandmarks(canvasCtx, resized);
+                }
+            }
+            animationFrameId = requestAnimationFrame(detectAndDraw);
+        };
+        detectAndDraw();
+    }
+
+    function stopFaceDetection() {
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        canvasCtx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
     }
 
     // ---------- تحميل النماذج ----------
@@ -833,7 +875,12 @@
             stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
             await video.play();
+            // تعيين أبعاد canvas لتطابق الفيديو
+            faceCanvas.width = video.videoWidth || 640;
+            faceCanvas.height = video.videoHeight || 480;
             cameraContainer.classList.add('active');
+            // بدء رسم الوجه إذا كانت النماذج محملة
+            if (modelsLoaded) startFaceDetection();
             return true;
         } catch (err) {
             showToast('تعذر الوصول إلى الكاميرا', 'error');
@@ -842,6 +889,7 @@
     }
 
     function closeCamera() {
+        stopFaceDetection();
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
@@ -898,14 +946,14 @@
             return false;
         } finally {
             updateStatus('جاهز', false);
-            closeCamera();
+            closeCamera(); // تأكيد إغلاق الكاميرا في كل الأحوال
             currentAction = null;
             tempName = null;
             tempEmail = null;
         }
     }
 
-    // ---------- تسجيل موظف جديد ----------
+    // ---------- تسجيل موظف جديد (مع استجابة) ----------
     async function registerNewEmployee(name, email, descriptor, imageData) {
         updateStatus('جاري تسجيل الموظف...', true);
         try {
@@ -916,13 +964,16 @@
                 descriptor: Array.from(descriptor),
                 imageData: imageData
             };
-            await fetch(GOOGLE_SCRIPT_URL, {
+            const response = await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
-                mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const tempCode = `EMP${(employeesList.length + 1).toString().padStart(3, '0')}`;
+            const result = await response.json();
+            if (!result.success) {
+                throw new Error(result.error || 'فشل التسجيل في الخادم');
+            }
+            const tempCode = result.code || `EMP${(employeesList.length + 1).toString().padStart(3, '0')}`;
             const newEmployee = { name, code: tempCode, imageData };
             employeesList.push(newEmployee);
             const existing = labeledDescriptors.find(ld => ld.label === name);
@@ -933,7 +984,7 @@
             return true;
         } catch (err) {
             console.error(err);
-            showToast('فشل إرسال طلب التسجيل. تأكد من الاتصال بالإنترنت.', 'error');
+            showToast(err.message || 'فشل إرسال طلب التسجيل. تأكد من الاتصال بالإنترنت.', 'error');
             return false;
         } finally {
             updateStatus('جاهز', false);
@@ -973,12 +1024,13 @@
 
         updateStatus('جاري الإرسال...', true);
         try {
-            await fetch(GOOGLE_SCRIPT_URL, {
+            const response = await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
-                mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error || 'فشل الإرسال');
             updateStatus(`تم إرسال طلب ${type}`, false);
             const icon = type === 'حضور' ? '✅' : '🚪';
             showModal(`تم تسجيل ${type}`, `الموظف: ${employee.name}\nالكود: ${employee.code}\nالوقت: ${fullDateTime}`, icon);
@@ -1038,10 +1090,10 @@
                 data.report.forEach(day => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                          <td>${day.date}</td>
-                          <td>${day.checkIn || '---'}</td>
-                          <td>${day.checkOut || '---'}</td>
-                          <td>${day.hours || '---'}</td>
+                           <td>${day.date}</td>
+                           <td>${day.checkIn || '---'}</td>
+                           <td>${day.checkOut || '---'}</td>
+                           <td>${day.hours || '---'}</td>
                     `;
                     reportTableBody.appendChild(row);
                 });
@@ -1099,6 +1151,13 @@
         if (!name) { showToast('يرجى إدخال اسم الموظف', 'warning'); return; }
         if (!email) { showToast('يرجى إدخال البريد الإلكتروني', 'warning'); return; }
         if (employeesList.some(emp => emp.name === name)) { showToast('هذا الاسم مسجل مسبقاً', 'warning'); return; }
+        
+        // التأكد من تحميل النماذج قبل فتح الكاميرا
+        if (!modelsLoaded) {
+            showToast('النماذج لا تزال تُحمل، انتظر قليلاً...', 'warning');
+            return;
+        }
+        
         tempName = name;
         tempEmail = email;
         currentAction = 'register';
@@ -1174,7 +1233,7 @@
         showToast('تم تحديث القائمة', 'success');
     }
 
-    // ---------- تسجيل الدخول (محسن مع Enter) ----------
+    // ---------- تسجيل الدخول (محسن) ----------
     async function login() {
         const code = document.getElementById('loginCode').value.trim();
         const password = document.getElementById('loginPassword').value.trim();
@@ -1191,7 +1250,7 @@
             if (data.success) {
                 loggedInUser = {
                     name: data.name || '',
-                    code: data.code || '',
+                    code: data.code || code,
                     isAdmin: data.isAdmin || false
                 };
                 sessionStorage.setItem('axentro_user', JSON.stringify(loggedInUser));
@@ -1199,6 +1258,13 @@
                 mainContent.style.display = 'block';
                 footer.style.display = 'block';
                 logoutBtn.style.display = 'block';
+                
+                // جلب قائمة الموظفين بعد تسجيل الدخول
+                const fetchSuccess = await fetchEmployeesFromSheet();
+                if (!fetchSuccess && !loggedInUser.isAdmin) {
+                    showToast('تم تسجيل الدخول ولكن لا يمكن تحميل بيانات الموظفين، حاول تحديث الصفحة', 'warning');
+                }
+                
                 if (loggedInUser.isAdmin) {
                     adminPanel.style.display = 'block';
                     changePasswordBtn.style.display = 'none';
@@ -1206,14 +1272,15 @@
                     adminPanel.style.display = 'none';
                     changePasswordBtn.style.display = 'block';
                     currentEmployee = employeesList.find(emp => emp.code === loggedInUser.code);
-                    searchInput.value = `${loggedInUser.name} (${loggedInUser.code})`;
-                    currentReportCode = loggedInUser.code;
-                    const now = new Date();
-                    const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-                    reportMonth.value = currentMonth;
-                    loadReport(loggedInUser.code, currentMonth);
+                    if (currentEmployee) {
+                        searchInput.value = `${currentEmployee.name} (${currentEmployee.code})`;
+                        currentReportCode = loggedInUser.code;
+                        const now = new Date();
+                        const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+                        reportMonth.value = currentMonth;
+                        loadReport(loggedInUser.code, currentMonth);
+                    }
                 }
-                await fetchEmployeesFromSheet();
                 getLocation();
                 setInterval(getLocation, 30000);
             } else {
@@ -1229,6 +1296,7 @@
     }
 
     function logout() {
+        closeCamera();
         loggedInUser = null;
         sessionStorage.removeItem('axentro_user');
         loginOverlay.style.display = 'flex';
@@ -1331,12 +1399,14 @@
                     adminPanel.style.display = 'none';
                     changePasswordBtn.style.display = 'block';
                     currentEmployee = employeesList.find(emp => emp.code === loggedInUser.code);
-                    searchInput.value = `${loggedInUser.name} (${loggedInUser.code})`;
-                    currentReportCode = loggedInUser.code;
-                    const now = new Date();
-                    const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-                    reportMonth.value = currentMonth;
-                    loadReport(loggedInUser.code, currentMonth);
+                    if (currentEmployee) {
+                        searchInput.value = `${currentEmployee.name} (${currentEmployee.code})`;
+                        currentReportCode = loggedInUser.code;
+                        const now = new Date();
+                        const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+                        reportMonth.value = currentMonth;
+                        loadReport(loggedInUser.code, currentMonth);
+                    }
                 }
                 getLocation();
                 setInterval(getLocation, 30000);
