@@ -1,0 +1,114 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f2f5;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    direction: rtl;
+}
+.container {
+    max-width: 500px;
+    margin: auto;
+    padding: 20px;
+}
+h1 {
+    font-size: 24px;
+    color: #1a73e8;
+}
+.subtitle {
+    color: #666;
+    margin-top: -10px;
+    margin-bottom: 20px;
+}
+.camera-container {
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+video {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+#status, #location {
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    margin: 10px 0;
+    font-size: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.admin-panel {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    margin: 15px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+input {
+    width: 80%;
+    padding: 10px;
+    margin: 8px 0;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 16px;
+}
+button {
+    padding: 10px 20px;
+    margin: 5px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+button:active {
+    transform: scale(0.97);
+}
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+#registerBtn {
+    background-color: #ffc107;
+    color: black;
+}
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 20px 0;
+}
+footer {
+    background: #1e2a3a;
+    color: white;
+    padding: 20px 10px;
+    margin-top: 30px;
+}
+.footer-content {
+    max-width: 500px;
+    margin: auto;
+}
+.qr-container {
+    margin-top: 10px;
+}
+.qr-image {
+    width: 80px;
+    height: auto;
+    border-radius: 8px;
+    background: white;
+    padding: 5px;
+}
+footer a {
+    color: #ffc107;
+    text-decoration: none;
+}
+footer p {
+    margin: 5px 0;
+    font-size: 12px;
+}
