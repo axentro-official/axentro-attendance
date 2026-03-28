@@ -6,7 +6,6 @@
     <title>Axentro | الحضور بالوجه</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
-        /* نفس الـ CSS السابق (لم يتغير) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, sans-serif;
@@ -104,7 +103,25 @@
             transform: translateY(-4px);
             box-shadow: 0 20px 30px -15px rgba(0,0,0,0.3);
         }
-        .input-group { display: flex; flex-direction: column; gap: 16px; }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .query-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .query-group input {
+            flex: 1;
+        }
+        .btn-query {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            padding: 14px 20px;
+            white-space: nowrap;
+        }
         input {
             background: rgba(0,0,0,0.5);
             border: 1px solid #334155;
@@ -190,21 +207,23 @@
             border: 1px solid rgba(255,255,255,0.2);
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
         }
-        .toast-message.show { transform: translateX(-50%) translateY(0); }
+        .toast-message.show {
+            transform: translateX(-50%) translateY(0);
+        }
         .toast-message.success { background: linear-gradient(135deg, #10b981, #059669); }
         .toast-message.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
         .toast-message.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
         .toast-message.info { background: linear-gradient(135deg, #3b82f6, #2563eb); }
 
-        /* Modal تأكيد */
+        /* Modal */
         .modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.7);
-            backdrop-filter: blur(8px);
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(12px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -217,16 +236,21 @@
         .modal-content {
             background: linear-gradient(145deg, #1e293b, #0f172a);
             border-radius: 48px;
-            padding: 32px 24px;
-            max-width: 320px;
-            width: 85%;
+            padding: 32px 28px;
+            max-width: 360px;
+            width: 90%;
             text-align: center;
-            border: 1px solid rgba(59,130,246,0.4);
-            box-shadow: 0 25px 40px -12px black;
+            border: 1px solid rgba(59,130,246,0.5);
+            box-shadow: 0 25px 40px -12px rgba(0,0,0,0.6);
             transform: scale(0.9);
             transition: transform 0.2s;
+            position: relative;
         }
         .modal.active .modal-content { transform: scale(1); }
+        .modal-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
         .modal-content h3 {
             font-size: 26px;
             margin-bottom: 12px;
@@ -235,8 +259,23 @@
             -webkit-background-clip: text;
             color: transparent;
         }
-        .modal-content p { color: #cbd5e1; margin-bottom: 24px; }
-        .modal-btn { background: #3b82f6; padding: 12px 24px; border-radius: 40px; font-weight: bold; }
+        .modal-content p {
+            color: #cbd5e1;
+            margin-bottom: 24px;
+            line-height: 1.5;
+            white-space: pre-line;
+        }
+        .modal-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: bold;
+            border: none;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .modal-btn:hover { transform: scale(1.02); }
 
         @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -264,9 +303,12 @@
         <h3>📝 تسجيل موظف جديد</h3>
         <div class="input-group">
             <input type="text" id="empName" placeholder="اسم الموظف" autocomplete="off">
-            <button id="registerBtn" class="btn-register">📸 التقاط الوجه وتسجيل</button>
+            <div class="query-group">
+                <button id="queryBtn" class="btn-query">🔍 استعلام</button>
+                <button id="registerBtn" class="btn-register">📸 التقاط الوجه وتسجيل</button>
+            </div>
         </div>
-        <div class="register-hint">أدخل الاسم ثم اضغط الزر، سيتم فتح الكاميرا لالتقاط وجهك وحفظه مع كود تلقائي.</div>
+        <div class="register-hint">أدخل الاسم واضغط "استعلام" للتحقق من التسجيل، أو قم بالتسجيل مباشرة.</div>
     </div>
 
     <div class="action-card">
@@ -290,6 +332,7 @@
     const statusDiv = document.getElementById('status');
     const locationDiv = document.getElementById('location');
     const empNameInput = document.getElementById('empName');
+    const queryBtn = document.getElementById('queryBtn');
     const registerBtn = document.getElementById('registerBtn');
     const attendanceBtn = document.getElementById('attendanceBtn');
     const leaveBtn = document.getElementById('leaveBtn');
@@ -299,16 +342,17 @@
     // ---------- المتغيرات ----------
     let modelsLoaded = false;
     let stream = null;
-    let labeledDescriptors = [];
+    let labeledDescriptors = [];          // للتسجيل المحلي
     let currentLocation = null;
-    let currentAction = null;      // 'register'
+    let currentAction = null;             // 'register'
     let tempName = null;
-    let employeesList = [];         // [{name, code}]
+    let employeesList = [];               // [{name, code, imageData}]
+    let currentEmployee = null;           // الموظف المختار بعد الاستعلام
 
-    // تأكد من استخدام الرابط الصحيح بعد النشر
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
     // ---------- دوال مساعدة ----------
+    let toastTimeout = null;
     function showToast(message, type = 'info') {
         let toast = document.getElementById('customToast');
         if (!toast) {
@@ -317,16 +361,20 @@
             toast.className = 'toast-message';
             document.body.appendChild(toast);
         }
+        // إلغاء المهلة السابقة إذا وجدت
+        if (toastTimeout) clearTimeout(toastTimeout);
         toast.textContent = message;
-        toast.classList.add('show', type);
-        setTimeout(() => toast.classList.remove('show', type), 4000);
+        toast.className = `toast-message ${type} show`;
+        toastTimeout = setTimeout(() => {
+            toast.classList.remove('show');
+        }, 4000);
     }
 
     function updateStatus(text, isLoading = false) {
         statusDiv.innerHTML = isLoading ? `<div class="spinner"></div><span>${text}</span>` : `<span>${text}</span>`;
     }
 
-    function showConfirmationModal(title, message, onClose) {
+    function showModal(title, message, icon = '✅', onClose = null) {
         let modal = document.getElementById('confirmationModal');
         if (!modal) {
             modal = document.createElement('div');
@@ -334,6 +382,7 @@
             modal.className = 'modal';
             modal.innerHTML = `
                 <div class="modal-content">
+                    <div class="modal-icon"></div>
                     <h3></h3>
                     <p></p>
                     <button class="modal-btn">رجوع</button>
@@ -345,6 +394,7 @@
                 if (onClose) onClose();
             };
         }
+        modal.querySelector('.modal-icon').textContent = icon;
         modal.querySelector('h3').textContent = title;
         modal.querySelector('p').textContent = message;
         modal.classList.add('active');
@@ -367,14 +417,23 @@
         }
     }
 
-    // ---------- جلب قائمة الموظفين من الشيت (GET - عادي) ----------
+    // ---------- جلب قائمة الموظفين من الشيت (GET) ----------
     async function fetchEmployeesFromSheet() {
         try {
             const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getEmployees`);
             if (!response.ok) throw new Error('فشل الاتصال بالخادم');
             const data = await response.json();
             if (data.success && data.employees) {
-                employeesList = data.employees;
+                // ندمج مع البيانات المحلية (الصور)
+                const localData = loadEmployeesLocal(); // نحمّل من localStorage
+                employeesList = data.employees.map(emp => {
+                    const local = localData.find(l => l.name === emp.name);
+                    return {
+                        name: emp.name,
+                        code: emp.code,
+                        imageData: local ? local.imageData : null
+                    };
+                });
                 updateStatus(`تم تحميل ${employeesList.length} موظف من السجل`, false);
             } else {
                 employeesList = [];
@@ -388,7 +447,24 @@
         }
     }
 
-    // ---------- تسجيل موظف جديد (POST - مع no-cors) ----------
+    // ---------- استعلام عن موظف ----------
+    function queryEmployee() {
+        const name = empNameInput.value.trim();
+        if (!name) {
+            showToast('يرجى إدخال اسم الموظف', 'warning');
+            return;
+        }
+        const employee = employeesList.find(emp => emp.name === name);
+        if (employee) {
+            currentEmployee = employee;
+            showModal('✅ معلومات الموظف', `الاسم: ${employee.name}\nالكود: ${employee.code}\nيمكنك الآن تسجيل حضور أو انصراف.`, '👤');
+        } else {
+            showModal('❌ غير مسجل', `الموظف "${name}" غير مسجل في النظام.\nيرجى التسجيل أولاً.`, '⚠️');
+            currentEmployee = null;
+        }
+    }
+
+    // ---------- تسجيل موظف جديد (POST مع no-cors) ----------
     async function registerNewEmployee(name, descriptor, imageData) {
         updateStatus('جاري تسجيل الموظف...', true);
         try {
@@ -398,27 +474,25 @@
                 descriptor: Array.from(descriptor),
                 imageData: imageData
             };
-            // استخدام no-cors لتجنب CORS، ولن نقرأ الاستجابة
             await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            // بما أننا لا نستطيع قراءة الاستجابة، نفترض النجاح ونضيف الموظف محلياً
-            // إنشاء كود مؤقت (سيتم إنشاء الكود الحقيقي في الخادم، لكننا لا نعرفه هنا)
-            // نضيف الموظف للقائمة المحلية برقم كود مؤقت
+            // تخزين محلي
             const tempCode = `EMP${(employeesList.length + 1).toString().padStart(3, '0')}`;
-            employeesList.push({ name, code: tempCode });
-            // حفظ descriptor محلياً (اختياري)
+            const newEmployee = { name, code: tempCode, imageData };
+            employeesList.push(newEmployee);
+            // تخزين الـ descriptor والصورة
             const existing = labeledDescriptors.find(ld => ld.label === name);
             if (existing) {
                 existing.descriptors.push(descriptor);
             } else {
                 labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(name, [descriptor]));
             }
-            saveEmployeesLocal();
-            showToast(`✅ تم إرسال طلب تسجيل ${name} بنجاح. سيظهر في النظام خلال لحظات.`, 'success');
+            saveEmployeesLocal(); // حفظ الصورة مع البيانات
+            showModal('✅ تم التسجيل', `تم إرسال طلب تسجيل الموظف ${name} بنجاح.\nسيظهر الكود قريباً.`, '📸');
             return true;
         } catch (err) {
             console.error(err);
@@ -429,24 +503,40 @@
         }
     }
 
-    // ---------- حفظ/تحميل الـ descriptors محلياً ----------
+    // ---------- حفظ/تحميل البيانات المحلية (descriptors + images) ----------
     function saveEmployeesLocal() {
-        const data = labeledDescriptors.map(ld => ({
+        // حفظ الـ descriptors
+        const descData = labeledDescriptors.map(ld => ({
             label: ld.label,
             descriptors: ld.descriptors.map(d => Array.from(d))
         }));
-        localStorage.setItem('axentro_face_descriptors', JSON.stringify(data));
+        localStorage.setItem('axentro_face_descriptors', JSON.stringify(descData));
+
+        // حفظ الصور مع البيانات الأساسية
+        const imagesData = employeesList.map(emp => ({
+            name: emp.name,
+            code: emp.code,
+            imageData: emp.imageData || null
+        }));
+        localStorage.setItem('axentro_employees_images', JSON.stringify(imagesData));
     }
 
     function loadEmployeesLocal() {
-        const stored = localStorage.getItem('axentro_face_descriptors');
-        if (stored) {
-            const data = JSON.parse(stored);
+        // تحميل الـ descriptors
+        const storedDesc = localStorage.getItem('axentro_face_descriptors');
+        if (storedDesc) {
+            const data = JSON.parse(storedDesc);
             labeledDescriptors = data.map(item => new faceapi.LabeledFaceDescriptors(
                 item.label,
                 item.descriptors.map(d => new Float32Array(d))
             ));
         }
+        // تحميل الصور
+        const storedImages = localStorage.getItem('axentro_employees_images');
+        if (storedImages) {
+            return JSON.parse(storedImages);
+        }
+        return [];
     }
 
     // ---------- الكاميرا ----------
@@ -504,7 +594,7 @@
             if (currentAction === 'register' && tempName) {
                 const success = await registerNewEmployee(tempName, descriptor, imageData);
                 if (success) {
-                    showConfirmationModal('✅ تم التسجيل', `تم إرسال طلب تسجيل الموظف ${tempName} بنجاح.`, () => {});
+                    showModal('✅ تم التسجيل', `تم إرسال طلب تسجيل الموظف ${tempName} بنجاح.`, '📸');
                 }
                 return success;
             }
@@ -521,7 +611,7 @@
         }
     }
 
-    // ---------- حضور/انصراف (POST - مع no-cors) ----------
+    // ---------- حضور/انصراف (بدون كاميرا، باستخدام الصورة المخزنة) ----------
     async function sendAttendanceManual(name, type) {
         if (!currentLocation) {
             showToast('جاري الحصول على الموقع... حاول مرة أخرى', 'info');
@@ -529,59 +619,52 @@
             return;
         }
 
-        const employee = employeesList.find(emp => emp.name === name);
+        // البحث عن الموظف في القائمة المحلية
+        let employee = employeesList.find(emp => emp.name === name);
         if (!employee) {
             showToast('الموظف غير مسجل في النظام. يرجى التسجيل أولاً.', 'error');
             return;
         }
 
-        const opened = await openCamera();
-        if (!opened) return;
+        // التأكد من وجود الصورة المخزنة
+        if (!employee.imageData) {
+            showToast('لا توجد صورة مسجلة لهذا الموظف. يرجى إعادة التسجيل.', 'error');
+            return;
+        }
 
-        // انتظر لحظة لظهور الكاميرا ثم التقط الصورة
-        setTimeout(async () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = canvas.toDataURL('image/jpeg');
-            closeCamera();
+        const now = new Date();
+        const timeStr = now.toLocaleString('ar-EG', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = now.toLocaleDateString('ar-EG');
+        const fullDateTime = `${dateStr} - ${timeStr}`;
 
-            const now = new Date();
-            const timeStr = now.toLocaleString('ar-EG', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const dateStr = now.toLocaleDateString('ar-EG');
-            const fullDateTime = `${dateStr} - ${timeStr}`;
+        const payload = {
+            action: 'attendance',
+            name: employee.name,
+            code: employee.code,
+            type: type,
+            location: currentLocation,
+            datetime: fullDateTime,
+            imageData: employee.imageData   // استخدام الصورة المخزنة
+        };
 
-            const payload = {
-                action: 'attendance',
-                name: name,
-                code: employee.code,
-                type: type,
-                location: currentLocation,
-                datetime: fullDateTime,
-                imageData: imageData
-            };
-
-            updateStatus('جاري الإرسال...', true);
-            try {
-                // استخدام no-cors لتجنب CORS
-                await fetch(GOOGLE_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                updateStatus(`تم إرسال طلب ${type}`, false);
-                showConfirmationModal(`✅ تم تسجيل ${type}`, `الموظف: ${name}\nالكود: ${employee.code}\nالوقت: ${fullDateTime}`, () => {});
-            } catch (err) {
-                updateStatus('خطأ في الإرسال', false);
-                showToast('حدث خطأ في الاتصال بالخادم. تأكد من الإنترنت.', 'error');
-                console.error(err);
-            } finally {
-                updateStatus('جاهز', false);
-            }
-        }, 500);
+        updateStatus('جاري الإرسال...', true);
+        try {
+            await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            updateStatus(`تم إرسال طلب ${type}`, false);
+            const icon = type === 'حضور' ? '✅' : '🚪';
+            showModal(`تم تسجيل ${type}`, `الموظف: ${employee.name}\nالكود: ${employee.code}\nالوقت: ${fullDateTime}`, icon);
+        } catch (err) {
+            updateStatus('خطأ في الإرسال', false);
+            showToast('حدث خطأ في الاتصال بالخادم. تأكد من الإنترنت.', 'error');
+            console.error(err);
+        } finally {
+            updateStatus('جاهز', false);
+        }
     }
 
     // ---------- معالجة الأزرار ----------
@@ -608,12 +691,11 @@
     }
 
     function handleAttendance(type) {
-        const name = empNameInput.value.trim();
-        if (!name) {
-            showToast('يرجى إدخال اسم الموظف أولاً', 'warning');
+        if (!currentEmployee) {
+            showToast('يرجى أولاً استعلام اسم الموظف', 'warning');
             return;
         }
-        sendAttendanceManual(name, type);
+        sendAttendanceManual(currentEmployee.name, type);
     }
 
     // ---------- الموقع ----------
@@ -639,6 +721,7 @@
     }
 
     // ---------- ربط الأزرار ----------
+    queryBtn.onclick = queryEmployee;
     registerBtn.onclick = handleRegister;
     attendanceBtn.onclick = () => handleAttendance('حضور');
     leaveBtn.onclick = () => handleAttendance('انصراف');
@@ -646,8 +729,9 @@
     // ---------- بدء التشغيل ----------
     async function init() {
         await loadModels();
-        loadEmployeesLocal();
-        await fetchEmployeesFromSheet();
+        // تحميل البيانات المحلية أولاً
+        const localImages = loadEmployeesLocal();
+        await fetchEmployeesFromSheet(); // هذه الدالة تدمج مع localImages
         getLocation();
         setInterval(getLocation, 30000);
     }
