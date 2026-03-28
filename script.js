@@ -1,4 +1,4 @@
-// إعدادات
+// إعدادات DOM
 const video = document.getElementById('video');
 const statusDiv = document.getElementById('status');
 const locationDiv = document.getElementById('location');
@@ -6,6 +6,9 @@ const empNameInput = document.getElementById('empName');
 const registerBtn = document.getElementById('registerBtn');
 const attendanceBtn = document.getElementById('attendanceBtn');
 const leaveBtn = document.getElementById('leaveBtn');
+const recognizedNameDiv = document.getElementById('recognizedName');
+const recognizedUserSpan = document.getElementById('recognizedUserName');
+const faceIndicator = document.getElementById('faceIndicator');
 
 let modelsLoaded = false;
 let currentStream = null;
@@ -13,31 +16,41 @@ let labeledDescriptors = [];
 let currentLocation = null;
 let currentRecognizedName = null;
 
-// الرابط الجديد من Google Apps Script
+// رابط Web App الجديد
 const googleScriptURL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
 // تحميل النماذج
 async function loadModels() {
-    statusDiv.innerText = 'جاري تحميل نماذج التعرف...';
-    await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
-    await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-    await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-    statusDiv.innerText = 'النماذج جاهزة. جاري تشغيل الكاميرا...';
-    startVideo();
+    updateStatus('جاري تحميل نماذج التعرف...', true);
+    try {
+        await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+        updateStatus('النماذج جاهزة. جاري تشغيل الكاميرا...', false);
+        startVideo();
+    } catch (err) {
+        updateStatus('خطأ في تحميل النماذج: ' + err.message, false);
+        console.error(err);
+    }
+}
+
+function updateStatus(text, isLoading) {
+    statusDiv.innerHTML = isLoading ? `<div class="spinner"></div><span>${text}</span>` : `<span>${text}</span>`;
 }
 
 // تشغيل الكاميرا
 async function startVideo() {
     try {
-        currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
         video.srcObject = currentStream;
         video.play();
-        statusDiv.innerText = 'الكاميرا تعمل. انتظر التعرف...';
+        updateStatus('الكاميرا تعمل. انتظر التعرف...', false);
         video.onloadedmetadata = () => {
             recognizeFaceContinuously();
         };
     } catch (err) {
-        statusDiv.innerText = 'خطأ في الكاميرا: ' + err.message;
+        updateStatus('خطأ في الكاميرا: يرجى السماح بالوصول إلى الكاميرا', false);
+        console.error(err);
     }
 }
 
@@ -49,21 +62,21 @@ function getLocation() {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 currentLocation = `https://maps.google.com/?q=${lat},${lng}`;
-                locationDiv.innerText = `الموقع: ${currentLocation}`;
+                locationDiv.innerHTML = `<span>📍 <a href="${currentLocation}" target="_blank" style="color:#60a5fa;">الموقع الحالي</a></span>`;
             },
             (error) => {
-                locationDiv.innerText = 'فشل الحصول على الموقع';
+                locationDiv.innerHTML = `<span>⚠️ فشل الحصول على الموقع: ${error.message}</span>`;
                 currentLocation = 'غير متوفر';
             },
             { enableHighAccuracy: true, timeout: 10000 }
         );
     } else {
-        locationDiv.innerText = 'المتصفح لا يدعم تحديد الموقع';
+        locationDiv.innerHTML = `<span>⚠️ المتصفح لا يدعم تحديد الموقع</span>`;
         currentLocation = 'غير مدعوم';
     }
 }
 
-// تحميل الموظفين من localStorage
+// تحميل الموظفين
 function loadEmployees() {
     const stored = localStorage.getItem('axentro_face_descriptors');
     if (stored) {
@@ -74,9 +87,9 @@ function loadEmployees() {
                 item.descriptors.map(d => new Float32Array(d))
             );
         });
-        statusDiv.innerText = `تم تحميل ${labeledDescriptors.length} موظف`;
+        updateStatus(`تم تحميل ${labeledDescriptors.length} موظف`, false);
     } else {
-        statusDiv.innerText = 'لا يوجد موظفون مسجلون';
+        updateStatus('لا يوجد موظفون مسجلون. سجل موظفاً أولاً', false);
     }
 }
 
@@ -87,7 +100,7 @@ function saveEmployees() {
         descriptors: ld.descriptors.map(d => Array.from(d))
     }));
     localStorage.setItem('axentro_face_descriptors', JSON.stringify(data));
-    statusDiv.innerText = `تم حفظ ${labeledDescriptors.length} موظف`;
+    updateStatus(`تم حفظ ${labeledDescriptors.length} موظف`, false);
 }
 
 // التعرف المستمر
@@ -102,18 +115,25 @@ async function recognizeFaceContinuously() {
         const resizedDetections = faceapi.resizeResults(detections, displaySize);
         
         if (resizedDetections.length > 0 && labeledDescriptors.length > 0) {
+            // إظهار مؤشر الوجه
+            faceIndicator.classList.add('active');
             const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
             const bestMatch = faceMatcher.findBestMatch(resizedDetections[0].descriptor);
             if (bestMatch.label !== 'unknown') {
-                statusDiv.innerText = `مرحباً ${bestMatch.label}`;
                 currentRecognizedName = bestMatch.label;
+                recognizedUserSpan.textContent = currentRecognizedName;
+                recognizedNameDiv.style.display = 'block';
+                updateStatus(`مرحباً ${currentRecognizedName}`, false);
             } else {
-                statusDiv.innerText = 'وجه غير مسجل';
                 currentRecognizedName = null;
+                recognizedNameDiv.style.display = 'none';
+                updateStatus('وجه غير مسجل. يرجى التسجيل أولاً', false);
             }
         } else if (resizedDetections.length === 0) {
-            statusDiv.innerText = 'لم يتم اكتشاف وجه';
+            faceIndicator.classList.remove('active');
             currentRecognizedName = null;
+            recognizedNameDiv.style.display = 'none';
+            updateStatus('لم يتم اكتشاف وجه', false);
         }
     }, 1500);
 }
@@ -131,11 +151,11 @@ function captureImage() {
 // إرسال البيانات
 async function sendAttendance(name, type) {
     if (!name) {
-        alert('لم يتم التعرف على الوجه');
+        alert('لم يتم التعرف على الوجه. تأكد من وضوح وجهك أمام الكاميرا.');
         return;
     }
     if (!currentLocation) {
-        alert('جاري الحصول على الموقع... حاول مرة أخرى');
+        alert('جاري الحصول على الموقع... حاول مرة أخرى بعد ثانية');
         getLocation();
         setTimeout(() => sendAttendance(name, type), 1000);
         return;
@@ -153,7 +173,7 @@ async function sendAttendance(name, type) {
         imageData: imageData
     };
     
-    statusDiv.innerText = 'جاري الإرسال...';
+    updateStatus('جاري الإرسال...', true);
     try {
         await fetch(googleScriptURL, {
             method: 'POST',
@@ -161,11 +181,12 @@ async function sendAttendance(name, type) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        statusDiv.innerText = `تم تسجيل ${type} بنجاح للموظف ${name}`;
-        alert(`تم تسجيل ${type}`);
+        updateStatus(`تم تسجيل ${type} بنجاح للموظف ${name}`, false);
+        alert(`✅ تم تسجيل ${type}`);
     } catch (err) {
-        statusDiv.innerText = 'خطأ في الإرسال';
+        updateStatus('خطأ في الإرسال', false);
         console.error(err);
+        alert('حدث خطأ أثناء الإرسال، حاول مرة أخرى');
     }
 }
 
@@ -176,25 +197,28 @@ async function registerEmployee() {
         alert('يرجى إدخال اسم الموظف');
         return;
     }
+    updateStatus('جاري التقاط الوجه...', true);
     const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
     if (!detection) {
-        alert('لم يتم اكتشاف وجه');
+        updateStatus('لم يتم اكتشاف وجه. تأكد من وجود وجه أمام الكاميرا', false);
+        alert('لم يتم اكتشاف وجه، حاول مرة أخرى');
         return;
     }
     const descriptor = detection.descriptor;
     const existing = labeledDescriptors.find(ld => ld.label === name);
     if (existing) {
         existing.descriptors.push(descriptor);
-        statusDiv.innerText = `تمت إضافة واصف جديد للموظف ${name}`;
+        updateStatus(`تمت إضافة واصف جديد للموظف ${name}`, false);
     } else {
         labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(name, [descriptor]));
-        statusDiv.innerText = `تم تسجيل الموظف ${name}`;
+        updateStatus(`تم تسجيل الموظف ${name} بنجاح`, false);
     }
     saveEmployees();
     empNameInput.value = '';
+    alert(`تم تسجيل ${name} بنجاح`);
 }
 
-// الأحداث
+// ربط الأزرار
 attendanceBtn.onclick = () => sendAttendance(currentRecognizedName, 'حضور');
 leaveBtn.onclick = () => sendAttendance(currentRecognizedName, 'انصراف');
 registerBtn.onclick = registerEmployee;
@@ -205,5 +229,5 @@ registerBtn.onclick = registerEmployee;
     modelsLoaded = true;
     loadEmployees();
     getLocation();
-    setInterval(getLocation, 30000);
+    setInterval(getLocation, 30000); // تحديث الموقع كل 30 ثانية
 })();
