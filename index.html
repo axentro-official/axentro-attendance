@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
-        /* جميع الأنماط السابقة كما هي (لم تتغير) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', 'Poppins', system-ui, -apple-system, sans-serif;
@@ -48,7 +47,6 @@
         }
         .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 24px; animation: fadeInUp 0.6s ease; }
 
-        /* كاميرا */
         .camera-container {
             background: #000;
             border-radius: 28px;
@@ -94,7 +92,6 @@
         }
         .capture-btn:active { transform: translateX(-50%) scale(0.96); }
 
-        /* باقي الأنماط كما هي (محذوفة للاختصار، لكنها موجودة في الكود الأصلي) */
         .status-card, .location-card {
             background: rgba(15, 23, 42, 0.7);
             backdrop-filter: blur(12px);
@@ -109,7 +106,6 @@
             border: 1px solid rgba(59,130,246,0.3);
             transition: all 0.3s;
         }
-        .status-card:hover, .location-card:hover { transform: translateY(-2px); border-color: rgba(59,130,246,0.6); }
         .spinner {
             width: 20px;
             height: 20px;
@@ -127,31 +123,11 @@
             padding: 24px;
             margin-bottom: 24px;
             border: 1px solid rgba(59,130,246,0.2);
-            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
         .admin-card:hover, .action-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 20px 30px -15px rgba(0,0,0,0.3);
-            border-color: rgba(59,130,246,0.5);
-        }
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .query-group {
-            display: flex;
-            gap: 12px;
-            margin-top: 8px;
-        }
-        .query-group input {
-            flex: 1;
-        }
-        .btn-query {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: white;
-            padding: 14px 20px;
-            white-space: nowrap;
         }
         input {
             background: rgba(0,0,0,0.5);
@@ -162,8 +138,10 @@
             color: white;
             outline: none;
             transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 12px;
         }
-        input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); transform: scale(1.01); }
+        input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
         button {
             padding: 14px 20px;
             border: none;
@@ -182,22 +160,18 @@
             background: linear-gradient(135deg, #f59e0b, #d97706);
             color: white;
             width: 100%;
-            box-shadow: 0 8px 16px -6px rgba(245,158,11,0.3);
         }
         .btn-attendance {
             background: linear-gradient(135deg, #10b981, #059669);
             color: white;
             flex: 1;
-            box-shadow: 0 8px 16px -6px rgba(16,185,129,0.3);
         }
         .btn-leave {
             background: linear-gradient(135deg, #ef4444, #dc2626);
             color: white;
             flex: 1;
-            box-shadow: 0 8px 16px -6px rgba(239,68,68,0.3);
         }
-        .action-card { display: flex; gap: 16px; }
-        .register-hint { font-size: 12px; color: #94a3b8; margin-top: 12px; }
+        .action-card { display: flex; gap: 16px; margin-top: 16px; }
         footer {
             background: rgba(0,0,0,0.5);
             backdrop-filter: blur(12px);
@@ -205,9 +179,7 @@
             margin-top: 40px;
             border-top: 1px solid rgba(255,255,255,0.1);
             border-radius: 32px 32px 0 0;
-            transition: transform 0.3s;
         }
-        footer:hover { transform: translateY(-4px); }
         .qr-image {
             width: 70px;
             height: auto;
@@ -215,10 +187,7 @@
             background: white;
             padding: 6px;
             margin-top: 10px;
-            transition: transform 0.2s;
         }
-        .qr-image:hover { transform: scale(1.05); }
-
         /* Toast */
         .toast-message {
             position: fixed;
@@ -238,13 +207,11 @@
             direction: rtl;
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255,255,255,0.2);
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
         }
         .toast-message.show { transform: translateX(-50%) translateY(0); }
         .toast-message.success { background: linear-gradient(135deg, #10b981, #059669); }
         .toast-message.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
         .toast-message.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
-        .toast-message.info { background: linear-gradient(135deg, #3b82f6, #2563eb); }
 
         /* Modal */
         .modal {
@@ -272,30 +239,13 @@
             width: 90%;
             text-align: center;
             border: 1px solid rgba(59,130,246,0.5);
-            box-shadow: 0 25px 40px -12px rgba(0,0,0,0.6);
             transform: scale(0.9);
             transition: transform 0.2s;
-            position: relative;
         }
         .modal.active .modal-content { transform: scale(1); }
-        .modal-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-        .modal-content h3 {
-            font-size: 26px;
-            margin-bottom: 12px;
-            background: linear-gradient(135deg, #fff, #a5f3fc);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-        }
-        .modal-content p {
-            color: #cbd5e1;
-            margin-bottom: 24px;
-            line-height: 1.5;
-            white-space: pre-line;
-        }
+        .modal-icon { font-size: 48px; margin-bottom: 16px; }
+        .modal-content h3 { font-size: 26px; margin-bottom: 12px; color: white; }
+        .modal-content p { color: #cbd5e1; margin-bottom: 24px; line-height: 1.5; }
         .modal-btn {
             background: linear-gradient(135deg, #3b82f6, #2563eb);
             padding: 12px 28px;
@@ -304,9 +254,7 @@
             border: none;
             color: white;
             cursor: pointer;
-            transition: 0.2s;
         }
-        .modal-btn:hover { transform: scale(1.02); }
 
         /* Login Overlay */
         .login-overlay, .register-overlay {
@@ -321,10 +269,8 @@
             align-items: center;
             justify-content: center;
             z-index: 3000;
-            animation: fadeIn 0.5s ease;
         }
         .register-overlay { z-index: 3001; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .login-card, .register-card {
             background: rgba(30, 41, 59, 0.8);
             backdrop-filter: blur(16px);
@@ -335,22 +281,6 @@
             text-align: center;
             border: 1px solid rgba(59,130,246,0.5);
             box-shadow: 0 25px 40px -12px black;
-            transform: translateY(20px);
-            animation: slideUp 0.5s forwards;
-        }
-        @keyframes slideUp { to { transform: translateY(0); } }
-        .login-icon, .register-icon {
-            font-size: 64px;
-            background: linear-gradient(135deg, #3b82f6, #a5f3fc);
-            background-clip: text;
-            -webkit-background-clip: text;
-            color: transparent;
-            margin-bottom: 16px;
-        }
-        .login-card h2, .register-card h2 {
-            font-size: 24px;
-            margin-bottom: 24px;
-            color: #f1f5f9;
         }
         .input-with-icon {
             position: relative;
@@ -369,6 +299,7 @@
             width: 100%;
             padding-right: 45px;
             padding-left: 45px;
+            margin-bottom: 0;
         }
         .toggle-password {
             position: absolute;
@@ -383,47 +314,17 @@
             padding: 0;
             width: 30px;
             height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: 0.2s;
-        }
-        .toggle-password:hover {
-            color: #3b82f6;
-            background: rgba(255,255,255,0.1);
         }
         .login-btn, .register-btn {
             width: 100%;
             background: linear-gradient(135deg, #3b82f6, #2563eb);
             margin-top: 8px;
-            transition: all 0.2s;
-        }
-        .login-btn:hover, .register-btn:hover { transform: scale(1.02); filter: brightness(1.05); }
-        .register-footer, .login-footer {
-            margin-top: 24px;
-            padding-top: 16px;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            font-size: 12px;
-            color: #94a3b8;
-        }
-        .register-footer img, .login-footer img {
-            width: 60px;
-            margin-top: 8px;
-            border-radius: 12px;
-            background: white;
-            padding: 4px;
         }
         .back-to-login {
             background: transparent;
             border: 1px solid rgba(255,255,255,0.3);
             color: white;
             margin-top: 12px;
-            width: 100%;
-        }
-        .back-to-login:hover {
-            background: rgba(255,255,255,0.1);
-            transform: scale(1.02);
         }
         .logout-btn {
             position: fixed;
@@ -436,12 +337,7 @@
             font-size: 14px;
             cursor: pointer;
             z-index: 100;
-            border: 1px solid rgba(255,255,255,0.2);
-            transition: 0.2s;
         }
-        .logout-btn:hover { background: #ef4444; transform: scale(1.02); }
-
-        /* Search & Report */
         .search-section {
             background: rgba(30, 41, 59, 0.6);
             backdrop-filter: blur(16px);
@@ -449,12 +345,6 @@
             padding: 20px;
             margin-bottom: 24px;
             text-align: right;
-            transition: all 0.3s;
-        }
-        .search-section:hover { border-color: rgba(59,130,246,0.4); box-shadow: 0 8px 20px -8px rgba(0,0,0,0.3); }
-        .search-section input {
-            width: 100%;
-            margin-bottom: 10px;
         }
         .datalist-items {
             background: #1e293b;
@@ -464,15 +354,13 @@
             margin-top: 8px;
             display: none;
         }
-        .datalist-items.show { display: block; animation: fadeInUp 0.2s; }
+        .datalist-items.show { display: block; }
         .datalist-item {
             padding: 12px 16px;
             border-bottom: 1px solid #334155;
             cursor: pointer;
-            transition: 0.2s;
             text-align: right;
         }
-        .datalist-item:hover { background: #3b82f6; transform: translateX(-5px); }
         .report-table {
             width: 100%;
             border-collapse: collapse;
@@ -493,10 +381,7 @@
         .btn-admin {
             background: #475569;
             flex: 1;
-            transition: all 0.2s;
         }
-        .btn-admin:hover { background: #3b82f6; transform: translateY(-2px); }
-
         @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
@@ -505,46 +390,29 @@
 
 <div class="logout-btn" id="logoutBtn" style="display: none;">🚪 تسجيل خروج</div>
 
-<!-- شاشة تسجيل الدخول -->
 <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
-        <div class="login-icon">
-            <i class="fas fa-user-check"></i>
-        </div>
+        <div class="login-icon"><i class="fas fa-user-check"></i></div>
         <h2>نظام إدارة الحضور والانصراف</h2>
         <div class="input-with-icon">
             <i class="fas fa-id-card"></i>
-            <input type="text" id="loginCode" placeholder="الكود (مثال: EMP001 أو ADMIN)" autocomplete="off">
+            <input type="text" id="loginCode" placeholder="الكود (ADMIN أو EMP001)" autocomplete="off">
         </div>
         <div class="input-with-icon">
             <i class="fas fa-lock"></i>
             <input type="password" id="loginPassword" placeholder="كلمة السر">
-            <button type="button" class="toggle-password" id="togglePasswordBtn">
-                <i class="fas fa-eye"></i>
-            </button>
+            <button type="button" class="toggle-password" id="togglePasswordBtn"><i class="fas fa-eye"></i></button>
         </div>
         <button id="doLoginBtn" class="login-btn">دخول <i class="fas fa-arrow-left"></i></button>
-        <button id="showRegisterBtn" class="login-btn back-to-login" style="background: linear-gradient(135deg, #f59e0b, #d97706); margin-top: 12px;">
-            <i class="fas fa-user-plus"></i> تسجيل موظف جديد
-        </button>
+        <button id="showRegisterBtn" class="login-btn back-to-login" style="background: linear-gradient(135deg, #f59e0b, #d97706);">تسجيل موظف جديد</button>
         <p style="margin-top: 12px; font-size: 12px;">للموظفين: الكود وكلمة السر المرسلة على البريد<br>للمدير: كود ADMIN وكلمة سر 1407</p>
-        <div class="login-footer">
-            <p>© 2025 Axentro - All Rights Reserved</p>
-            <p>Powered by Axentro System</p>
-            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
-                <img src="qr-links.png" alt="QR Code">
-            </a>
-            <p>Scan Me</p>
-        </div>
+        <div class="login-footer">© 2025 Axentro - All Rights Reserved</div>
     </div>
 </div>
 
-<!-- شاشة تسجيل موظف جديد منفصلة -->
 <div id="registerOverlay" class="register-overlay" style="display: none;">
     <div class="register-card">
-        <div class="register-icon">
-            <i class="fas fa-user-plus"></i>
-        </div>
+        <div class="register-icon"><i class="fas fa-user-plus"></i></div>
         <h2>تسجيل موظف جديد</h2>
         <div class="input-with-icon">
             <i class="fas fa-user"></i>
@@ -556,14 +424,7 @@
         </div>
         <button id="doRegisterBtn" class="register-btn">📸 التقاط الوجه وتسجيل <i class="fas fa-camera"></i></button>
         <button id="backToLoginBtn" class="register-btn back-to-login">عودة إلى تسجيل الدخول</button>
-        <div class="register-footer">
-            <p>© 2025 Axentro - All Rights Reserved</p>
-            <p>Powered by Axentro System</p>
-            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
-                <img src="qr-links.png" alt="QR Code">
-            </a>
-            <p>Scan Me</p>
-        </div>
+        <div class="register-footer">© 2025 Axentro - All Rights Reserved</div>
     </div>
 </div>
 
@@ -577,40 +438,26 @@
         <button class="capture-btn" id="captureBtn">📸 التقاط الوجه</button>
     </div>
 
-    <div class="status-card" id="status">
-        <div class="spinner"></div>
-        <span>جاري تحميل النماذج...</span>
-    </div>
-    <div class="location-card" id="location">
-        <span>📍 جاري الحصول على الموقع...</span>
-    </div>
+    <div class="status-card" id="status"><div class="spinner"></div><span>جاري تحميل النماذج...</span></div>
+    <div class="location-card" id="location"><span>📍 جاري الحصول على الموقع...</span></div>
 
-    <!-- قسم البحث والتقرير -->
-    <div class="search-section" id="searchSection">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="search-section">
+        <div style="display: flex; justify-content: space-between;">
             <h3>🔍 بحث عن موظف</h3>
             <button id="changePasswordBtn" class="btn-query" style="padding: 8px 16px;">🔑 تغيير كلمة السر</button>
         </div>
-        <div style="position: relative;">
-            <input type="text" id="searchInput" placeholder="اكتب اسم الموظف أو الكود ..." autocomplete="off">
-            <div id="searchResults" class="datalist-items"></div>
-        </div>
+        <input type="text" id="searchInput" placeholder="اكتب اسم الموظف أو الكود ...">
+        <div id="searchResults" class="datalist-items"></div>
         <div id="reportContainer" style="margin-top: 20px; display: none;">
             <h4>📊 تقرير الشهر الحالي</h4>
             <div style="display: flex; gap: 10px; margin: 10px 0;">
-                <input type="month" id="reportMonth" value="">
+                <input type="month" id="reportMonth">
                 <button id="loadReportBtn" class="btn-query">عرض التقرير</button>
             </div>
-            <div style="overflow-x: auto;">
-                <table class="report-table" id="reportTable">
-                    <thead> <tr><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th></tr> </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+            <table class="report-table" id="reportTable"><thead><tr><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>ساعات العمل</th></tr></thead><tbody></tbody></table>
         </div>
     </div>
 
-    <!-- لوحة إدارة (تظهر للمدير فقط) -->
     <div id="adminPanel" style="display: none;">
         <div class="admin-card">
             <h3>🛠️ لوحة المدير</h3>
@@ -618,9 +465,7 @@
                 <button id="exportClearBtn" class="btn-admin">📤 تصدير ومسح شيت الحضور</button>
                 <button id="refreshEmployeesBtn" class="btn-admin">🔄 تحديث قائمة الموظفين</button>
             </div>
-            <div id="employeesListAdmin" style="margin-top: 16px; text-align: right; max-height: 200px; overflow-y: auto;">
-                <p>قائمة الموظفين ستظهر هنا...</p>
-            </div>
+            <div id="employeesListAdmin" style="margin-top: 16px; text-align: right; max-height: 200px; overflow-y: auto;"><p>قائمة الموظفين ستظهر هنا...</p></div>
         </div>
     </div>
 
@@ -630,17 +475,10 @@
     </div>
 </div>
 
-<footer id="footer" style="display: none;">
-    <p>© 2025 Axentro - All Rights Reserved</p>
-    <p>Powered by Axentro System</p>
-    <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
-        <img src="qr-links.png" alt="QR Code" class="qr-image">
-    </a>
-    <p>Scan Me</p>
-</footer>
+<footer id="footer" style="display: none;"><p>© 2025 Axentro - All Rights Reserved</p><p>Powered by Axentro System</p><a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank"><img src="qr-links.png" alt="QR Code" class="qr-image"></a><p>Scan Me</p></footer>
 
 <script>
-    // ---------- العناصر ----------
+    // -------------------- العناصر --------------------
     const video = document.getElementById('video');
     const faceCanvas = document.getElementById('faceCanvas');
     const canvasCtx = faceCanvas.getContext('2d');
@@ -674,24 +512,22 @@
     const togglePasswordBtn = document.getElementById('togglePasswordBtn');
     const loginPassword = document.getElementById('loginPassword');
 
-    // ---------- المتغيرات العامة ----------
+    // -------------------- المتغيرات --------------------
     let modelsLoaded = false;
     let stream = null;
     let labeledDescriptors = [];
     let currentLocation = null;
     let currentAction = null;
-    let tempName = null;
-    let tempEmail = null;
+    let tempName = null, tempEmail = null;
     let employeesList = [];
     let currentEmployee = null;
     let loggedInUser = null;
     let currentReportCode = null;
     let animationFrameId = null;
 
-    // الرابط الصحيح بعد النشر
     const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
-    // ---------- دوال مساعدة ----------
+    // -------------------- دوال مساعدة --------------------
     let toastTimeout = null;
     function showToast(message, type = 'info') {
         let toast = document.getElementById('customToast');
@@ -717,14 +553,7 @@
             modal = document.createElement('div');
             modal.id = 'confirmationModal';
             modal.className = 'modal';
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <div class="modal-icon"></div>
-                    <h3></h3>
-                    <p></p>
-                    <button class="modal-btn">رجوع</button>
-                </div>
-            `;
+            modal.innerHTML = `<div class="modal-content"><div class="modal-icon"></div><h3></h3><p></p><button class="modal-btn">رجوع</button></div>`;
             document.body.appendChild(modal);
             modal.querySelector('.modal-btn').onclick = () => {
                 modal.classList.remove('active');
@@ -737,18 +566,13 @@
         modal.classList.add('active');
     }
 
-    // ---------- رسم إطار الوجه ----------
+    // -------------------- رسم إطار الوجه --------------------
     async function startFaceDetection() {
         if (!modelsLoaded || !video.srcObject) return;
         if (animationFrameId) cancelAnimationFrame(animationFrameId);
-        
         const detectAndDraw = async () => {
-            if (!video.srcObject || video.paused || video.ended) {
-                animationFrameId = null;
-                return;
-            }
+            if (!video.srcObject || video.paused || video.ended) { animationFrameId = null; return; }
             if (modelsLoaded && video.videoWidth > 0) {
-                // تأكد من مطابقة أبعاد canvas
                 if (faceCanvas.width !== video.videoWidth || faceCanvas.height !== video.videoHeight) {
                     faceCanvas.width = video.videoWidth;
                     faceCanvas.height = video.videoHeight;
@@ -768,14 +592,11 @@
     }
 
     function stopFaceDetection() {
-        if (animationFrameId) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
-        }
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
         canvasCtx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
     }
 
-    // ---------- تحميل النماذج ----------
+    // -------------------- تحميل نماذج الوجه --------------------
     async function loadModels() {
         updateStatus('جاري تحميل نماذج الوجه...', true);
         try {
@@ -787,73 +608,49 @@
             updateStatus('النماذج جاهزة ✅', false);
             showToast('تم تحميل نماذج الوجه بنجاح', 'success');
         } catch (err) {
-            updateStatus('فشل تحميل النماذج: ' + err.message, false);
+            updateStatus('فشل تحميل النماذج', false);
             showToast('فشل تحميل النماذج، تأكد من الاتصال بالإنترنت', 'error');
         }
     }
 
-    // ---------- جلب قائمة الموظفين ----------
+    // -------------------- جلب قائمة الموظفين --------------------
     async function fetchEmployeesFromSheet() {
         try {
             const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getEmployees`);
-            if (!response.ok) throw new Error('فشل الاتصال بالخادم');
+            if (!response.ok) throw new Error('فشل الاتصال');
             const data = await response.json();
             if (data.success && data.employees) {
                 const localData = loadEmployeesLocal();
                 employeesList = data.employees.map(emp => {
                     const local = localData.find(l => l.name === emp.name);
-                    return {
-                        name: emp.name,
-                        code: emp.code,
-                        imageData: local ? local.imageData : null
-                    };
+                    return { name: emp.name, code: emp.code, imageData: local ? local.imageData : null };
                 });
-                updateStatus(`تم تحميل ${employeesList.length} موظف من السجل`, false);
+                updateStatus(`تم تحميل ${employeesList.length} موظف`, false);
                 renderEmployeesListAdmin();
                 return true;
-            } else {
-                employeesList = [];
-                updateStatus('لا يوجد موظفون مسجلون بعد', false);
-                return false;
-            }
+            } else { employeesList = []; return false; }
         } catch (err) {
             console.error(err);
             employeesList = [];
-            updateStatus('فشل تحميل قائمة الموظفين - حاول مرة أخرى', false);
-            showToast('تعذر الاتصال بالخادم لجلب الموظفين', 'error');
+            updateStatus('فشل تحميل القائمة', false);
             return false;
         }
     }
 
     function renderEmployeesListAdmin() {
         if (!loggedInUser?.isAdmin) return;
-        if (employeesList.length === 0) {
-            employeesListAdmin.innerHTML = '<p>لا يوجد موظفون مسجلون بعد</p>';
-            return;
-        }
-        let html = '<div style="display:flex; flex-direction:column; gap:8px;">';
-        employeesList.forEach(emp => {
-            html += `<div style="display:flex; justify-content:space-between; background:rgba(0,0,0,0.3); padding:8px 12px; border-radius:40px;">
-                        <span>${emp.name}</span>
-                        <span style="color:#60a5fa;">${emp.code}</span>
-                     </div>`;
-        });
+        if (employeesList.length === 0) { employeesListAdmin.innerHTML = '<p>لا يوجد موظفون</p>'; return; }
+        let html = '<div>';
+        employeesList.forEach(emp => { html += `<div style="padding:8px; border-bottom:1px solid #334155;">${emp.name} (${emp.code})</div>`; });
         html += '</div>';
         employeesListAdmin.innerHTML = html;
     }
 
-    // ---------- حفظ/تحميل البيانات المحلية ----------
+    // -------------------- حفظ/تحميل محلي --------------------
     function saveEmployeesLocal() {
-        const descData = labeledDescriptors.map(ld => ({
-            label: ld.label,
-            descriptors: ld.descriptors.map(d => Array.from(d))
-        }));
+        const descData = labeledDescriptors.map(ld => ({ label: ld.label, descriptors: ld.descriptors.map(d => Array.from(d)) }));
         localStorage.setItem('axentro_face_descriptors', JSON.stringify(descData));
-        const imagesData = employeesList.map(emp => ({
-            name: emp.name,
-            code: emp.code,
-            imageData: emp.imageData || null
-        }));
+        const imagesData = employeesList.map(emp => ({ name: emp.name, code: emp.code, imageData: emp.imageData }));
         localStorage.setItem('axentro_employees_images', JSON.stringify(imagesData));
     }
 
@@ -861,226 +658,119 @@
         const storedDesc = localStorage.getItem('axentro_face_descriptors');
         if (storedDesc) {
             const data = JSON.parse(storedDesc);
-            labeledDescriptors = data.map(item => new faceapi.LabeledFaceDescriptors(
-                item.label,
-                item.descriptors.map(d => new Float32Array(d))
-            ));
+            labeledDescriptors = data.map(item => new faceapi.LabeledFaceDescriptors(item.label, item.descriptors.map(d => new Float32Array(d))));
         }
         const storedImages = localStorage.getItem('axentro_employees_images');
-        if (storedImages) return JSON.parse(storedImages);
-        return [];
+        return storedImages ? JSON.parse(storedImages) : [];
     }
 
-    // ---------- الكاميرا ----------
+    // -------------------- الكاميرا --------------------
     async function openCamera() {
         if (stream) closeCamera();
         try {
             stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
             await video.play();
-            // تعيين أبعاد canvas بعد تشغيل الفيديو
             faceCanvas.width = video.videoWidth || 640;
             faceCanvas.height = video.videoHeight || 480;
             cameraContainer.classList.add('active');
             if (modelsLoaded) startFaceDetection();
             return true;
-        } catch (err) {
-            showToast('تعذر الوصول إلى الكاميرا', 'error');
-            return false;
-        }
+        } catch (err) { showToast('تعذر الوصول إلى الكاميرا', 'error'); return false; }
     }
 
     function closeCamera() {
         stopFaceDetection();
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
-        }
+        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
         video.srcObject = null;
         cameraContainer.classList.remove('active');
     }
 
-    // ---------- التقاط الوجه للتسجيل ----------
+    // -------------------- التقاط الوجه للتسجيل --------------------
     async function captureAndRegister() {
-        if (!modelsLoaded) {
-            showToast('النماذج لم تُحمل بعد، انتظر قليلاً', 'warning');
-            return false;
-        }
-        if (!video.srcObject) {
-            showToast('الكاميرا غير جاهزة', 'error');
-            return false;
-        }
-
+        if (!modelsLoaded) { showToast('النماذج لم تُحمل بعد', 'warning'); return false; }
+        if (!video.srcObject) { showToast('الكاميرا غير جاهزة', 'error'); return false; }
         updateStatus('جاري معالجة الوجه...', true);
         try {
             const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
-            if (!detection) {
-                updateStatus('لم يتم اكتشاف وجه', false);
-                showToast('لم يتم اكتشاف وجه، حاول مرة أخرى', 'error');
-                return false;
-            }
-
+            if (!detection) { updateStatus('لم يتم اكتشاف وجه', false); showToast('لم يتم اكتشاف وجه', 'error'); return false; }
             const descriptor = detection.descriptor;
             const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
             const imageData = canvas.toDataURL('image/jpeg');
-
             if (currentAction === 'register' && tempName && tempEmail) {
                 const success = await registerNewEmployee(tempName, tempEmail, descriptor, imageData);
                 if (success) {
-                    showModal('✅ تم التسجيل', `تم إرسال طلب تسجيل الموظف ${tempName} بنجاح.\nسيظهر الكود وكلمة السر على البريد.\nيمكنك الآن تسجيل الدخول.`, '📸', () => {
+                    showModal('✅ تم التسجيل', `تم تسجيل ${tempName} بنجاح. سيصلك الكود وكلمة السر على البريد.`, '📸', () => {
                         registerOverlay.style.display = 'none';
                         loginOverlay.style.display = 'flex';
-                        if (regNameInput) regNameInput.value = '';
-                        if (regEmailInput) regEmailInput.value = '';
+                        regNameInput.value = ''; regEmailInput.value = '';
                     });
                 }
                 return success;
             }
             return false;
-        } catch (err) {
-            console.error(err);
-            showToast('حدث خطأ أثناء معالجة الوجه', 'error');
-            return false;
-        } finally {
-            updateStatus('جاهز', false);
-            closeCamera(); // إغلاق الكاميرا في كل الأحوال
-            currentAction = null;
-            tempName = null;
-            tempEmail = null;
-        }
+        } catch (err) { console.error(err); showToast('خطأ أثناء معالجة الوجه', 'error'); return false; }
+        finally { updateStatus('جاهز', false); closeCamera(); currentAction = null; tempName = null; tempEmail = null; }
     }
 
-    // ---------- تسجيل موظف جديد (مع استجابة) ----------
     async function registerNewEmployee(name, email, descriptor, imageData) {
-        updateStatus('جاري تسجيل الموظف...', true);
+        updateStatus('جاري التسجيل...', true);
         try {
-            const payload = {
-                action: 'register',
-                name: name,
-                email: email,
-                descriptor: Array.from(descriptor),
-                imageData: imageData
-            };
+            const payload = { action: 'register', name, email, descriptor: Array.from(descriptor), imageData };
             const response = await fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
             });
             const result = await response.json();
-            if (!result.success) {
-                throw new Error(result.error || 'فشل التسجيل في الخادم');
-            }
-            const tempCode = result.code || `EMP${(employeesList.length + 1).toString().padStart(3, '0')}`;
-            const newEmployee = { name, code: tempCode, imageData };
-            employeesList.push(newEmployee);
+            if (!result.success) throw new Error(result.error || 'فشل التسجيل');
+            const tempCode = result.code || `EMP${(employeesList.length+1).toString().padStart(3,'0')}`;
+            employeesList.push({ name, code: tempCode, imageData });
             const existing = labeledDescriptors.find(ld => ld.label === name);
             if (existing) existing.descriptors.push(descriptor);
             else labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(name, [descriptor]));
             saveEmployeesLocal();
             await fetchEmployeesFromSheet();
             return true;
-        } catch (err) {
-            console.error(err);
-            showToast(err.message || 'فشل إرسال طلب التسجيل. تأكد من الاتصال بالإنترنت.', 'error');
-            return false;
-        } finally {
-            updateStatus('جاهز', false);
-        }
+        } catch (err) { showToast(err.message, 'error'); return false; }
+        finally { updateStatus('جاهز', false); }
     }
 
-    // ---------- حضور/انصراف ----------
+    // -------------------- حضور/انصراف --------------------
     async function sendAttendanceManual(code, type) {
-        if (!currentLocation) {
-            showToast('جاري الحصول على الموقع... حاول مرة أخرى', 'info');
-            setTimeout(() => sendAttendanceManual(code, type), 1000);
-            return;
-        }
+        if (!currentLocation) { showToast('جاري الحصول على الموقع...', 'info'); setTimeout(() => sendAttendanceManual(code, type), 1000); return; }
         const employee = employeesList.find(emp => emp.code === code);
-        if (!employee) {
-            showToast('الموظف غير مسجل في النظام.', 'error');
-            return;
-        }
-        if (!employee.imageData) {
-            showToast('لا توجد صورة مسجلة لهذا الموظف. يرجى إعادة التسجيل.', 'error');
-            return;
-        }
-
+        if (!employee) { showToast('الموظف غير مسجل', 'error'); return; }
+        if (!employee.imageData) { showToast('لا توجد صورة مسجلة', 'error'); return; }
         const now = new Date();
-        const timeStr = now.toLocaleString('ar-EG', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const timeStr = now.toLocaleString('ar-EG', { hour12: true, hour:'2-digit', minute:'2-digit', second:'2-digit' });
         const dateStr = now.toLocaleDateString('ar-EG');
         const fullDateTime = `${dateStr} - ${timeStr}`;
-
-        const payload = {
-            action: 'attendance',
-            code: employee.code,
-            type: type,
-            location: currentLocation,
-            datetime: fullDateTime,
-            imageData: employee.imageData
-        };
-
+        const payload = { action: 'attendance', code: employee.code, type, location: currentLocation, datetime: fullDateTime, imageData: employee.imageData };
         updateStatus('جاري الإرسال...', true);
         try {
-            const response = await fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            const response = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const result = await response.json();
-            if (!result.success) throw new Error(result.error || 'فشل الإرسال');
-            updateStatus(`تم إرسال طلب ${type}`, false);
-            const icon = type === 'حضور' ? '✅' : '🚪';
-            showModal(`تم تسجيل ${type}`, `الموظف: ${employee.name}\nالكود: ${employee.code}\nالوقت: ${fullDateTime}`, icon);
-        } catch (err) {
-            updateStatus('خطأ في الإرسال', false);
-            showToast('حدث خطأ في الاتصال بالخادم. تأكد من الإنترنت.', 'error');
-            console.error(err);
-        } finally {
-            updateStatus('جاهز', false);
-        }
+            if (!result.success) throw new Error(result.error);
+            showModal(`تم تسجيل ${type}`, `الموظف: ${employee.name}\nالكود: ${employee.code}\nالوقت: ${fullDateTime}`, type === 'حضور' ? '✅' : '🚪');
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { updateStatus('جاهز', false); }
     }
 
-    // ---------- تغيير كلمة السر ----------
+    // -------------------- تغيير كلمة السر --------------------
     async function changePassword() {
-        if (!loggedInUser || loggedInUser.isAdmin) {
-            showToast('هذه الخاصية متاحة فقط للموظفين العاديين', 'warning');
-            return;
-        }
-        const oldPass = prompt('كلمة السر الحالية:');
-        if (!oldPass) return;
-        const newPass = prompt('كلمة السر الجديدة (4 أرقام أو أكثر):');
-        if (!newPass || newPass.length < 4) {
-            showToast('كلمة السر يجب أن تكون 4 أحرف على الأقل', 'warning');
-            return;
-        }
-        const payload = {
-            action: 'changePassword',
-            code: loggedInUser.code,
-            oldPassword: oldPass,
-            newPassword: newPass
-        };
+        if (!loggedInUser || loggedInUser.isAdmin) { showToast('خاصية للموظفين فقط', 'warning'); return; }
+        const oldPass = prompt('كلمة السر الحالية:'); if (!oldPass) return;
+        const newPass = prompt('كلمة السر الجديدة (4 أحرف على الأقل):'); if (!newPass || newPass.length<4) { showToast('يجب أن تكون 4 أحرف', 'warning'); return; }
+        const payload = { action: 'changePassword', code: loggedInUser.code, oldPassword: oldPass, newPassword: newPass };
         try {
-            const response = await fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            const response = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const result = await response.json();
-            if (result.success) {
-                showToast('تم تغيير كلمة السر بنجاح', 'success');
-            } else {
-                showToast(result.error || 'فشل تغيير كلمة السر', 'error');
-            }
-        } catch (err) {
-            showToast('خطأ في الاتصال بالخادم', 'error');
-        }
+            showToast(result.success ? 'تم التغيير بنجاح' : (result.error || 'فشل'), result.success ? 'success' : 'error');
+        } catch (err) { showToast('خطأ في الاتصال', 'error'); }
     }
 
-    // ---------- تحميل تقرير الموظف ----------
+    // -------------------- تقرير --------------------
     async function loadReport(code, month) {
         if (!code) return;
         try {
@@ -1090,210 +780,124 @@
                 reportTableBody.innerHTML = '';
                 data.report.forEach(day => {
                     const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${day.date}</td>
-                        <td>${day.checkIn || '---'}</td>
-                        <td>${day.checkOut || '---'}</td>
-                        <td>${day.hours || '---'}</td>
-                    `;
+                    row.innerHTML = `<td>${day.date}</td><td>${day.checkIn || '---'}</td><td>${day.checkOut || '---'}</td><td>${day.hours || '---'}</td>`;
                     reportTableBody.appendChild(row);
                 });
                 reportContainer.style.display = 'block';
-            } else {
-                showToast('لا توجد بيانات لهذا الشهر', 'info');
-                reportContainer.style.display = 'none';
-            }
-        } catch (err) {
-            console.error(err);
-            showToast('فشل تحميل التقرير', 'error');
-        }
+            } else { showToast('لا توجد بيانات', 'info'); reportContainer.style.display = 'none'; }
+        } catch (err) { showToast('فشل تحميل التقرير', 'error'); }
     }
 
-    // ---------- البحث ----------
+    // -------------------- البحث --------------------
     function searchEmployees(query) {
-        if (!query.trim()) {
-            searchResultsDiv.classList.remove('show');
-            return [];
-        }
-        const lowerQuery = query.trim().toLowerCase();
-        const results = employeesList.filter(emp => 
-            emp.name.toLowerCase().includes(lowerQuery) || 
-            emp.code.toLowerCase().includes(lowerQuery)
-        );
-        if (results.length === 0) {
-            searchResultsDiv.classList.remove('show');
-            return [];
-        }
+        if (!query.trim()) { searchResultsDiv.classList.remove('show'); return; }
+        const lowerQuery = query.toLowerCase();
+        const results = employeesList.filter(emp => emp.name.toLowerCase().includes(lowerQuery) || emp.code.toLowerCase().includes(lowerQuery));
+        if (results.length === 0) { searchResultsDiv.classList.remove('show'); return; }
         searchResultsDiv.innerHTML = results.map(emp => `<div class="datalist-item" data-code="${emp.code}" data-name="${emp.name}">${emp.name} (${emp.code})</div>`).join('');
         searchResultsDiv.classList.add('show');
         document.querySelectorAll('.datalist-item').forEach(el => {
             el.onclick = () => {
-                const code = el.getAttribute('data-code');
-                const name = el.getAttribute('data-name');
+                const code = el.dataset.code, name = el.dataset.name;
                 searchInput.value = `${name} (${code})`;
                 currentReportCode = code;
                 searchResultsDiv.classList.remove('show');
                 const now = new Date();
-                const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-                reportMonth.value = currentMonth;
-                loadReport(code, currentMonth);
-                if (loggedInUser?.isAdmin) {
-                    currentEmployee = employeesList.find(emp => emp.code === code);
-                }
+                reportMonth.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+                loadReport(code, reportMonth.value);
+                if (loggedInUser?.isAdmin) currentEmployee = employeesList.find(emp => emp.code === code);
             };
         });
-        return results;
     }
 
-    // ---------- معالجة أزرار التسجيل المنفصل ----------
+    // -------------------- معالجة التسجيل من الشاشة المنفصلة --------------------
     async function handleRegisterFromOverlay() {
-        const name = regNameInput.value.trim();
-        const email = regEmailInput.value.trim();
-        if (!name) { showToast('يرجى إدخال اسم الموظف', 'warning'); return; }
-        if (!email) { showToast('يرجى إدخال البريد الإلكتروني', 'warning'); return; }
-        if (employeesList.some(emp => emp.name === name)) { showToast('هذا الاسم مسجل مسبقاً', 'warning'); return; }
-        
-        if (!modelsLoaded) {
-            showToast('النماذج لا تزال تُحمل، انتظر قليلاً...', 'warning');
-            return;
-        }
-        
-        tempName = name;
-        tempEmail = email;
-        currentAction = 'register';
+        const name = regNameInput.value.trim(), email = regEmailInput.value.trim();
+        if (!name) { showToast('أدخل اسم الموظف', 'warning'); return; }
+        if (!email) { showToast('أدخل البريد الإلكتروني', 'warning'); return; }
+        if (employeesList.some(emp => emp.name === name)) { showToast('الاسم مسجل مسبقاً', 'warning'); return; }
+        if (!modelsLoaded) { showToast('النماذج لا تزال تُحمل', 'warning'); return; }
+        tempName = name; tempEmail = email; currentAction = 'register';
         const opened = await openCamera();
-        if (opened) {
-            captureBtn.onclick = async () => {
-                captureBtn.disabled = true;
-                await captureAndRegister();
-                captureBtn.disabled = false;
-            };
-        }
+        if (opened) captureBtn.onclick = async () => { captureBtn.disabled = true; await captureAndRegister(); captureBtn.disabled = false; };
     }
 
     function handleAttendance(type) {
         let code = null;
         if (loggedInUser?.isAdmin) {
-            if (!currentEmployee) {
-                showToast('يرجى اختيار موظف من البحث أولاً', 'warning');
-                return;
-            }
+            if (!currentEmployee) { showToast('اختر موظفاً من البحث أولاً', 'warning'); return; }
             code = currentEmployee.code;
         } else {
-            if (!loggedInUser?.code) {
-                showToast('يجب تسجيل الدخول أولاً', 'warning');
-                return;
-            }
+            if (!loggedInUser?.code) { showToast('يجب تسجيل الدخول أولاً', 'warning'); return; }
             code = loggedInUser.code;
         }
         sendAttendanceManual(code, type);
     }
 
-    // ---------- الموقع ----------
+    // -------------------- الموقع --------------------
     function getLocation() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-                pos => {
-                    const lat = pos.coords.latitude;
-                    const lng = pos.coords.longitude;
-                    currentLocation = `https://maps.google.com/?q=${lat},${lng}`;
-                    locationDiv.innerHTML = `<span>📍 <a href="${currentLocation}" target="_blank" style="color:#60a5fa;">الموقع الحالي</a></span>`;
-                },
-                err => {
-                    locationDiv.innerHTML = `<span>⚠️ فشل الحصول على الموقع: ${err.message}</span>`;
-                    currentLocation = 'غير متوفر';
-                },
+                pos => { currentLocation = `https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`; locationDiv.innerHTML = `<span>📍 <a href="${currentLocation}" target="_blank">الموقع الحالي</a></span>`; },
+                err => { locationDiv.innerHTML = `<span>⚠️ فشل الحصول على الموقع</span>`; currentLocation = 'غير متوفر'; },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
-        } else {
-            locationDiv.innerHTML = `<span>⚠️ المتصفح لا يدعم تحديد الموقع</span>`;
-            currentLocation = 'غير مدعوم';
-        }
+        } else { locationDiv.innerHTML = `<span>⚠️ المتصفح لا يدعم تحديد الموقع</span>`; currentLocation = 'غير مدعوم'; }
     }
 
-    // ---------- تصدير ومسح (للمدير) ----------
+    // -------------------- تصدير ومسح --------------------
     async function exportAndClear() {
-        if (!confirm('سيتم تصدير جميع سجلات الحضور والانصراف إلى ملف Excel جديد، ثم مسح الشيت الحالي. هل أنت متأكد؟')) return;
+        if (!confirm('سيتم تصدير جميع السجلات ومسح الشيت. هل أنت متأكد؟')) return;
         try {
             const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=exportAndClear&password=1407`);
             const result = await response.json();
-            if (result.success) {
-                showToast('تم التصدير والمسح بنجاح', 'success');
-                if (result.fileUrl) window.open(result.fileUrl, '_blank');
-            } else {
-                showToast(result.error || 'فشل التصدير', 'error');
-            }
-        } catch (err) {
-            showToast('خطأ في الاتصال بالخادم', 'error');
-        }
+            if (result.success) { showToast('تم التصدير والمسح', 'success'); if (result.fileUrl) window.open(result.fileUrl, '_blank'); }
+            else showToast(result.error || 'فشل', 'error');
+        } catch (err) { showToast('خطأ في الاتصال', 'error'); }
     }
 
-    async function refreshEmployees() {
-        await fetchEmployeesFromSheet();
-        showToast('تم تحديث القائمة', 'success');
-    }
+    async function refreshEmployees() { await fetchEmployeesFromSheet(); showToast('تم تحديث القائمة', 'success'); }
 
-    // ---------- تسجيل الدخول (محسن) ----------
+    // -------------------- تسجيل الدخول --------------------
     async function login() {
         const code = document.getElementById('loginCode').value.trim();
         const password = document.getElementById('loginPassword').value.trim();
-        if (!code || !password) { showToast('يرجى إدخال الكود وكلمة السر', 'warning'); return; }
+        if (!code || !password) { showToast('أدخل الكود وكلمة السر', 'warning'); return; }
         const loginBtn = document.getElementById('doLoginBtn');
         const originalText = loginBtn.innerHTML;
-        loginBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> جاري التحقق...';
-        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> جاري التحقق...'; loginBtn.disabled = true;
         try {
-            const url = `${GOOGLE_SCRIPT_URL}?action=verifyLogin&code=${encodeURIComponent(code)}&password=${encodeURIComponent(password)}`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=verifyLogin&code=${encodeURIComponent(code)}&password=${encodeURIComponent(password)}`);
             const data = await response.json();
             if (data.success) {
-                loggedInUser = {
-                    name: data.name || '',
-                    code: data.code || code,
-                    isAdmin: data.isAdmin || false
-                };
+                loggedInUser = { name: data.name || '', code: data.code || code, isAdmin: data.isAdmin || false };
                 sessionStorage.setItem('axentro_user', JSON.stringify(loggedInUser));
                 loginOverlay.style.display = 'none';
                 mainContent.style.display = 'block';
                 footer.style.display = 'block';
                 logoutBtn.style.display = 'block';
-                
-                // جلب قائمة الموظفين بشكل غير متزامن (لا نعتمد نجاحها لبدء الجلسة)
-                fetchEmployeesFromSheet().catch(e => console.warn('فشل جلب الموظفين', e));
-                
+                await fetchEmployeesFromSheet();
                 if (loggedInUser.isAdmin) {
                     adminPanel.style.display = 'block';
                     changePasswordBtn.style.display = 'none';
                 } else {
                     adminPanel.style.display = 'none';
                     changePasswordBtn.style.display = 'block';
-                    // نبحث عن الموظف بعد تحميل القائمة (قد يكون لم تتحقق بعد، سنحاول لاحقًا)
-                    setTimeout(() => {
-                        currentEmployee = employeesList.find(emp => emp.code === loggedInUser.code);
-                        if (currentEmployee) {
-                            searchInput.value = `${currentEmployee.name} (${currentEmployee.code})`;
-                            currentReportCode = loggedInUser.code;
-                            const now = new Date();
-                            const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-                            reportMonth.value = currentMonth;
-                            loadReport(loggedInUser.code, currentMonth);
-                        }
-                    }, 1000);
+                    currentEmployee = employeesList.find(emp => emp.code === loggedInUser.code);
+                    if (currentEmployee) {
+                        searchInput.value = `${currentEmployee.name} (${currentEmployee.code})`;
+                        currentReportCode = loggedInUser.code;
+                        const now = new Date();
+                        reportMonth.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+                        loadReport(loggedInUser.code, reportMonth.value);
+                    }
                 }
                 getLocation();
                 setInterval(getLocation, 30000);
-                showToast(`مرحبًا ${loggedInUser.name}`, 'success');
-            } else {
-                showToast(data.error || 'كود أو كلمة سر غير صحيحة', 'error');
-            }
-        } catch (err) {
-            console.error(err);
-            showToast(`فشل الاتصال بالخادم: ${err.message}. تأكد من الرابط ومن أن الخادم يعمل.`, 'error');
-        } finally {
-            loginBtn.innerHTML = originalText;
-            loginBtn.disabled = false;
-        }
+                showToast(`مرحباً ${loggedInUser.name}`, 'success');
+            } else { showToast(data.error || 'كود أو كلمة سر غير صحيحة', 'error'); }
+        } catch (err) { console.error(err); showToast(`فشل الاتصال بالخادم: ${err.message}`, 'error'); }
+        finally { loginBtn.innerHTML = originalText; loginBtn.disabled = false; }
     }
 
     function logout() {
@@ -1308,77 +912,32 @@
         adminPanel.style.display = 'none';
         reportContainer.style.display = 'none';
         searchInput.value = '';
-        if (regNameInput) regNameInput.value = '';
-        if (regEmailInput) regEmailInput.value = '';
+        regNameInput.value = ''; regEmailInput.value = '';
     }
 
-    // ---------- أحداث البحث ----------
-    searchInput.addEventListener('input', (e) => {
-        searchEmployees(e.target.value);
-    });
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !searchResultsDiv.contains(e.target)) {
-            searchResultsDiv.classList.remove('show');
-        }
-    });
-
-    loadReportBtn.onclick = () => {
-        if (!currentReportCode) {
-            showToast('يرجى اختيار موظف أولاً', 'warning');
-            return;
-        }
-        let month = reportMonth.value;
-        if (!month) {
-            const now = new Date();
-            month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-            reportMonth.value = month;
-        }
-        loadReport(currentReportCode, month);
-    };
-
-    togglePasswordBtn.addEventListener('click', function() {
-        const type = loginPassword.getAttribute('type') === 'password' ? 'text' : 'password';
-        loginPassword.setAttribute('type', type);
-        const icon = this.querySelector('i');
-        icon.classList.toggle('fa-eye');
-        icon.classList.toggle('fa-eye-slash');
-    });
-
-    const loginCodeInput = document.getElementById('loginCode');
-    const loginPassInput = document.getElementById('loginPassword');
-    const doLogin = () => login();
-    loginCodeInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
-    loginPassInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') doLogin(); });
-
-    if (doRegisterBtn) doRegisterBtn.onclick = handleRegisterFromOverlay;
-    if (backToLoginBtn) {
-        backToLoginBtn.onclick = () => {
-            registerOverlay.style.display = 'none';
-            loginOverlay.style.display = 'flex';
-            if (regNameInput) regNameInput.value = '';
-            if (regEmailInput) regEmailInput.value = '';
-        };
-    }
-    if (showRegisterBtn) {
-        showRegisterBtn.onclick = () => {
-            loginOverlay.style.display = 'none';
-            registerOverlay.style.display = 'flex';
-        };
-    }
-
+    // -------------------- أحداث --------------------
+    searchInput.addEventListener('input', (e) => searchEmployees(e.target.value));
+    document.addEventListener('click', (e) => { if (!searchInput.contains(e.target) && !searchResultsDiv.contains(e.target)) searchResultsDiv.classList.remove('show'); });
+    loadReportBtn.onclick = () => { if (currentReportCode) loadReport(currentReportCode, reportMonth.value); else showToast('اختر موظفاً أولاً', 'warning'); };
+    togglePasswordBtn.addEventListener('click', () => { const type = loginPassword.type === 'password' ? 'text' : 'password'; loginPassword.type = type; togglePasswordBtn.querySelector('i').classList.toggle('fa-eye'); togglePasswordBtn.querySelector('i').classList.toggle('fa-eye-slash'); });
+    document.getElementById('doLoginBtn').onclick = login;
+    document.getElementById('loginCode').addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+    document.getElementById('loginPassword').addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+    doRegisterBtn.onclick = handleRegisterFromOverlay;
+    backToLoginBtn.onclick = () => { registerOverlay.style.display = 'none'; loginOverlay.style.display = 'flex'; regNameInput.value = ''; regEmailInput.value = ''; };
+    showRegisterBtn.onclick = () => { loginOverlay.style.display = 'none'; registerOverlay.style.display = 'flex'; };
     attendanceBtn.onclick = () => handleAttendance('حضور');
     leaveBtn.onclick = () => handleAttendance('انصراف');
     changePasswordBtn.onclick = changePassword;
     exportClearBtn.onclick = exportAndClear;
     refreshEmployeesBtn.onclick = refreshEmployees;
-    document.getElementById('doLoginBtn').onclick = login;
     logoutBtn.onclick = logout;
 
-    // ---------- بدء التشغيل ----------
+    // -------------------- بدء التشغيل --------------------
     async function init() {
         await loadModels();
         loadEmployeesLocal();
-        await fetchEmployeesFromSheet(); // محاولة تحميل القائمة أول مرة
+        await fetchEmployeesFromSheet();
         const storedUser = sessionStorage.getItem('axentro_user');
         if (storedUser) {
             try {
@@ -1388,30 +947,22 @@
                 mainContent.style.display = 'block';
                 footer.style.display = 'block';
                 logoutBtn.style.display = 'block';
-                if (loggedInUser.isAdmin) {
-                    adminPanel.style.display = 'block';
-                    changePasswordBtn.style.display = 'none';
-                } else {
-                    adminPanel.style.display = 'none';
-                    changePasswordBtn.style.display = 'block';
+                if (loggedInUser.isAdmin) { adminPanel.style.display = 'block'; changePasswordBtn.style.display = 'none'; }
+                else {
+                    adminPanel.style.display = 'none'; changePasswordBtn.style.display = 'block';
                     currentEmployee = employeesList.find(emp => emp.code === loggedInUser.code);
                     if (currentEmployee) {
                         searchInput.value = `${currentEmployee.name} (${currentEmployee.code})`;
                         currentReportCode = loggedInUser.code;
                         const now = new Date();
-                        const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-                        reportMonth.value = currentMonth;
-                        loadReport(loggedInUser.code, currentMonth);
+                        reportMonth.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+                        loadReport(loggedInUser.code, reportMonth.value);
                     }
                 }
                 getLocation();
                 setInterval(getLocation, 30000);
-            } catch (e) { logout(); }
-        } else {
-            loginOverlay.style.display = 'flex';
-            mainContent.style.display = 'none';
-            footer.style.display = 'none';
-        }
+            } catch(e) { logout(); }
+        } else { loginOverlay.style.display = 'flex'; mainContent.style.display = 'none'; footer.style.display = 'none'; }
     }
     init();
 </script>
