@@ -25,6 +25,7 @@
         @keyframes slideInRight { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes qrPulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 50% { transform: scale(1.05); box-shadow: 0 0 15px 5px rgba(59, 130, 246, 0); } }
         @keyframes btnGlow { 0% { box-shadow: 0 0 5px rgba(59,130,246,0.4); } 50% { box-shadow: 0 0 20px rgba(59,130,246,0.8); } 100% { box-shadow: 0 0 5px rgba(59,130,246,0.4); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
         
         .app-container { flex: 1; width: 100%; max-width: 550px; margin: 0 auto; padding: 15px; position: relative; z-index: 1; animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
         h1 { font-size: 26px; text-align: center; background: linear-gradient(135deg, #fff, #93c5fd); -webkit-background-clip: text; color: transparent; margin-bottom: 20px; font-weight: 800; letter-spacing: -0.5px; }
@@ -210,7 +211,7 @@
     <div class="status-bar" id="statusBar">
         <span class="status-dot online" id="connDot"></span>
         <span id="connText">النظام جاهز</span>
-        <button class="btn btn-action btn-login" onclick="refreshData()" title="تحديث"><i class="fas fa-sync-alt"></i></button>
+        <button class="btn btn-action btn-login" onclick="refreshData()" title="تحديث" id="refreshBtn"><i class="fas fa-sync-alt"></i></button>
         <button class="btn btn-action btn-leave" onclick="logout()" title="خروج"><i class="fas fa-sign-out-alt"></i></button>
     </div>
     <div class="status-bar" id="locBar" style="font-size: 12px;"><i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span></div>
@@ -300,93 +301,101 @@
         } catch (e) { console.error("Fingerprint Registration Error:", e); }
     }
 
+    // ==========================================
+    // تم إعادة كتابة دالة البصمة بالكامل لحل مشكلة الخروج والدخول
+    // ==========================================
     async function loginWithFingerprint() {
         const savedFpId = localStorage.getItem('axentro_fp_id');
         if (!savedFpId) { showToast('لم تقم بتسجيل بصمة مسبقاً، سجل دخولك عادياً أولاً وفعّل "تذكرني"', 'error'); return; }
+        
+        // جلب الكود والباسورد المحفوظين في الخانات (التي لا تمسح أبداً)
+        const savedLogin = localStorage.getItem('axentro_saved_login');
+        if (!savedLogin) { showToast('لا توجد بيانات دخول محفوظة، سجل دخولك عادياً مرة أخرى.', 'error'); return; }
+
         try {
+            setStatus('جاري التحقق من البصمة...');
             const challenge = new Uint8Array(32); crypto.getRandomValues(challenge);
             const assertion = await navigator.credentials.get({ publicKey: { challenge: challenge, allowCredentials: [{ id: base64ToBuffer(savedFpId), type: 'public-key' }], userVerification: "required" } });
+            
             if (assertion) {
                 playSound('login-success');
-                const savedSessionStr = localStorage.getItem('rememberedUser');
-                if (savedSessionStr) {
-                    const sessionObj = JSON.parse(savedSessionStr);
-                    const TEN_HOURS = 10 * 60 * 60 * 1000;
-                    if (Date.now() - sessionObj.timestamp < TEN_HOURS) {
-                        user = sessionObj.data;
-                        if (!user.isAdmin) { const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`); const empData = await empRes.json(); sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null; }
-                        showApp(); setStatus('النظام جاهز');
-                    } else { playSound('login-error'); showToast('انتهت صلاحية الجلسة المحفوظة (10 ساعات)، يرجى تسجيل الدخول بكلمة السر.', 'error'); logout(); }
+                setStatus('جاري التحقق مع السيرفر...');
+                const loginData = JSON.parse(savedLogin);
+                
+                // إرسال الكود والباسورد للسيرفر للتحقق الأمني القوي
+                const res = await fetch(`${URL}?action=verifyLogin&code=${encodeURIComponent(loginData.code)}&password=${encodeURIComponent(loginData.pass)}`);
+                const data = await res.json();
+                
+                if (data.success) {
+                    user = { name: data.name, code: data.code, isAdmin: data.isAdmin, isFirstLogin: data.isFirstLogin };
+                    
+                    // إنشاء جلسة جديدة
+                    localStorage.setItem('rememberedUser', JSON.stringify({ data: user, timestamp: Date.now() }));
+                    
+                    setStatus('جاري تحميل بيانات الوجه...');
+                    if (!user.isAdmin) {
+                        const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
+                        const empData = await empRes.json();
+                        sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null;
+                    }
+                    
+                    if (data.isAdmin && !sessionDescriptor) {
+                        showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'error');
+                        updateFaceMode = true; const opened = await openCamera(); if (!opened) { updateFaceMode = false; showToast('فشل فتح الكاميرا، لا يمكنك الدخول', 'error'); logout(); }
+                    } else if (!data.isAdmin && data.isFirstLogin) {
+                        $('forcePwModal').classList.add('active');
+                    } else {
+                        showApp(); // الانتقال الحقيقي للتطبيق
+                    }
+                    setStatus('النظام جاهز');
+                } else {
+                    playSound('login-error');
+                    showToast('فشل التحقق، ربما تم تغيير كلمة السر من جهاز آخر.', 'error');
+                    setStatus('النظام جاهز');
                 }
             }
-        } catch (e) { if(e.name !== 'NotAllowedError') { playSound('login-error'); showToast('فشل مطابقة البصمة', 'error'); } }
+        } catch (e) { 
+            if(e.name === 'NotAllowedError') showToast('تم إلغاء عملية البصمة', 'error');
+            else showToast('فشل التحقق من البصمة', 'error'); 
+            setStatus('النظام جاهز');
+        }
     }
 
-    // ==========================================
-    // تهيئة النظام (تم حل مشكلة التجميد هنا)
-    // ==========================================
     async function init() {
         const savedSessionStr = localStorage.getItem('rememberedUser');
         const savedTempStr = sessionStorage.getItem('user');
         let savedUser = null;
 
-        // 1. ملء الخانات تلقائياً إذا كان "تذكرني" مفعل
         const savedLogin = localStorage.getItem('axentro_saved_login');
         if (savedLogin) {
-            try {
-                const loginData = JSON.parse(savedLogin);
-                $('loginCode').value = loginData.code || '';
-                $('loginPass').value = loginData.pass || '';
-                $('rememberMe').checked = true;
-            } catch(e) {}
+            try { const loginData = JSON.parse(savedLogin); $('loginCode').value = loginData.code || ''; $('loginPass').value = loginData.pass || ''; $('rememberMe').checked = true; } catch(e) {}
         }
 
-        // 2. منع التجميد 5 ثواني: إخفاء شاشة الدخول فوراً إذا كان هناك جلسة
         if (savedSessionStr) {
             try { 
                 const sessionObj = JSON.parse(savedSessionStr); 
                 const TEN_HOURS = 10 * 60 * 60 * 1000;
                 if (Date.now() - sessionObj.timestamp < TEN_HOURS) { 
                     savedUser = sessionObj.data; 
-                    $('loginScreen').classList.add('hidden'); 
-                    $('registerScreen').classList.add('hidden'); 
-                    $('mainApp').style.display = 'block'; 
-                    setStatus('جاري تحميل النظام...'); 
-                } else { 
-                    localStorage.removeItem('rememberedUser'); 
-                    localStorage.removeItem('axentro_fp_id'); 
-                } 
+                    $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display = 'block'; setStatus('جاري تحميل النظام...'); 
+                } else { localStorage.removeItem('rememberedUser'); localStorage.removeItem('axentro_fp_id'); } 
             } catch (e) { localStorage.removeItem('rememberedUser'); }
         } else if (savedTempStr) {
             savedUser = JSON.parse(savedTempStr);
-            $('loginScreen').classList.add('hidden'); 
-            $('registerScreen').classList.add('hidden'); 
-            $('mainApp').style.display = 'block';
-            setStatus('جاري تحميل النظام...');
+            $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display = 'block'; setStatus('جاري تحميل النظام...');
         }
 
-        // 3. تحميل النماذج في الخلفية
         try {
             await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
-            lightModels = true; 
-            loadHeavyModels(); 
-            if(!savedUser) setStatus('النظام جاهز');
+            lightModels = true; loadHeavyModels(); if(!savedUser) setStatus('النظام جاهز');
         } catch (e) { setStatus('فشل تحميل النماذج'); }
-        
         getLocation();
         
-        // 4. استكمال الجلسة المحفوظة بعد تحميل النماذج
         if (savedUser) { 
-            user = savedUser; 
-            setStatus('جاري تحميل بيانات الوجه...');
-            if (!user.isAdmin) {
-                const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
-                const empData = await empRes.json();
-                sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null;
-            }
-            showApp(); 
-            setStatus('النظام جاهز'); // التأكد من ظهورها أخيراً
+            user = savedUser; setStatus('جاري تحميل بيانات الوجه...');
+            if (!user.isAdmin) { const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`); const empData = await empRes.json(); sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null; }
+            showApp(); setStatus('النظام جاهز');
         }
     }
 
@@ -402,49 +411,45 @@
             if (data.success) {
                 user = { name: data.name, code: data.code, isAdmin: data.isAdmin, isFirstLogin: data.isFirstLogin };
                 playSound('login-success');
-                
-                // حفظ بيانات الدخول في الخانات (منفصل عن الجلسة)
-                if($('rememberMe').checked) { 
-                    localStorage.setItem('rememberedUser', JSON.stringify({ data: user, timestamp: Date.now() })); 
-                    localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass }));
-                } else { 
-                    sessionStorage.setItem('user', JSON.stringify(user)); 
-                    localStorage.removeItem('axentro_saved_login');
-                    localStorage.removeItem('axentro_fp_id'); // مسح البصمة فقط إذا ألغى تذكرني
-                }
-
+                if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data: user, timestamp: Date.now() })); localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass })); } else { sessionStorage.setItem('user', JSON.stringify(user)); localStorage.removeItem('axentro_saved_login'); localStorage.removeItem('axentro_fp_id'); }
                 setStatus('جاري تحميل بيانات الوجه...');
                 const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(data.code)}`);
                 const empData = await empRes.json();
                 sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null;
 
-                if (data.isAdmin && !sessionDescriptor) {
-                    showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'error');
-                    updateFaceMode = true; const opened = await openCamera(); if (!opened) { updateFaceMode = false; showToast('فشل فتح الكاميرا، لا يمكنك الدخول', 'error'); logout(); }
-                } else if (!data.isAdmin && data.isFirstLogin) { $('forcePwModal').classList.add('active'); }
-                else {
-                    showApp();
-                    setStatus('النظام جاهز');
-                    if($('rememberMe').checked && window.PublicKeyCredential) { setTimeout(() => registerFingerprint(), 1000); }
-                }
+                if (data.isAdmin && !sessionDescriptor) { showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'error'); updateFaceMode = true; const opened = await openCamera(); if (!opened) { updateFaceMode = false; showToast('فشل فتح الكاميرا، لا يمكنك الدخول', 'error'); logout(); } } 
+                else if (!data.isAdmin && data.isFirstLogin) { $('forcePwModal').classList.add('active'); }
+                else { showApp(); setStatus('النظام جاهز'); if($('rememberMe').checked && window.PublicKeyCredential) { setTimeout(() => registerFingerprint(), 1000); } }
             } else { playSound('login-error'); showToast(data.error || 'بيانات خاطئة', 'error'); setStatus('النظام جاهز'); }
         } catch (e) { playSound('login-error'); showToast('خطأ في الاتصال بالخادم', 'error'); setStatus('غير متصل'); }
     }
 
     async function submitFirstPwChange() { const newPw = $('firstNewPw').value.trim(); if (!newPw || newPw.length < 4) return showToast('كلمة السر ضعيفة (4 أحرف على الأقل)', 'error'); try { const res = await fetch(URL, { method: 'POST', body: JSON.stringify({ action: 'changePassword', code: user.code, oldPassword: null, newPassword: newPw }) }); const data = await res.json(); if (data.success) { $('forcePwModal').classList.remove('active'); showToast('تم تحديث كلمة السر بنجاح', 'success'); showApp(); setStatus('النظام جاهز'); } else { showToast(data.error, 'error'); } } catch(e) { showToast('خطأ في الاتصال', 'error'); } }
 
-    function logout() { 
-        playSound('logout-success'); 
-        localStorage.removeItem('rememberedUser'); // مسح الجلسة فقط
-        // تم إزالة مسح بصمة الإصبع وبيانات الخانات من هنا
-        sessionStorage.removeItem('user'); 
-        user = null; sessionDescriptor = null; 
-        $('mainApp').style.display = 'none'; 
-        $('loginScreen').classList.remove('hidden'); 
-        setStatus('النظام جاهز'); 
-    }
+    function logout() { playSound('logout-success'); localStorage.removeItem('rememberedUser'); sessionStorage.removeItem('user'); user = null; sessionDescriptor = null; $('mainApp').style.display = 'none'; $('loginScreen').classList.remove('hidden'); setStatus('النظام جاهز'); }
     
-    function refreshData() { if(user?.isAdmin) { loadEmployees(); showToast('تم التحديث', 'success'); } }
+    // ==========================================
+    // تم تعديل زر التحديث ليعمل للموظف أيضاً
+    // ==========================================
+    async function refreshData() { 
+        const refreshIcon = $('refreshBtn').querySelector('i');
+        refreshIcon.style.animation = 'spin 0.5s linear'; // تأثير بصري للدوران
+        setTimeout(() => refreshIcon.style.animation = '', 600);
+        
+        if(user?.isAdmin) { 
+            await loadEmployees(); 
+        } else if(user) {
+            // للموظف: جلب بيانات الوجه الجديدة إن وجدت
+            setStatus('جاري تحديث البيانات...');
+            try {
+                const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
+                const empData = await empRes.json();
+                sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null;
+                setStatus('متصل');
+            } catch(e) { setStatus('غير متصل'); }
+        }
+        showToast('تم التحديث بنجاح', 'success'); 
+    }
     
     function showApp() {
         $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display = 'block';
