@@ -7,14 +7,179 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
-        /* نفس الأنماط السابقة مع إضافة قليل للقوائم المنسدلة */
-        select {
+        :root {
+            --primary: #3b82f6; --primary-dark: #2563eb;
+            --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+            --dark: #0f172a; --card-bg: rgba(30, 41, 59, 0.7);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(145deg, #0a0f1e 0%, #0f172a 100%);
+            color: #f1f5f9; direction: rtl; min-height: 100vh;
+            display: flex; flex-direction: column; overflow-x: hidden;
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        
+        .app-container {
+            flex: 1; width: 100%; max-width: 550px; margin: 0 auto;
+            padding: 20px; position: relative; z-index: 1;
+            animation: fadeIn 0.5s ease-out;
+        }
+        h1 {
+            font-size: 28px; text-align: center;
+            background: linear-gradient(135deg, #fff, #a5f3fc);
+            -webkit-background-clip: text; color: transparent;
+            margin-bottom: 24px;
+        }
+        .camera-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 2000;
+            display: none; align-items: center; justify-content: center;
+            flex-direction: column;
+        }
+        .camera-overlay.active { display: flex; }
+        .camera-container {
+            background: #000; border-radius: 24px; overflow: hidden;
+            position: relative; width: 90%; max-width: 500px; aspect-ratio: 4/3;
+            box-shadow: 0 20px 60px -10px rgba(0,0,0,0.9);
+            border: 2px solid var(--primary);
+        }
+        video { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
+        .face-canvas { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 10; }
+        .close-cam { 
+            position: absolute; top: 20px; right: 20px; z-index: 30; 
+            background: rgba(0,0,0,0.5); border: none; color: white; 
+            width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer;
+        }
+        .card {
+            background: var(--card-bg); backdrop-filter: blur(12px);
+            border-radius: 24px; padding: 24px; margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        input, select {
             width: 100%; padding: 14px 20px; border-radius: 50px;
             background: rgba(0,0,0,0.5); border: 1px solid #334155;
             color: white; font-size: 16px; outline: none; margin-bottom: 12px;
-            appearance: none;
         }
-        /* باقي الأنماط كما هي */
+        input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+        .password-wrapper input {
+            margin-bottom: 0;
+            padding-left: 50px;
+        }
+        .toggle-password {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .btn {
+            width: 100%; padding: 14px; border-radius: 50px; border: none;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: 0.2s; color: white;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-login { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
+        .btn-reg { background: linear-gradient(135deg, var(--warning), #d97706); }
+        .btn-att { background: linear-gradient(135deg, var(--success), #059669); }
+        .btn-leave { background: linear-gradient(135deg, var(--danger), #dc2626); }
+        .btn-action { padding: 8px 16px; width: auto; font-size: 14px; }
+        .btn-refresh { background: var(--primary); }
+        .btn-logout { background: var(--danger); }
+        .btn-change-pw { background: #6b21a5; }
+        .action-group { display: flex; gap: 12px; margin-top: 20px; }
+        .action-group .btn { flex: 1; }
+        .status-bar {
+            background: rgba(15, 23, 42, 0.7); padding: 10px 20px;
+            border-radius: 50px; display: flex; align-items: center; justify-content: center; gap: 10px;
+            font-size: 14px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .status-dot.online { background: var(--success); animation: pulse 2s infinite; }
+        .status-dot.offline { background: var(--danger); }
+        .stat-card {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            padding: 20px; border-radius: 20px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-card h2 { font-size: 40px; color: var(--primary); margin-bottom: 5px; }
+        .admin-tools { display: flex; gap: 10px; margin-top: 15px; justify-content: center; flex-wrap: wrap; }
+        .search-results { max-height: 300px; overflow-y: auto; margin-top: 10px; border-radius: 12px; }
+        .search-item {
+            padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;
+            transition: background 0.2s; text-align: right;
+        }
+        .search-item:hover { background: rgba(59, 130, 246, 0.1); }
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 15, 30, 0.98); backdrop-filter: blur(15px);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100;
+            padding: 20px; overflow-y: auto;
+        }
+        .overlay.hidden { display: none; }
+        footer {
+            background: rgba(15, 23, 42, 0.9);
+            padding: 30px 20px;
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: auto; 
+            width: 100%;
+        }
+        footer .brand {
+            font-size: 18px; font-weight: bold;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text; color: transparent; margin-bottom: 10px;
+        }
+        footer p { color: #64748b; font-size: 12px; margin-bottom: 5px; }
+        footer .qr-code {
+            width: 80px; height: 80px;
+            background: white; padding: 5px; border-radius: 10px;
+            margin-top: 15px; transition: transform 0.2s;
+        }
+        .toast {
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(100px);
+            background: #1e293b; color: white; padding: 12px 24px; border-radius: 50px;
+            font-size: 14px; z-index: 3000; transition: 0.3s; opacity: 0;
+            border: 1px solid rgba(255,255,255,0.1); text-align: center; max-width: 90%;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); backdrop-filter: blur(5px);
+            display: none; align-items: center; justify-content: center; z-index: 1500;
+            padding: 20px;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: #1e293b; width: 100%; max-width: 500px;
+            border-radius: 24px; padding: 30px; text-align: right;
+            position: relative; animation: slideIn 0.3s ease-out;
+            max-height: 90vh; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .modal-close {
+            position: absolute; top: 15px; left: 15px; background: none;
+            border: none; color: white; font-size: 24px; cursor: pointer;
+        }
+        .report-table { width: 100%; border-collapse: collapse; text-align: center; }
+        .report-table th, .report-table td { padding: 8px; border-bottom: 1px solid #334155; }
     </style>
 </head>
 <body>
@@ -26,32 +191,30 @@
         <video id="video" autoplay muted playsinline></video>
         <canvas id="canvas" class="face-canvas"></canvas>
     </div>
-    <!-- زر الالتقاط غير مرئي الآن، لكننا سنستخدم التقاط تلقائي -->
-    <button class="capture-btn" id="captureBtn" style="display: none;" onclick="handleCapture()">التقاط</button>
 </div>
 
-<!-- Detail Modal (Employee details) -->
+<!-- Modal: تفاصيل الموظف (للأدمن) -->
 <div id="detailModal" class="modal">
     <div class="modal-content">
-        <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+        <button class="modal-close" onclick="closeModal('detailModal')"><i class="fas fa-times"></i></button>
         <h2 style="text-align:center; margin-bottom:20px;" id="modalTitle">تفاصيل الموظف</h2>
         <div id="modalBody"></div>
     </div>
 </div>
 
-<!-- Report Modal -->
+<!-- Modal: تقرير الحضور -->
 <div id="reportModal" class="modal">
     <div class="modal-content">
-        <button class="modal-close" onclick="closeReportModal()"><i class="fas fa-times"></i></button>
+        <button class="modal-close" onclick="closeModal('reportModal')"><i class="fas fa-times"></i></button>
         <h2 style="text-align:center; margin-bottom:20px;">تقرير الحضور والانصراف</h2>
         <div id="reportBody" style="max-height: 60vh; overflow-y: auto;"></div>
     </div>
 </div>
 
-<!-- Change Password Modal for Admin -->
+<!-- Modal: تغيير كلمة سر الأدمن -->
 <div id="changeAdminPwModal" class="modal">
     <div class="modal-content">
-        <button class="modal-close" onclick="closeAdminPwModal()"><i class="fas fa-times"></i></button>
+        <button class="modal-close" onclick="closeModal('changeAdminPwModal')"><i class="fas fa-times"></i></button>
         <h2 style="text-align:center; margin-bottom:20px;">تغيير كلمة سر الأدمن</h2>
         <div style="text-align: center;">
             <div class="password-wrapper">
@@ -67,12 +230,12 @@
     </div>
 </div>
 
-<!-- Change Password Modal for Employee (Admin can change for any employee) -->
+<!-- Modal: تغيير كلمة سر موظف (لأدمن) -->
 <div id="changePwModal" class="modal">
     <div class="modal-content">
-        <button class="modal-close" onclick="closeChangePwModal()"><i class="fas fa-times"></i></button>
+        <button class="modal-close" onclick="closeModal('changePwModal')"><i class="fas fa-times"></i></button>
         <h2 style="text-align:center; margin-bottom:20px;">تغيير كلمة سر موظف</h2>
-        <div style="text-align: center;" id="changePwBody">
+        <div style="text-align: center;">
             <input type="text" id="targetEmpCode" placeholder="كود الموظف (EMPxxx)">
             <div class="password-wrapper">
                 <input type="password" id="newPassword" placeholder="كلمة السر الجديدة">
@@ -83,18 +246,16 @@
     </div>
 </div>
 
-<!-- Login Screen -->
+<!-- شاشة تسجيل الدخول -->
 <div id="loginScreen" class="overlay">
     <div class="card" style="max-width: 400px; width: 100%; margin-bottom: 20px;">
-        <h1 style="margin-bottom: 10px;"><i class="fas fa-fingerprint"></i> Axentro</h1>
+        <h1><i class="fas fa-fingerprint"></i> Axentro</h1>
         <p style="color: #94a3b8; margin-bottom: 24px;">نظام متابعة الحضور والانصراف</p>
-        
         <input type="text" id="loginCode" placeholder="كود المستخدم">
         <div class="password-wrapper">
             <input type="password" id="loginPass" placeholder="كلمة السر">
             <button class="toggle-password" onclick="togglePassword('loginPass')"><i class="fas fa-eye"></i></button>
         </div>
-        
         <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;">
             <i class="fas fa-arrow-left"></i> دخول
         </button>
@@ -102,7 +263,7 @@
             <i class="fas fa-user-plus"></i> تسجيل موظف جديد
         </button>
     </div>
-    <footer style="position: relative; margin-top: 20px;">
+    <footer>
         <div class="brand">Axentro</div>
         <p>نظام حضور وانصراف ومتابعة الموظفين</p>
         <p>© 2024 Axentro – All Rights Reserved</p>
@@ -110,11 +271,11 @@
         <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://axentro-official.github.io/axentro-website/links.html" alt="QR Code" class="qr-code">
         </a>
-        <p style="margin-top: 8px;"><a href="https://axentro-official.github.io/axentro-website/links.html" style="color: #3b82f6;">Scan Me < Click On Me</a></p>
+        <p><a href="https://axentro-official.github.io/axentro-website/links.html" style="color: #3b82f6;">Scan Me < Click On Me</a></p>
     </footer>
 </div>
 
-<!-- Register Screen -->
+<!-- شاشة تسجيل موظف جديد -->
 <div id="registerScreen" class="overlay hidden">
     <div class="card" style="max-width: 400px; width: 100%;">
         <h3 style="margin-bottom: 20px; text-align:center;"><i class="fas fa-id-card"></i> تسجيل موظف جديد</h3>
@@ -130,7 +291,7 @@
         </button>
         <button class="btn" onclick="showLoginScreen()" style="background: #334155; margin-top: 10px;">رجوع</button>
     </div>
-    <footer style="position: relative; margin-top: 20px;">
+    <footer>
         <div class="brand">Axentro</div>
         <p>© 2024 Axentro – All Rights Reserved</p>
         <p>Powered by Axentro System</p>
@@ -141,48 +302,44 @@
     </footer>
 </div>
 
-<!-- Main App -->
+<!-- التطبيق الرئيسي -->
 <div class="app-container" id="mainApp" style="display: none;">
     <h1>نظام متابعة الموظفين</h1>
-    
-    <div class="status-bar" id="statusBar">
+    <div class="status-bar">
         <span class="status-dot online" id="connDot"></span>
         <span id="connText">متصل بالخادم</span>
         <button class="btn btn-action btn-refresh" onclick="refreshData()" title="تحديث"><i class="fas fa-sync-alt"></i></button>
         <button class="btn btn-action btn-logout" onclick="logout()" title="خروج"><i class="fas fa-sign-out-alt"></i></button>
     </div>
-    
-    <div class="status-bar" id="locBar" style="font-size: 12px;">
+    <div class="status-bar" id="locBar">
         <i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span>
     </div>
 
-    <!-- Admin Panel -->
+    <!-- لوحة الأدمن -->
     <div id="adminPanel" style="display: none;">
         <div class="stat-card">
             <h2 id="empCount">0</h2>
             <p>إجمالي الموظفين المسجلين</p>
         </div>
-        
         <div class="admin-tools">
-            <button class="btn btn-action btn-change-pw" onclick="openChangePwModal()"><i class="fas fa-key"></i> تغيير كلمة سر موظف</button>
-            <button class="btn btn-action btn-change-pw" onclick="openAdminChangePwModal()"><i class="fas fa-user-shield"></i> تغيير كلمة سر الأدمن</button>
+            <button class="btn btn-action btn-change-pw" onclick="openModal('changePwModal')"><i class="fas fa-key"></i> تغيير كلمة سر موظف</button>
+            <button class="btn btn-action btn-change-pw" onclick="openModal('changeAdminPwModal')"><i class="fas fa-user-shield"></i> تغيير كلمة سر الأدمن</button>
         </div>
-        
         <div class="card" style="margin-top: 20px;">
-            <h3 style="margin-bottom:12px;"><i class="fas fa-search"></i> بحث الموظفين</h3>
-            <input type="text" id="searchInput" placeholder="اكتب حرف أو كود للبحث السريع..." style="margin-bottom:0;">
+            <h3><i class="fas fa-search"></i> بحث الموظفين</h3>
+            <input type="text" id="searchInput" placeholder="اكتب حرف أو كود للبحث السريع...">
             <div id="searchResults" class="search-results"></div>
         </div>
     </div>
 
-    <!-- Employee Buttons (non-admin) -->
+    <!-- أزرار الموظف العادي -->
     <div class="action-group" id="actionBtns" style="margin-top: 30px; display: none;">
-        <button class="btn btn-att" onclick="handleAttendance('حضور')"><i class="fas fa-check"></i> حضور</button>
-        <button class="btn btn-leave" onclick="handleAttendance('انصراف')"><i class="fas fa-times"></i> انصراف</button>
+        <button class="btn btn-att" onclick="prepareAttendance('حضور')"><i class="fas fa-check"></i> حضور</button>
+        <button class="btn btn-leave" onclick="prepareAttendance('انصراف')"><i class="fas fa-times"></i> انصراف</button>
         <button class="btn btn-action" onclick="showEmployeeReport()" style="background:#6b21a5;"><i class="fas fa-chart-line"></i> تقاريري</button>
     </div>
-    
-    <footer style="margin-top: 40px;">
+
+    <footer>
         <div class="brand">Axentro</div>
         <p>نظام حضور وانصراف ومتابعة الموظفين</p>
         <p>© 2024 Axentro – All Rights Reserved</p>
@@ -194,7 +351,6 @@
     </footer>
 </div>
 
-<!-- Toast -->
 <div id="toast" class="toast"></div>
 
 <script>
@@ -210,10 +366,11 @@
     let selectedEmp = null;
     let regMode = false; 
     let regData = {}; 
-    let attendanceMode = false; // لتحديد ما إذا كانت الكاميرا مفتوحة لتسجيل حضور
+    let attendanceMode = false;
+    let pendingAttendanceType = null;
     let autoCapture = false;
     let lastDetectionTime = 0;
-    const DETECTION_INTERVAL = 200; // ms
+    const DETECTION_INTERVAL = 200;
     let detectionTimeout = null;
     
     // --- Elements ---
@@ -225,18 +382,13 @@
         const t = $('toast'); t.textContent = msg; t.className = `toast show ${type}`;
         setTimeout(() => t.classList.remove('show'), 4000);
     };
-    const setStatus = (txt) => {
-        $('connText').textContent = txt;
+    const setStatus = (txt) => { $('connText').textContent = txt; };
+    const togglePassword = (id) => {
+        const inp = $(id);
+        inp.type = inp.type === 'password' ? 'text' : 'password';
     };
-    
-    function togglePassword(inputId) {
-        const input = $(inputId);
-        if (input.type === 'password') {
-            input.type = 'text';
-        } else {
-            input.type = 'password';
-        }
-    }
+    const openModal = (id) => { $(id).classList.add('active'); };
+    const closeModal = (id) => { $(id).classList.remove('active'); };
     
     // --- Initialization ---
     async function init() {
@@ -253,20 +405,15 @@
             setStatus('غير متصل');
             $('connDot').classList.remove('online');
             $('connDot').classList.add('offline');
-            return; 
         }
-
         const stored = localStorage.getItem('axentro_data');
         if(stored) localData = JSON.parse(stored);
         getLocation();
-
         const savedUser = sessionStorage.getItem('user');
         if (savedUser) {
             user = JSON.parse(savedUser);
             showApp();
         }
-        
-        // Enter key login
         $('loginCode').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
         $('loginPass').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
     }
@@ -276,7 +423,6 @@
         const code = $('loginCode').value.trim();
         const pass = $('loginPass').value.trim();
         if (!code || !pass) return showToast('يرجى إدخال الكود وكلمة السر', 'error');
-        
         try {
             const res = await fetch(`${URL}?action=verifyLogin&code=${encodeURIComponent(code)}&password=${encodeURIComponent(pass)}`);
             const data = await res.json();
@@ -289,19 +435,14 @@
             }
         } catch (e) { showToast('خطأ في الاتصال', 'error'); }
     }
-
     function logout() {
         sessionStorage.removeItem('user');
         user = null;
         $('mainApp').style.display = 'none';
         $('loginScreen').classList.remove('hidden');
     }
-    
     function refreshData() {
-       if(user && user.isAdmin) {
-           loadEmployees();
-           showToast('جاري تحديث البيانات...', 'success');
-       }
+        if(user && user.isAdmin) { loadEmployees(); showToast('جاري تحديث البيانات...', 'success'); }
     }
     
     // --- App Logic ---
@@ -309,7 +450,6 @@
         $('loginScreen').classList.add('hidden');
         $('registerScreen').classList.add('hidden');
         $('mainApp').style.display = 'block';
-
         if (user.isAdmin) {
             $('adminPanel').style.display = 'block';
             $('actionBtns').style.display = 'none';
@@ -321,7 +461,6 @@
             if(selectedEmp) showToast(`مرحباً ${user.name}`, 'success');
         }
     }
-    
     async function loadEmployees() {
         try {
             const res = await fetch(`${URL}?action=getEmployees`);
@@ -340,15 +479,7 @@
         }
     }
     
-    // --- Admin Password Change ---
-    function openAdminChangePwModal() {
-        $('adminOldPassword').value = '';
-        $('adminNewPassword').value = '';
-        $('changeAdminPwModal').classList.add('active');
-    }
-    function closeAdminPwModal() {
-        $('changeAdminPwModal').classList.remove('active');
-    }
+    // --- Change Passwords ---
     async function submitAdminChangePassword() {
         const oldPass = $('adminOldPassword').value.trim();
         const newPass = $('adminNewPassword').value.trim();
@@ -361,29 +492,16 @@
             const data = await res.json();
             if (data.success) {
                 showToast('تم تغيير كلمة سر الأدمن بنجاح', 'success');
-                closeAdminPwModal();
-            } else {
-                showToast(data.error || 'فشل التغيير', 'error');
-            }
+                closeModal('changeAdminPwModal');
+                $('adminOldPassword').value = '';
+                $('adminNewPassword').value = '';
+            } else { showToast(data.error || 'فشل التغيير', 'error'); }
         } catch(e) { showToast('خطأ في الاتصال', 'error'); }
-    }
-    
-    // --- Change Password for Employee (Admin) ---
-    function openChangePwModal() {
-        $('targetEmpCode').value = '';
-        $('newPassword').value = '';
-        $('changePwModal').classList.add('active');
-    }
-    function closeChangePwModal() {
-        $('changePwModal').classList.remove('active');
     }
     async function submitChangePassword() {
         const code = $('targetEmpCode').value.trim();
         const newPass = $('newPassword').value.trim();
-        if (!code || !newPass) {
-            showToast('يرجى إدخال الكود وكلمة السر الجديدة', 'error');
-            return;
-        }
+        if (!code || !newPass) return showToast('يرجى إدخال الكود وكلمة السر الجديدة', 'error');
         try {
             const res = await fetch(URL, {
                 method: 'POST',
@@ -392,40 +510,27 @@
             const data = await res.json();
             if (data.success) {
                 showToast('تم تغيير كلمة السر بنجاح', 'success');
-                closeChangePwModal();
-            } else {
-                showToast(data.error || 'فشل التغيير', 'error');
-            }
-        } catch(e) {
-            showToast('خطأ في الاتصال', 'error');
-        }
+                closeModal('changePwModal');
+                $('targetEmpCode').value = '';
+                $('newPassword').value = '';
+            } else { showToast(data.error || 'فشل التغيير', 'error'); }
+        } catch(e) { showToast('خطأ في الاتصال', 'error'); }
     }
     
     // --- Registration ---
-    function showRegisterScreen() {
-        $('loginScreen').classList.add('hidden');
-        $('registerScreen').classList.remove('hidden');
-    }
-    function showLoginScreen() {
-        $('registerScreen').classList.add('hidden');
-        $('loginScreen').classList.remove('hidden');
-    }
-
+    function showRegisterScreen() { $('loginScreen').classList.add('hidden'); $('registerScreen').classList.remove('hidden'); }
+    function showLoginScreen() { $('registerScreen').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); }
     async function startRegistration() {
         const name = $('regName').value.trim();
         const email = $('regEmail').value.trim();
         const shift = $('regShift').value;
         if (!name || !email) return showToast('يرجى إدخال الاسم والبريد', 'error');
-        
         regData = { name, email, shift };
         regMode = true;
         attendanceMode = false;
         autoCapture = true;
         const opened = await openCamera();
-        if (!opened) {
-            regMode = false;
-            showToast('فشل فتح الكاميرا', 'error');
-        }
+        if (!opened) { regMode = false; showToast('فشل فتح الكاميرا', 'error'); }
     }
     
     // --- Camera with auto-capture ---
@@ -441,7 +546,6 @@
             return true;
         } catch (e) { return false; }
     }
-    
     function startDetectionLoop() {
         function detect() {
             if (!video.srcObject || !$('cameraOverlay').classList.contains('active')) return;
@@ -454,7 +558,6 @@
         }
         detect();
     }
-    
     async function drawFaceBoxAndAutoCapture() {
         if (!video.srcObject || video.videoWidth === 0) return;
         try {
@@ -466,32 +569,26 @@
                 ctx.strokeRect(box.x, box.y, box.width, box.height);
                 ctx.fillStyle = '#10b981'; ctx.font = 'bold 16px sans-serif';
                 ctx.fillText('وجه مكتشف', box.x, box.y - 10);
-                
-                if (autoCapture && (regMode || attendanceMode)) {
-                    autoCapture = false; // منع الالتقاط المتكرر
+                if (autoCapture) {
+                    autoCapture = false;
                     if (regMode) {
                         await handleCapture(detection.descriptor);
-                    } else if (attendanceMode) {
+                    } else if (attendanceMode && pendingAttendanceType) {
                         await handleAttendanceWithFace(detection.descriptor);
                     }
                 }
             } else {
-                // إذا لم يتم اكتشاف وجه، نعيد تمكين autoCapture بعد 2 ثانية
                 if (detectionTimeout) clearTimeout(detectionTimeout);
                 detectionTimeout = setTimeout(() => { autoCapture = true; }, 2000);
             }
         } catch(e) { console.error(e); }
     }
-    
     async function handleCapture(descriptor) {
-        if (!models) return showToast('النماذج غير جاهزة', 'error');
-        if (!regMode) return;
-        
+        if (!models || !regMode) return;
         const c = document.createElement('canvas');
         c.width = video.videoWidth; c.height = video.videoHeight;
         c.getContext('2d').drawImage(video, 0, 0);
         const imgData = c.toDataURL('image/jpeg');
-        
         const payload = {
             action: 'register',
             name: regData.name,
@@ -500,13 +597,11 @@
             imageData: imgData,
             shift: regData.shift
         };
-        
         try {
             const response = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) });
             const result = await response.json();
             if(result.success) {
-                const newEmp = { name: regData.name, code: result.code, imageData: imgData };
-                localData.push(newEmp);
+                localData.push({ name: regData.name, code: result.code, imageData: imgData });
                 localStorage.setItem('axentro_data', JSON.stringify(localData));
                 showToast('تم التسجيل بنجاح! راجع بريدك الإلكتروني.', 'success');
                 closeCamera();
@@ -515,36 +610,18 @@
         } catch (e) { showToast('خطأ في الاتصال', 'error'); }
     }
     
-    // --- Attendance with face verification ---
-    async function handleAttendance(type) {
-        // للموظف العادي: فتح الكاميرا للتحقق من الوجه
-        if (!user.isAdmin) {
-            attendanceMode = true;
-            autoCapture = true;
-            selectedEmp = user; // حفظ الموظف الحالي
-            const opened = await openCamera();
-            if (!opened) {
-                attendanceMode = false;
-                showToast('فشل فتح الكاميرا', 'error');
-            }
-            return;
-        }
-        // للأدمن: يجب اختيار موظف أولاً
-        const searchVal = $('searchInput').value.trim();
-        const target = employees.find(e => e.name === searchVal || e.code === searchVal);
-        if (!target) return showToast('يرجى اختيار موظف من البحث', 'error');
-        selectedEmp = target;
-        // للأدمن، إذا أراد التسجيل يدويًا نستخدم دالة منفصلة
-        showToast('استخدم أزرار التسجيل اليدوي في نافذة الموظف', 'info');
+    // --- Attendance for employee (non-admin) ---
+    function prepareAttendance(type) {
+        if (user.isAdmin) return;
+        attendanceMode = true;
+        pendingAttendanceType = type;
+        autoCapture = true;
+        openCamera();
     }
-    
     async function handleAttendanceWithFace(descriptor) {
         if (!attendanceMode) return;
-        const type = attendanceType; // يجب حفظ النوع في متغير
-        const target = selectedEmp;
-        if (!target) return;
-        
-        // التحقق من الوجه عبر الخادم
+        const target = user;
+        // Verify face
         const verifyRes = await fetch(URL, {
             method: 'POST',
             body: JSON.stringify({ action: 'verifyFace', code: target.code, descriptor: Array.from(descriptor) })
@@ -556,39 +633,34 @@
             closeCamera();
             return;
         }
-        
         const now = new Date();
         const timeStr = now.toLocaleString('ar-EG', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const dateStr = now.toLocaleDateString('ar-EG');
-        
         const payload = {
             action: 'attendance',
             name: target.name,
             code: target.code,
-            type: type,
+            type: pendingAttendanceType,
             location: currentLoc || 'غير متوفر',
             datetime: `${dateStr} - ${timeStr}`,
-            imageData: '', // لا نرسل صورة الآن
+            imageData: '',
             descriptor: Array.from(descriptor),
             manual: false
         };
-        
         try {
             await fetch(URL, { method: 'POST', body: JSON.stringify(payload) });
-            showToast(`تم تسجيل ${type} بنجاح`, 'success');
+            showToast(`تم تسجيل ${pendingAttendanceType} بنجاح`, 'success');
             attendanceMode = false;
             closeCamera();
         } catch (e) { showToast('فشل الإرسال', 'error'); }
     }
     
-    // Manual attendance for admin (no camera)
+    // --- Manual attendance for admin ---
     async function handleManualAttendance(type) {
-        if (!user.isAdmin) return;
-        if (!selectedEmp) return showToast('لم يتم اختيار موظف', 'error');
+        if (!user.isAdmin || !selectedEmp) return showToast('لم يتم اختيار موظف', 'error');
         const now = new Date();
         const timeStr = now.toLocaleString('ar-EG', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const dateStr = now.toLocaleDateString('ar-EG');
-        
         const payload = {
             action: 'attendance',
             name: selectedEmp.name,
@@ -600,48 +672,33 @@
             descriptor: null,
             manual: true
         };
-        
         try {
             const res = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) });
             const data = await res.json();
-            if (data.success) {
-                showToast(`تم تسجيل ${type} يدويًا بنجاح`, 'success');
-            } else {
-                showToast(data.error || 'فشل التسجيل', 'error');
-            }
+            if (data.success) showToast(`تم تسجيل ${type} يدويًا بنجاح`, 'success');
+            else showToast(data.error || 'فشل التسجيل', 'error');
         } catch(e) { showToast('خطأ في الاتصال', 'error'); }
     }
     
-    // --- Employee Report for non-admin ---
+    // --- Employee Report ---
     async function showEmployeeReport() {
         if (!user || user.isAdmin) return;
-        const code = user.code;
-        const res = await fetch(`${URL}?action=getAttendance&code=${encodeURIComponent(code)}`);
+        const res = await fetch(`${URL}?action=getAttendance&code=${encodeURIComponent(user.code)}`);
         const data = await res.json();
-        if (!data.success) {
-            showToast('فشل تحميل التقرير', 'error');
-            return;
-        }
+        if (!data.success) { showToast('فشل تحميل التقرير', 'error'); return; }
         displayReport(data.workHours);
     }
-    
     async function fetchEmployeeReportForAdmin(code) {
         const res = await fetch(`${URL}?action=getAttendance&code=${encodeURIComponent(code)}`);
         const data = await res.json();
-        if (!data.success) {
-            showToast('فشل تحميل التقرير', 'error');
-            return;
-        }
+        if (!data.success) { showToast('فشل تحميل التقرير', 'error'); return; }
         displayReport(data.workHours);
     }
-    
     function displayReport(workHours) {
         let html = '<div style="text-align:right;">';
-        if (workHours.length === 0) {
-            html += '<p>لا توجد سجلات حضور بعد.</p>';
-        } else {
-            html += '<table style="width:100%; border-collapse:collapse;">';
-            html += '<tr><th>التاريخ</th><th>حضور</th><th>انصراف</th><th>ساعات العمل</th><th>المتوقع</th><th>الشفت</th></tr>';
+        if (workHours.length === 0) html += '<p>لا توجد سجلات حضور بعد.</p>';
+        else {
+            html += '<table class="report-table"><thead><tr><th>التاريخ</th><th>حضور</th><th>انصراف</th><th>ساعات العمل</th><th>المتوقع</th><th>الشفت</th></tr></thead><tbody>';
             for (let day of workHours) {
                 html += `<tr>
                     <td>${day.date}</td>
@@ -652,40 +709,32 @@
                     <td>${day.shift === 'EARLY' ? 'صباحي' : (day.shift === 'BETWEEN' ? 'بعد الظهر' : 'مسائي')}</td>
                 </tr>`;
             }
-            html += '</table>';
+            html += '</tbody></table>';
         }
         html += '</div>';
         $('reportBody').innerHTML = html;
-        $('reportModal').classList.add('active');
+        openModal('reportModal');
     }
     
-    function closeReportModal() {
-        $('reportModal').classList.remove('active');
-    }
-    
-    // --- Search & Modal (Admin) ---
+    // --- Admin: Search & Employee Details ---
     $('searchInput')?.addEventListener('input', (e) => {
         const q = e.target.value.toLowerCase();
         if(!q) { $('searchResults').innerHTML = ''; return; }
-        
         const res = employees.filter(emp => emp.name.toLowerCase().includes(q) || emp.code.toLowerCase().includes(q));
-        const html = res.map(e => `
-            <div class="search-item" onclick="showEmployeeDetails('${e.code}')">
-                <div style="font-weight:bold;">${e.name}</div>
-                <div style="font-size:12px; color:#94a3b8;">${e.code}</div>
+        const html = res.map(emp => `
+            <div class="search-item" onclick="showEmployeeDetails('${emp.code}')">
+                <div style="font-weight:bold;">${emp.name}</div>
+                <div style="font-size:12px; color:#94a3b8;">${emp.code}</div>
             </div>
         `).join('');
         $('searchResults').innerHTML = html;
     });
-    
     async function showEmployeeDetails(code) {
         const emp = employees.find(e => e.code === code);
         if(!emp) return;
-        
         selectedEmp = emp;
         $('searchInput').value = emp.name;
         $('searchResults').innerHTML = '';
-        
         $('modalTitle').textContent = emp.name;
         $('modalBody').innerHTML = `
             <div style="text-align:center; margin-bottom:20px;">
@@ -705,11 +754,7 @@
                 يمكنك تسجيل الحضور والانصراف يدويًا دون كاميرا.
             </div>
         `;
-        $('detailModal').classList.add('active');
-    }
-    
-    function closeModal() {
-        $('detailModal').classList.remove('active');
+        openModal('detailModal');
     }
     
     // --- Camera close ---
