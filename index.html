@@ -7,11 +7,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     
-    <!-- ملفات الصوت (قم بتسمية ملفاتك بهذه الأسماء بالضبط) -->
-    <audio id="login_success" src="login_success.mp3" preload="auto"></audio>
-    <audio id="login_error" src="login_error.mp3" preload="auto"></audio>
-    <audio id="checkout_success" src="checkout_success.mp3" preload="auto"></audio>
-    <audio id="checkout_error" src="checkout_error.mp3" preload="auto"></audio>
+    <!-- ملفات الصوت المحدثة -->
+    <audio id="login-success" src="login-success.mp3" preload="auto"></audio>
+    <audio id="login-error" src="login-error.mp3" preload="auto"></audio>
+    <audio id="logout-success" src="logout-success.mp3" preload="auto"></audio>
+    <audio id="faceid-success" src="faceid-success.mp3" preload="auto"></audio>
+    <audio id="faceid-error" src="faceid-error.mp3" preload="auto"></audio>
 
     <style>
         :root {
@@ -120,7 +121,7 @@
 
         /* Remember Me */
         .remember-me { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; cursor: pointer; }
-        .remember-me input { width: 18px; height: 18px; accent-color: var(--primary); margin: 0; cursor: pointer; }
+        .remember-me input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); margin: 0; cursor: pointer; flex-shrink: 0; }
         .remember-me label { color: #94a3b8; font-size: 14px; cursor: pointer; }
 
         /* Toasts */
@@ -167,7 +168,8 @@
 <div id="loginScreen" class="overlay">
     <div class="card" style="max-width: 420px; width: 100%; margin-bottom: 20px; animation: fadeInUp 0.8s ease-out;">
         <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="margin-bottom: 5px; font-size: 32px;">Axentro System</h1>
+            <!-- تم إضافة أيقونة البصمة -->
+            <h1 style="margin-bottom: 5px; font-size: 32px;"><i class="fas fa-fingerprint"></i> Axentro System</h1>
             <p style="color: #64748b; font-size: 14px; font-weight: 600;">نظام إدارة الحضور والانصراف المتقدم</p>
         </div>
         <input type="text" id="loginCode" placeholder="اسم المستخدم أو الكود">
@@ -175,10 +177,13 @@
             <input type="password" id="loginPass" placeholder="كلمة السر">
             <button class="toggle-password" onclick="togglePassword('loginPass')"><i class="fas fa-eye"></i></button>
         </div>
-        <div class="remember-me" onclick="document.getElementById('rememberMe').click();">
+        
+        <!-- تم تعديل الـ Checkbox ليكون عادي وواضح -->
+        <div class="remember-me">
             <input type="checkbox" id="rememberMe">
             <label for="rememberMe">تذكرني (حفظ جلسة الدخول)</label>
         </div>
+
         <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;"><i class="fas fa-arrow-right-to-bracket"></i> تسجيل الدخول</button>
         <button class="btn btn-reg" onclick="showRegisterScreen()"><i class="fas fa-user-plus"></i> إنشاء حساب جديد</button>
         <p style="text-align: center; margin-top: 20px;"><a href="#" onclick="showForgotPw()" style="color: #64748b; text-decoration: none; font-size: 13px; transition: 0.2s;">نسيت كلمة المرور؟</a></p>
@@ -301,7 +306,9 @@
     const $ = id => document.getElementById(id);
     const video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
     
+    // دالة تشغيل الصوتيات المحدثة
     const playSound = (id) => { const audio = $(id); if(audio) audio.play().catch(e => {}); };
+    
     const showToast = (msg, type = '') => { const t = $('toast'); t.textContent = msg; t.className = `toast show ${type}`; setTimeout(() => t.classList.remove('show'), 4000); };
     const setStatus = (txt) => { $('connText').textContent = txt; };
     function togglePassword(id) { const i = $(id); i.type = i.type === 'password' ? 'text' : 'password'; }
@@ -326,11 +333,31 @@
         } catch (e) { setStatus('فشل تحميل النماذج'); }
         getLocation();
         
-        // Check Remember Me
-        const savedUser = localStorage.getItem('rememberedUser') || sessionStorage.getItem('user');
+        // Check Remember Me مع التحقق من مدة الـ 10 ساعات
+        const savedSessionStr = localStorage.getItem('rememberedUser');
+        const savedTempStr = sessionStorage.getItem('user');
+        let savedUser = null;
+
+        if (savedSessionStr) {
+            try {
+                const sessionObj = JSON.parse(savedSessionStr);
+                const TEN_HOURS = 10 * 60 * 60 * 1000; // 10 ساعات بالمللي ثانية
+                
+                if (Date.now() - sessionObj.timestamp < TEN_HOURS) {
+                    savedUser = sessionObj.data;
+                } else {
+                    // انتهت المدة (10 ساعات) -> يتم مسح الجلسة فوراً
+                    localStorage.removeItem('rememberedUser');
+                }
+            } catch (e) {
+                localStorage.removeItem('rememberedUser'); // في حال كان الجيسون تالف
+            }
+        } else if (savedTempStr) {
+            savedUser = JSON.parse(savedTempStr);
+        }
+
         if (savedUser) { 
-            user = JSON.parse(savedUser); 
-            // جلب بيانات الوجه للجلسة المحفوظة
+            user = savedUser; 
             if (!user.isAdmin) {
                 const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
                 const empData = await empRes.json();
@@ -360,24 +387,27 @@
             if (data.success) {
                 user = { name: data.name, code: data.code, isAdmin: data.isAdmin, isFirstLogin: data.isFirstLogin };
                 
-                // حفظ الجلسة
-                if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify(user)); } 
-                else { sessionStorage.setItem('user', JSON.stringify(user)); }
+                // تشغيل صوت نجاح الدخول العادي (كود + باسورد)
+                playSound('login-success');
 
-                // جلب بيانات الوجه لـ "جميع" المستخدمين (بما فيهم الأدمن)
+                // حفظ الجلسة مع إضافة الطابع الزمني للـ 10 ساعات
+                if($('rememberMe').checked) { 
+                    localStorage.setItem('rememberedUser', JSON.stringify({ data: user, timestamp: Date.now() })); 
+                } else { 
+                    sessionStorage.setItem('user', JSON.stringify(user)); 
+                }
+
                 setStatus('جاري تحميل بيانات الوجه...');
                 const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(data.code)}`);
                 const empData = await empRes.json();
                 sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null;
 
-                // التحقق الأمني للأدمن (إجبار تسجيل الوجه)
                 if (data.isAdmin && !sessionDescriptor) {
                     showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'error');
                     updateFaceMode = true;
                     const opened = await openCamera();
                     if (!opened) { updateFaceMode = false; showToast('فشل فتح الكاميرا، لا يمكنك الدخول', 'error'); logout(); }
                 } 
-                // التحقق من أول مرة لتغيير كلمة السر للموظفين
                 else if (!data.isAdmin && data.isFirstLogin) {
                     $('forcePwModal').classList.add('active');
                 } 
@@ -385,12 +415,12 @@
                     showApp();
                 }
             } else { 
-                playSound('login_error');
+                playSound('login-error'); // صوت فشل الدخول العادي
                 showToast(data.error || 'بيانات خاطئة', 'error'); 
                 setStatus('النظام جاهز');
             }
         } catch (e) { 
-            playSound('login_error');
+            playSound('login-error'); // صوت فشل الدخول العادي
             showToast('خطأ في الاتصال بالخادم', 'error'); 
             setStatus('غير متصل');
         }
@@ -411,6 +441,7 @@
     }
 
     function logout() { 
+        playSound('logout-success'); // صوت تسجيل الخروج
         localStorage.removeItem('rememberedUser'); 
         sessionStorage.removeItem('user'); 
         user = null; sessionDescriptor = null; 
@@ -422,14 +453,13 @@
     
     function showApp() {
         $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display = 'block';
+        // تم إزالة أصوات الدخول من هنا لأنها تُشغل الآن من handleLogin بشكل أدق
         if (user.isAdmin) {
             $('mainAppTitle').textContent = 'لوحة تحكم المدير'; $('adminPanel').style.display = 'block'; $('employeePanel').style.display = 'none';
-            playSound('login_success');
             showToast(`مرحباً بك في لوحة التحكم`, 'success');
             loadEmployees();
         } else {
             $('mainAppTitle').textContent = 'لوحة الموظف'; $('adminPanel').style.display = 'none'; $('employeePanel').style.display = 'block';
-            playSound('login_success');
             showToast(`مرحباً يا ${user.name}`, 'success');
         }
     }
@@ -576,7 +606,7 @@
         
         const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
         if (!detection) { 
-            playSound('login_error'); 
+            playSound('faceid-error'); // صوت فشل التقاط الوجه
             $('camStatus').innerHTML = '<i class="fas fa-times-circle" style="color:red;"></i> فشل قراءة الوجه'; 
             autoCaptureTimeout = null; 
             setTimeout(() => closeCamera(), 2000); 
@@ -593,9 +623,9 @@
             const payload = { action: 'register', name: regData.name, email: regData.email, descriptor: newDescriptor, imageData: imgData };
             try {
                 const response = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) }); const result = await response.json();
-                if(result.success) { playSound('login_success'); showToast('تم التسجيل بنجاح!', 'success'); closeCamera(); showLoginScreen(); } 
-                else { playSound('login_error'); showToast(result.error || 'حدث خطأ', 'error'); closeCamera(); }
-            } catch (e) { playSound('login_error'); showToast('خطأ في الاتصال بالشيت', 'error'); closeCamera(); }
+                if(result.success) { playSound('faceid-success'); showToast('تم التسجيل بنجاح!', 'success'); closeCamera(); showLoginScreen(); } 
+                else { playSound('faceid-error'); showToast(result.error || 'حدث خطأ', 'error'); closeCamera(); }
+            } catch (e) { playSound('faceid-error'); showToast('خطأ في الاتصال بالشيت', 'error'); closeCamera(); }
         } 
         else if (updateFaceMode) {
             $('camStatus').innerHTML = '<i class="fas fa-upload"></i> جاري تحديث بيانات الوجه للأدمن...';
@@ -603,16 +633,16 @@
             try {
                 const response = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) }); const result = await response.json();
                 if(result.success) { 
-                    playSound('login_success'); 
-                    sessionDescriptor = newDescriptor; // تحديث الجلسة فوراً
+                    playSound('faceid-success'); 
+                    sessionDescriptor = newDescriptor;
                     showToast('تم تسجيل وجهك بنجاح!', 'success'); 
                     closeCamera(); 
                     showApp(); 
-                } else { playSound('login_error'); showToast('فشل التحديث', 'error'); closeCamera(); }
-            } catch (e) { playSound('login_error'); showToast('خطأ في الاتصال', 'error'); closeCamera(); }
+                } else { playSound('faceid-error'); showToast('فشل التحديث', 'error'); closeCamera(); }
+            } catch (e) { playSound('faceid-error'); showToast('خطأ في الاتصال', 'error'); closeCamera(); }
         }
         else if (attMode) {
-            if (!sessionDescriptor) { playSound('login_error'); showToast('بيانات الوجه غير متوفرة، تواصل مع الأدمن.', 'error'); closeCamera(); return; }
+            if (!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة، تواصل مع الأدمن.', 'error'); closeCamera(); return; }
 
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
             if (distance < 0.6) { 
@@ -629,23 +659,22 @@
                     const res = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) }); 
                     const data = await res.json();
                     
-                    // الأمان الحرج: لا نعتبرها نجاح إلا إذا أكد السيرفر
                     if(data.success) {
-                        playSound(attType === 'حضور' ? 'login_success' : 'checkout_success');
+                        playSound('faceid-success'); // صوت نجاح البصمة في الحضور والانصراف
                         let msg = `تم تسجيل ${attType} بنجاح في الشيت`;
                         if(data.hoursWorked) msg += ` (${data.hoursWorked})`;
                         showToast(msg, 'success');
                     } else {
-                        playSound(attType === 'حضور' ? 'login_error' : 'checkout_error');
+                        playSound('faceid-error'); 
                         showToast('فشل التسجيل في الشيت: ' + (data.error || ''), 'error');
                     }
                 } catch (e) {
-                    playSound(attType === 'حضور' ? 'login_error' : 'checkout_error');
+                    playSound('faceid-error'); 
                     showToast('خطأ في الاتصال بالشيت! لم يتم تسجيل الحضور.', 'error');
                 }
                 closeCamera();
             } else {
-                playSound(attType === 'حضور' ? 'login_error' : 'checkout_error');
+                playSound('faceid-error'); // صوت عدم تطابق الوجه
                 showToast('الوجه غير مطابق! تم رفض التسجيل.', 'error');
                 $('camStatus').innerHTML = '<i class="fas fa-ban" style="color:var(--danger);"></i> الوجه غير مطابق!';
                 autoCaptureTimeout = null; setTimeout(() => closeCamera(), 2500);
