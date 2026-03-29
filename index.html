@@ -6,7 +6,6 @@
     <title>Axentro | نظام متابعة الموظفين</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-    <!-- الأصوات (تأكد من رفع الملفات في نفس مسار هذا الملف) -->
     <audio id="successSound" src="success.mp3" preload="auto"></audio>
     <audio id="errorSound" src="error.mp3" preload="auto"></audio>
     <style>
@@ -30,8 +29,8 @@
         .close-cam { position: absolute; top: 15px; right: 15px; z-index: 30; background: rgba(239, 68, 68, 0.8); border: none; color: white; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer; }
 
         .card { background: var(--card-bg); backdrop-filter: blur(12px); border-radius: 24px; padding: 20px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
-        input { width: 100%; padding: 14px 20px; border-radius: 50px; background: rgba(0,0,0,0.5); border: 1px solid #334155; color: white; font-size: 16px; outline: none; margin-bottom: 12px; transition: 0.2s; }
-        input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
+        input, select { width: 100%; padding: 14px 20px; border-radius: 50px; background: rgba(0,0,0,0.5); border: 1px solid #334155; color: white; font-size: 16px; outline: none; margin-bottom: 12px; transition: 0.2s; appearance: none; }
+        input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
         input::placeholder { color: #94a3b8; }
         .password-wrapper { position: relative; width: 100%; margin-bottom: 12px; }
         .password-wrapper input { margin-bottom: 0; padding-left: 50px; }
@@ -66,7 +65,7 @@
         .emp-item { background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; border-radius: 16px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
         .emp-info h4 { margin-bottom: 4px; font-size: 15px; }
         .emp-info p { color: #94a3b8; font-size: 12px; }
-        .emp-actions { display: flex; gap: 8px; }
+        .emp-actions { display: flex; gap: 6px; }
 
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 30, 0.98); backdrop-filter: blur(15px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; overflow-y: auto; }
         .overlay.hidden { display: none; }
@@ -83,8 +82,16 @@
 
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; z-index: 1500; padding: 20px; }
         .modal.active { display: flex; }
-        .modal-content { background: #1e293b; width: 100%; max-width: 400px; border-radius: 24px; padding: 25px; text-align: right; position: relative; animation: slideIn 0.3s ease-out; max-height: 90vh; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); }
+        .modal-content { background: #1e293b; width: 100%; max-width: 500px; border-radius: 24px; padding: 25px; text-align: right; position: relative; animation: slideIn 0.3s ease-out; max-height: 90vh; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); }
         .modal-close { position: absolute; top: 15px; left: 15px; background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
+
+        /* تنسيق جدول التقارير */
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        .report-table th { background: #334155; padding: 10px; color: #38bdf8; border-bottom: 2px solid #475569; }
+        .report-table td { padding: 10px; border-bottom: 1px solid #334155; color: #cbd5e1; }
+        .att-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .att-in { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .att-out { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
         @media (max-width: 400px) {
             .btn { font-size: 14px; padding: 12px; }
@@ -105,46 +112,21 @@
     <p id="camStatus">جاري البحث عن الوجه...</p>
 </div>
 
-<div id="changePwModal" class="modal">
-    <div class="modal-content">
-        <button class="modal-close" onclick="closeChangePwModal()"><i class="fas fa-times"></i></button>
-        <h2 style="text-align:center; margin-bottom:20px;" id="changePwTitle">تغيير كلمة السر</h2>
-        <div style="text-align: center;" id="changePwBody"></div>
-    </div>
-</div>
-
-<div id="forgotPwModal" class="modal">
-    <div class="modal-content" style="text-align: center;">
-        <button class="modal-close" onclick="closeForgotPw()"><i class="fas fa-times"></i></button>
-        <h2 style="margin-bottom: 20px;"><i class="fas fa-key"></i> استعادة كلمة المرور</h2>
-        <p style="color: #94a3b8; font-size: 14px; margin-bottom: 20px;">سيتم إرسال كلمة السر إلى بريدك الإلكتروني المسجل في النظام.</p>
-        <input type="text" id="forgotCode" placeholder="أدخل كود الموظف (EMPxxx)">
-        <button class="btn btn-login" onclick="submitForgotPw()"><i class="fas fa-paper-plane"></i> إرسال كلمة السر</button>
-    </div>
-</div>
+<div id="changePwModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeChangePwModal()"><i class="fas fa-times"></i></button><h2 style="text-align:center; margin-bottom:20px;" id="changePwTitle">تغيير كلمة السر</h2><div style="text-align: center;" id="changePwBody"></div></div></div>
+<div id="forgotPwModal" class="modal"><div class="modal-content" style="text-align: center;"><button class="modal-close" onclick="closeForgotPw()"><i class="fas fa-times"></i></button><h2 style="margin-bottom: 20px;"><i class="fas fa-key"></i> استعادة كلمة المرور</h2><input type="text" id="forgotCode" placeholder="أدخل كود الموظف"><button class="btn btn-login" onclick="submitForgotPw()"><i class="fas fa-paper-plane"></i> إرسال كلمة السر</button></div></div>
+<div id="reportModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeReportModal()"><i class="fas fa-times"></i></button><h2 style="text-align:center; margin-bottom:20px;" id="reportTitle">التقارير</h2><div id="reportBody"></div></div></div>
 
 <div id="loginScreen" class="overlay">
     <div class="card" style="max-width: 400px; width: 100%; margin-bottom: 20px;">
         <h1 style="margin-bottom: 10px;"><i class="fas fa-fingerprint"></i> Axentro</h1>
         <p style="color: #94a3b8; margin-bottom: 24px;">نظام متابعة الحضور والانصراف</p>
         <input type="text" id="loginCode" placeholder="كود المستخدم">
-        <div class="password-wrapper">
-            <input type="password" id="loginPass" placeholder="كلمة السر">
-            <button class="toggle-password" onclick="togglePassword('loginPass')"><i class="fas fa-eye"></i></button>
-        </div>
+        <div class="password-wrapper"><input type="password" id="loginPass" placeholder="كلمة السر"><button class="toggle-password" onclick="togglePassword('loginPass')"><i class="fas fa-eye"></i></button></div>
         <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;"><i class="fas fa-arrow-left"></i> دخول</button>
         <button class="btn btn-reg" onclick="showRegisterScreen()"><i class="fas fa-user-plus"></i> تسجيل موظف جديد</button>
-        <p style="text-align: center; margin-top: 15px;">
-            <a href="#" onclick="showForgotPw()" style="color: var(--primary); text-decoration: none; font-size: 14px;">نسيت كلمة المرور؟</a>
-        </p>
+        <p style="text-align: center; margin-top: 15px;"><a href="#" onclick="showForgotPw()" style="color: var(--primary); text-decoration: none; font-size: 14px;">نسيت كلمة المرور؟</a></p>
     </div>
-    <footer style="position: relative; margin-top: 20px;">
-        <div class="brand">Axentro</div>
-        <p>© 2024 Axentro – All Rights Reserved</p>
-        <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://axentro-official.github.io/axentro-website/links.html" alt="QR Code" class="qr-code">
-        </a>
-    </footer>
+    <footer style="position: relative; margin-top: 20px;"><div class="brand">Axentro</div><p>© 2024 Axentro – All Rights Reserved</p></footer>
 </div>
 
 <div id="registerScreen" class="overlay hidden">
@@ -165,18 +147,14 @@
         <button class="btn btn-action btn-login" onclick="refreshData()" title="تحديث"><i class="fas fa-sync-alt"></i></button>
         <button class="btn btn-action btn-leave" onclick="logout()" title="خروج"><i class="fas fa-sign-out-alt"></i></button>
     </div>
-    <div class="status-bar" id="locBar" style="font-size: 12px;">
-        <i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span>
-    </div>
+    <div class="status-bar" id="locBar" style="font-size: 12px;"><i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span></div>
 
     <div id="adminPanel" style="display: none;">
         <div class="stat-card"><h2 id="empCount">0</h2><p>إجمالي الموظفين المسجلين</p></div>
-        
         <div class="admin-tools">
             <button class="btn btn-change-pw" onclick="openChangePwModal('own')"><i class="fas fa-user-shield"></i> كلمة سرى</button>
             <button class="btn btn-change-pw" onclick="openChangePwModal('employee')" style="background: #4338ca;"><i class="fas fa-key"></i> سر موظف</button>
         </div>
-        
         <div class="card" style="padding: 15px;">
             <div style="position: relative;">
                 <input type="text" id="searchInput" placeholder="ابحث بالاسم أو الكود..." style="margin-bottom: 15px; padding-right: 45px;">
@@ -187,21 +165,21 @@
     </div>
 
     <div id="employeePanel" style="display: none;">
+        <select id="shiftSelect">
+            <option value="">اختر وردية العمل الخاصة بك</option>
+            <option value="EARLY SHIFT (صباحي)">EARLY SHIFT (صباحي) | 9:00 ص - 5:00 م</option>
+            <option value="BETWEEN SHIFT (بعد الظهر)">BETWEEN SHIFT (بعد الظهر) | 2:00 م - 10:00 م</option>
+            <option value="NIGHT SHIFT (مسائي)">NIGHT SHIFT (مسائي) | 10:00 م - 6:00 ص</option>
+        </select>
         <div class="action-group">
             <button class="btn btn-att" onclick="handleAttendance('حضور')"><i class="fas fa-sign-in-alt"></i> حضور</button>
             <button class="btn btn-leave" onclick="handleAttendance('انصراف')"><i class="fas fa-sign-out-alt"></i> انصراف</button>
         </div>
-        <button class="btn btn-report" onclick="showToast('سيتم تفعيل التقارير قريباً', 'success')" style="margin-top: 15px;"><i class="fas fa-chart-bar"></i> سجل تقاريري</button>
+        <button class="btn btn-report" onclick="loadMyReport()" style="margin-top: 15px;"><i class="fas fa-chart-bar"></i> سجل تقاريري</button>
         <button class="btn btn-change-pw" onclick="openChangePwModal('own')" style="margin-top: 10px;"><i class="fas fa-lock"></i> تغيير كلمة المرور</button>
     </div>
 
-    <footer style="margin-top: 30px;">
-        <div class="brand">Axentro</div>
-        <p>© 2024 Axentro – All Rights Reserved</p>
-        <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://axentro-official.github.io/axentro-website/links.html" alt="QR Code" class="qr-code">
-        </a>
-    </footer>
+    <footer style="margin-top: 30px;"><div class="brand">Axentro</div><p>© 2024 Axentro – All Rights Reserved</p></footer>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -211,7 +189,7 @@
     
     let user = null;
     let lightModels = false, heavyModels = false, stream = null, employees = [];
-    let sessionDescriptor = null; // لتخزين بصمة الوجه من السيرفر (إصلاح ثغرة الأجهزة)
+    let sessionDescriptor = null;
     let selectedEmp = null, regMode = false, attMode = false, attType = '', regData = {}, autoCaptureTimeout = null;
     
     const $ = id => document.getElementById(id);
@@ -222,11 +200,12 @@
         if(audio) audio.play().catch(e => {});
     };
 
+    // تعديل مهم: الأصوات لن تعمل هنا anymore
     const showToast = (msg, type = '') => {
         const t = $('toast'); t.textContent = msg; t.className = `toast show ${type}`;
-        playSound(type);
         setTimeout(() => t.classList.remove('show'), 4000);
     };
+    
     const setStatus = (txt) => { $('connText').textContent = txt; };
     function togglePassword(id) { const i = $(id); i.type = i.type === 'password' ? 'text' : 'password'; }
     
@@ -240,8 +219,7 @@
             setStatus('تحميل النماذج...');
             await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
-            lightModels = true; loadHeavyModels();
-            setStatus('النظام جاهز');
+            lightModels = true; loadHeavyModels(); setStatus('النظام جاهز');
         } catch (e) { setStatus('فشل تحميل النماذج'); }
         getLocation();
         const savedUser = sessionStorage.getItem('user');
@@ -266,17 +244,11 @@
             if (data.success) {
                 user = { name: data.name, code: data.code, isAdmin: data.isAdmin };
                 sessionStorage.setItem('user', JSON.stringify(user));
-                
                 if (!data.isAdmin) {
-                    // جلب بصمة الوجه من السيرفر لحل مشكلة تغيير الجهاز
                     setStatus('جاري تحميل بيانات الوجه...');
                     const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(data.code)}`);
                     const empData = await empRes.json();
-                    if (empData.success && empData.descriptor) {
-                        sessionDescriptor = empData.descriptor;
-                    } else {
-                        sessionDescriptor = null;
-                    }
+                    sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null;
                 }
                 showApp();
             } else { showToast(data.error || 'بيانات خاطئة', 'error'); }
@@ -293,7 +265,6 @@
             await loadEmployees();
         } else {
             $('mainAppTitle').textContent = `مرحباً ${user.name}`; $('adminPanel').style.display = 'none'; $('employeePanel').style.display = 'block';
-            showToast(`مرحباً ${user.name}`, 'success');
         }
     }
     
@@ -308,13 +279,11 @@
         if(list.length === 0) { $('searchResults').innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">لا يوجد موظفين</p>'; return; }
         $('searchResults').innerHTML = list.map(e => `
             <div class="emp-item">
-                <div class="emp-info">
-                    <h4>${e.name}</h4>
-                    <p>${e.code}</p>
-                </div>
+                <div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div>
                 <div class="emp-actions">
                     <button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button>
                     <button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button>
+                    <button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button>
                 </div>
             </div>
         `).join('');
@@ -323,25 +292,64 @@
     $('searchInput')?.addEventListener('input', (e) => {
         const q = e.target.value.toLowerCase();
         if(!q) { renderEmployeeList(employees); return; }
-        const res = employees.filter(emp => emp.name.toLowerCase().includes(q) || emp.code.toLowerCase().includes(q));
-        renderEmployeeList(res);
+        renderEmployeeList(employees.filter(emp => emp.name.toLowerCase().includes(q) || emp.code.toLowerCase().includes(q)));
     });
     
-    // تسجيل أدمن مباشر بدون كاميرا
     async function adminDirectAtt(type, code, name) {
         const now = new Date();
         const timeStr = now.toLocaleString('ar-EG', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const dateStr = now.toLocaleDateString('ar-EG');
-        const payload = { action: 'attendance', name: name, code: code, type: type, location: currentLoc || 'غير متوفر', datetime: `${dateStr} - ${timeStr}`, imageData: null };
+        const payload = { action: 'attendance', name, code, type, location: currentLoc || 'غير متوفر', datetime: `${dateStr} - ${timeStr}`, imageData: null, shift: 'تسجيل يدوي بواسطة الأدمن' };
         try {
             const res = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) }); const data = await res.json();
-            if(data.success) showToast(`تم تسجيل ${type} لـ ${name} يدوياً`, 'success');
+            if(data.success) showToast(`تم تسجيل ${type} لـ ${name} (يدوياً)`, 'success');
             else showToast(data.error || 'فشل التسجيل', 'error');
         } catch (e) { showToast('فشل الإرسال', 'error'); }
     }
 
     // ==========================================
-    // نظام كلمات السر واسترجاعها
+    // نظام التقارير
+    // ==========================================
+    function closeReportModal() { $('reportModal').classList.remove('active'); }
+
+    async function loadMyReport() {
+        $('reportTitle').textContent = `تقرير ${user.name}`;
+        $('reportBody').innerHTML = '<center>جاري تحميل التقرير...</center>';
+        $('reportModal').classList.add('active');
+        await fetchAndRenderReport(user.code);
+    }
+
+    async function loadEmpReport(code, name) {
+        $('reportTitle').textContent = `تقرير ${name}`;
+        $('reportBody').innerHTML = '<center>جاري تحميل التقرير...</center>';
+        $('reportModal').classList.add('active');
+        await fetchAndRenderReport(code);
+    }
+
+    async function fetchAndRenderReport(code) {
+        try {
+            const res = await fetch(`${URL}?action=getEmployeeReport&code=${encodeURIComponent(code)}`);
+            const data = await res.json();
+            if(data.success && data.records.length > 0) {
+                let tableRows = data.records.map(r => `
+                    <tr>
+                        <td>${r.date}</td>
+                        <td><span class="att-badge ${r.type === 'حضور' ? 'att-in' : 'att-out'}">${r.type}</span></td>
+                        <td style="font-size:11px; color:#94a3b8;">${r.shift}</td>
+                        <td style="font-weight:bold; color:${r.hours ? '#38bdf8' : '#64748b'}">${r.hours || '-'}</td>
+                    </tr>
+                `).join('');
+                $('reportBody').innerHTML = `<table class="report-table"><thead><tr><th>التاريخ</th><th>الحالة</th><th>الشفت</th><th>الساعات</th></tr></thead><tbody>${tableRows}</tbody></table>`;
+            } else {
+                $('reportBody').innerHTML = '<center style="color:#94a3b8; padding:20px;">لا توجد سجلات حتى الآن.</center>';
+            }
+        } catch(e) {
+            $('reportBody').innerHTML = '<center style="color:#ef4444;">فشل تحميل التقرير</center>';
+        }
+    }
+
+    // ==========================================
+    // نظام كلمات السر
     // ==========================================
     let pwChangeMode = ''; 
     function openChangePwModal(mode) {
@@ -351,7 +359,7 @@
             body.innerHTML = `<div class="password-wrapper"><input type="password" id="oldPassword" placeholder="كلمة السر الحالية"><button class="toggle-password" onclick="togglePassword('oldPassword')"><i class="fas fa-eye"></i></button></div><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تحديث</button>`;
         } else {
             title.textContent = 'تغيير كلمة سر موظف';
-            body.innerHTML = `<input type="text" id="targetEmpCode" placeholder="كود الموظف (EMPxxx)"><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>`;
+            body.innerHTML = `<input type="text" id="targetEmpCode" placeholder="كود الموظف"><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>`;
         }
         $('changePwModal').classList.add('active');
     }
@@ -367,17 +375,12 @@
     function showForgotPw() { $('forgotPwModal').classList.add('active'); $('forgotCode').value = ''; }
     function closeForgotPw() { $('forgotPwModal').classList.remove('active'); }
     async function submitForgotPw() {
-        const code = $('forgotCode').value.trim();
-        if (!code) return showToast('يرجى إدخال الكود', 'error');
-        try {
-            const res = await fetch(URL, { method: 'POST', body: JSON.stringify({ action: 'forgotPassword', code }) });
-            const data = await res.json();
-            if(data.success) { showToast(data.message, 'success'); closeForgotPw(); } else showToast(data.error, 'error');
-        } catch(e) { showToast('خطأ في الاتصال', 'error'); }
+        const code = $('forgotCode').value.trim(); if (!code) return showToast('يرجى إدخال الكود', 'error');
+        try { const res = await fetch(URL, { method: 'POST', body: JSON.stringify({ action: 'forgotPassword', code }) }); const data = await res.json(); if(data.success) { showToast(data.message, 'success'); closeForgotPw(); } else showToast(data.error, 'error'); } catch(e) { showToast('خطأ في الاتصال', 'error'); }
     }
     
     // ==========================================
-    // نظام الكاميرا والتحقق الآمن
+    // نظام الكاميرا والتحقق الآمن (مع الأصوات هنا فقط)
     // ==========================================
     function showRegisterScreen() { $('loginScreen').classList.add('hidden'); $('registerScreen').classList.remove('hidden'); }
     function showLoginScreen() { $('registerScreen').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); }
@@ -399,10 +402,7 @@
     }
     
     function startDetectionLoop() {
-        async function detect() {
-            if (!video.srcObject || !$('cameraOverlay').classList.contains('active')) return;
-            await drawFaceBox(); requestAnimationFrame(detect);
-        } detect();
+        async function detect() { if (!video.srcObject || !$('cameraOverlay').classList.contains('active')) return; await drawFaceBox(); requestAnimationFrame(detect); } detect();
     }
     
     async function drawFaceBox() {
@@ -438,7 +438,7 @@
         if (!heavyModels) { $('camStatus').textContent = 'جاري تحميل نموذج الدقة...'; while(!heavyModels) await new Promise(r => setTimeout(r, 500)); }
         $('camStatus').textContent = 'جاري التحليل والمطابقة...';
         const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
-        if (!detection) { $('camStatus').textContent = 'فشل القراءة'; autoCaptureTimeout = null; setTimeout(() => closeCamera(), 2000); return; }
+        if (!detection) { playSound('error'); $('camStatus').textContent = 'فشل القراءة'; autoCaptureTimeout = null; setTimeout(() => closeCamera(), 2000); return; }
 
         const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
         c.getContext('2d').drawImage(video, 0, 0);
@@ -450,26 +450,31 @@
             const payload = { action: 'register', name: regData.name, email: regData.email, descriptor: newDescriptor, imageData: imgData };
             try {
                 const response = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) }); const result = await response.json();
-                if(result.success) { showToast('تم التسجيل بنجاح!', 'success'); closeCamera(); showLoginScreen(); } else { showToast(result.error || 'حدث خطأ', 'error'); closeCamera(); }
-            } catch (e) { showToast('خطأ في الاتصال', 'error'); closeCamera(); }
+                if(result.success) { playSound('success'); showToast('تم التسجيل بنجاح!', 'success'); closeCamera(); showLoginScreen(); } else { playSound('error'); showToast(result.error || 'حدث خطأ', 'error'); closeCamera(); }
+            } catch (e) { playSound('error'); showToast('خطأ في الاتصال', 'error'); closeCamera(); }
         } 
         else if (attMode) {
-            // استخدام بصمة الوجه من السيرفر (Session) بدلاً من الجهاز
-            if (!sessionDescriptor) { showToast('بيانات الوجه غير متوفرة في النظام، تواصل مع الأدمن.', 'error'); closeCamera(); return; }
+            if (!sessionDescriptor) { playSound('error'); showToast('بيانات الوجه غير متوفرة، تواصل مع الأدمن.', 'error'); closeCamera(); return; }
 
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
             if (distance < 0.6) { 
+                playSound('success'); // صوت النجاح عند التحقق من الوجه فقط
                 $('camStatus').textContent = 'تم التحقق بنجاح!';
                 const now = new Date();
                 const timeStr = now.toLocaleString('ar-EG', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 const dateStr = now.toLocaleDateString('ar-EG');
-                const payload = { action: 'attendance', name: user.name, code: user.code, type: attType, location: currentLoc || 'غير متوفر', datetime: `${dateStr} - ${timeStr}`, imageData: imgData };
+                const selectedShift = $('shiftSelect') ? $('shiftSelect').value : 'لم يتم التحديد';
+                
+                const payload = { action: 'attendance', name: user.name, code: user.code, type: attType, location: currentLoc || 'غير متوفر', datetime: `${dateStr} - ${timeStr}`, imageData: imgData, shift: selectedShift };
                 try {
-                    await fetch(URL, { method: 'POST', body: JSON.stringify(payload) });
-                    showToast(`تم تسجيل ${attType} بنجاح`, 'success');
+                    const res = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) }); const data = await res.json();
+                    let msg = `تم تسجيل ${attType} بنجاح`;
+                    if(data.hoursWorked) msg += ` (${data.hoursWorked})`;
+                    showToast(msg, 'success');
                 } catch (e) { showToast('فشل الإرسال', 'error'); }
                 closeCamera();
             } else {
+                playSound('error'); // صوت الخطأ عند رفض الوجه
                 showToast('الوجه غير مطابق! تم رفض التسجيل.', 'error');
                 $('camStatus').textContent = 'الوجه غير مطابق!';
                 autoCaptureTimeout = null; setTimeout(() => closeCamera(), 2000);
