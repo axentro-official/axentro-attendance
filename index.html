@@ -39,10 +39,10 @@
             margin-bottom: 24px;
         }
 
-        /* --- Camera Overlay (Fixed Z-Index) --- */
+        /* --- Camera Overlay --- */
         .camera-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 2000;
+            background: rgba(0,0,0,0.95); z-index: 2000;
             display: none; align-items: center; justify-content: center;
             flex-direction: column;
         }
@@ -81,15 +81,25 @@
         }
         .card:hover { transform: translateY(-2px); box-shadow: 0 15px 35px -10px rgba(0,0,0,0.6); }
         
+        .input-group { position: relative; margin-bottom: 12px; }
+        
         input {
-            width: 100%; padding: 14px 20px; border-radius: 50px;
+            width: 100%; padding: 14px 45px 14px 20px; border-radius: 50px;
             background: rgba(0,0,0,0.5); border: 1px solid #334155;
-            color: white; font-size: 16px; outline: none; margin-bottom: 12px;
+            color: white; font-size: 16px; outline: none;
             transition: 0.2s;
         }
         input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
         input::placeholder { color: #94a3b8; }
         
+        .input-icon {
+            position: absolute; top: 50%; right: 15px; transform: translateY(-50%); color: #94a3b8;
+        }
+        .toggle-password {
+            position: absolute; top: 50%; left: 15px; transform: translateY(-50%);
+            background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 18px;
+        }
+
         /* --- Buttons --- */
         .btn {
             width: 100%; padding: 14px; border-radius: 50px; border: none;
@@ -98,8 +108,6 @@
             transition: 0.2s; color: white; position: relative; overflow: hidden;
         }
         .btn:active { transform: scale(0.98); }
-        .btn::after { content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0; background: rgba(255,255,255,0.2); border-radius: 50%; transform: translate(-50%, -50%); transition: width 0.3s, height 0.3s; }
-        .btn:active::after { width: 200px; height: 200px; }
         
         .btn-login { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
         .btn-reg { background: linear-gradient(135deg, var(--warning), #d97706); }
@@ -149,7 +157,7 @@
         }
         .overlay.hidden { display: none; }
         
-        /* --- Footer (Global) --- */
+        /* --- Footer --- */
         footer {
             background: rgba(15, 23, 42, 0.9);
             padding: 30px 20px;
@@ -200,11 +208,6 @@
             position: absolute; top: 15px; left: 15px; background: none;
             border: none; color: white; font-size: 24px; cursor: pointer;
         }
-        .report-row {
-            display: flex; justify-content: space-between; padding: 10px;
-            border-bottom: 1px solid #334155; font-size: 14px;
-        }
-        .report-row span { color: #cbd5e1; }
     </style>
 </head>
 <body>
@@ -236,8 +239,20 @@
         <h1 style="margin-bottom: 10px;"><i class="fas fa-fingerprint"></i> Axentro</h1>
         <p style="color: #94a3b8; margin-bottom: 24px;">نظام متابعة الحضور والانصراف</p>
         
-        <input type="text" id="loginCode" placeholder="كود المستخدم">
-        <input type="password" id="loginPass" placeholder="كلمة السر">
+        <!-- حقل كود المستخدم -->
+        <div class="input-group">
+            <input type="text" id="loginCode" placeholder="كود المستخدم">
+            <i class="fas fa-id-badge input-icon"></i>
+        </div>
+        
+        <!-- حقل كلمة السر مع زر العين -->
+        <div class="input-group">
+            <input type="password" id="loginPass" placeholder="كلمة السر">
+            <i class="fas fa-lock input-icon"></i>
+            <button type="button" class="toggle-password" onclick="togglePasswordVisibility()">
+                <i class="fas fa-eye" id="eyeIcon"></i>
+            </button>
+        </div>
         
         <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;">
             <i class="fas fa-arrow-left"></i> دخول
@@ -261,8 +276,8 @@
 <div id="registerScreen" class="overlay hidden">
     <div class="card" style="max-width: 400px; width: 100%;">
         <h3 style="margin-bottom: 20px; text-align:center;"><i class="fas fa-id-card"></i> تسجيل موظف جديد</h3>
-        <input type="text" id="regName" placeholder="اسم الموظف الثلاثي">
-        <input type="email" id="regEmail" placeholder="البريد الإلكتروني (لإرسال البيانات)">
+        <input type="text" id="regName" placeholder="اسم الموظف الثلاثي" style="margin-bottom: 12px;">
+        <input type="email" id="regEmail" placeholder="البريد الإلكتروني (لإرسال البيانات)" style="margin-bottom: 12px;">
         <button class="btn btn-reg" onclick="startRegistration()">
             <i class="fas fa-camera"></i> التقاط الوجه وتسجيل
         </button>
@@ -282,7 +297,7 @@
 <div class="app-container" id="mainApp" style="display: none;">
     <h1>نظام متابعة الموظفين</h1>
     
-    <!-- Status Bar with Connection Status -->
+    <!-- Status Bar -->
     <div class="status-bar" id="statusBar">
         <span class="status-dot online" id="connDot"></span>
         <span id="connText">متصل بالخادم</span>
@@ -351,14 +366,29 @@
         setTimeout(() => t.classList.remove('show'), 4000);
     };
     const setStatus = (txt, load = false) => {
-        // Keep status text simple
         $('connText').textContent = txt;
     };
+
+    // --- Password Toggle ---
+    function togglePasswordVisibility() {
+        const passInput = $('loginPass');
+        const eyeIcon = $('eyeIcon');
+        if (passInput.type === 'password') {
+            passInput.type = 'text';
+            eyeIcon.classList.remove('fa-eye');
+            eyeIcon.classList.add('fa-eye-slash');
+        } else {
+            passInput.type = 'password';
+            eyeIcon.classList.remove('fa-eye-slash');
+            eyeIcon.classList.add('fa-eye');
+        }
+    }
 
     // --- Initialization ---
     async function init() {
         try {
             setStatus('تحميل النماذج...', true);
+            // تحميل النماذج بشكل متزامن لضمان العمل
             await faceapi.nets.ssdMobilenetv1.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
@@ -425,7 +455,7 @@
 
         if (user.isAdmin) {
             $('adminPanel').style.display = 'block';
-            $('actionBtns').style.display = 'none'; // Hide attendance buttons for admin initially
+            $('actionBtns').style.display = 'none'; 
             loadEmployees();
         } else {
             $('adminPanel').style.display = 'none';
@@ -478,10 +508,12 @@
         }
     }
 
-    // --- Camera ---
+    // --- Camera (Optimized) ---
     async function openCamera() {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } 
+            });
             video.srcObject = stream;
             await video.play(); 
             
@@ -504,6 +536,7 @@
 
     async function drawFaceBox() {
         if (!video.srcObject) return;
+        // استخدام detectSingleFace لسرعة أكبر
         const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (detection) {
@@ -609,36 +642,24 @@
         const emp = employees.find(e => e.code === code);
         if(!emp) return;
         
-        selectedEmp = emp; // Set for attendance
+        selectedEmp = emp; 
         $('searchInput').value = emp.name;
         $('searchResults').innerHTML = '';
-        $('actionBtns').style.display = 'flex'; // Show attendance buttons for selected employee
+        $('actionBtns').style.display = 'flex'; 
         
-        // Load Report
         $('modalTitle').textContent = emp.name;
-        $('modalBody').innerHTML = '<center><div class="spinner"></div></center>';
+        $('modalBody').innerHTML = `
+            <div style="text-align:center; margin-bottom:20px;">
+                <i class="fas fa-user-circle" style="font-size:50px; color:#3b82f6;"></i>
+                <h3>${emp.name}</h3>
+                <p style="color:#94a3b8;">${emp.code}</p>
+            </div>
+            <div class="action-group">
+                <button class="btn btn-att" onclick="handleModalAction('حضور')"><i class="fas fa-check"></i> تسجيل حضور</button>
+                <button class="btn btn-leave" onclick="handleModalAction('انصراف')"><i class="fas fa-times"></i> تسجيل انصراف</button>
+            </div>
+        `;
         $('detailModal').classList.add('active');
-        
-        try {
-            // Fetch report (Assuming you have a getAttendance endpoint, if not, just show info)
-            // For now, just show info and option to register attendance
-            $('modalBody').innerHTML = `
-                <div style="text-align:center; margin-bottom:20px;">
-                    <i class="fas fa-user-circle" style="font-size:50px; color:#3b82f6;"></i>
-                    <h3>${emp.name}</h3>
-                    <p style="color:#94a3b8;">${emp.code}</p>
-                </div>
-                <div class="action-group">
-                    <button class="btn btn-att" onclick="handleModalAction('حضور')"><i class="fas fa-check"></i> تسجيل حضور</button>
-                    <button class="btn btn-leave" onclick="handleModalAction('انصراف')"><i class="fas fa-times"></i> تسجيل انصراف</button>
-                </div>
-                <div style="margin-top:20px; text-align:center; color:#64748b; font-size:12px;">
-                    يمكنك تسجيل الحضور من هنا مباشرة.
-                </div>
-            `;
-        } catch(e) {
-            $('modalBody').innerHTML = '<p style="text-align:center;">خطأ في تحميل البيانات</p>';
-        }
     }
     
     function handleModalAction(type) {
