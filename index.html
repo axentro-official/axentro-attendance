@@ -42,7 +42,7 @@
         /* --- Camera Overlay --- */
         .camera-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 2000;
+            background: rgba(0,0,0,0.9); z-index: 2000;
             display: none; align-items: center; justify-content: center;
             flex-direction: column;
         }
@@ -81,25 +81,37 @@
         }
         .card:hover { transform: translateY(-2px); box-shadow: 0 15px 35px -10px rgba(0,0,0,0.6); }
         
-        .input-group { position: relative; margin-bottom: 12px; }
-        
         input {
-            width: 100%; padding: 14px 45px 14px 20px; border-radius: 50px;
+            width: 100%; padding: 14px 20px; border-radius: 50px;
             background: rgba(0,0,0,0.5); border: 1px solid #334155;
-            color: white; font-size: 16px; outline: none;
+            color: white; font-size: 16px; outline: none; margin-bottom: 12px;
             transition: 0.2s;
         }
         input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
         input::placeholder { color: #94a3b8; }
         
-        .input-icon {
-            position: absolute; top: 50%; right: 15px; transform: translateY(-50%); color: #94a3b8;
+        /* Password field with eye */
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+        .password-wrapper input {
+            margin-bottom: 0;
+            padding-left: 50px;
         }
         .toggle-password {
-            position: absolute; top: 50%; left: 15px; transform: translateY(-50%);
-            background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 18px;
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 18px;
         }
-
+        
         /* --- Buttons --- */
         .btn {
             width: 100%; padding: 14px; border-radius: 50px; border: none;
@@ -108,6 +120,8 @@
             transition: 0.2s; color: white; position: relative; overflow: hidden;
         }
         .btn:active { transform: scale(0.98); }
+        .btn::after { content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0; background: rgba(255,255,255,0.2); border-radius: 50%; transform: translate(-50%, -50%); transition: width 0.3s, height 0.3s; }
+        .btn:active::after { width: 200px; height: 200px; }
         
         .btn-login { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
         .btn-reg { background: linear-gradient(135deg, var(--warning), #d97706); }
@@ -116,6 +130,7 @@
         .btn-action { padding: 8px 16px; width: auto; font-size: 14px; }
         .btn-refresh { background: var(--primary); }
         .btn-logout { background: var(--danger); }
+        .btn-change-pw { background: #6b21a5; }
         
         .action-group { display: flex; gap: 12px; margin-top: 20px; }
         .action-group .btn { flex: 1; }
@@ -157,7 +172,7 @@
         }
         .overlay.hidden { display: none; }
         
-        /* --- Footer --- */
+        /* --- Footer (Global) --- */
         footer {
             background: rgba(15, 23, 42, 0.9);
             padding: 30px 20px;
@@ -208,6 +223,11 @@
             position: absolute; top: 15px; left: 15px; background: none;
             border: none; color: white; font-size: 24px; cursor: pointer;
         }
+        .report-row {
+            display: flex; justify-content: space-between; padding: 10px;
+            border-bottom: 1px solid #334155; font-size: 14px;
+        }
+        .report-row span { color: #cbd5e1; }
     </style>
 </head>
 <body>
@@ -233,25 +253,32 @@
     </div>
 </div>
 
+<!-- Change Password Modal -->
+<div id="changePwModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeChangePwModal()"><i class="fas fa-times"></i></button>
+        <h2 style="text-align:center; margin-bottom:20px;">تغيير كلمة السر</h2>
+        <div style="text-align: center;" id="changePwBody">
+            <input type="text" id="targetEmpCode" placeholder="كود الموظف (EMPxxx)">
+            <div class="password-wrapper">
+                <input type="password" id="newPassword" placeholder="كلمة السر الجديدة">
+                <button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button>
+            </div>
+            <button class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>
+        </div>
+    </div>
+</div>
+
 <!-- Login Screen -->
 <div id="loginScreen" class="overlay">
     <div class="card" style="max-width: 400px; width: 100%; margin-bottom: 20px;">
         <h1 style="margin-bottom: 10px;"><i class="fas fa-fingerprint"></i> Axentro</h1>
         <p style="color: #94a3b8; margin-bottom: 24px;">نظام متابعة الحضور والانصراف</p>
         
-        <!-- حقل كود المستخدم -->
-        <div class="input-group">
-            <input type="text" id="loginCode" placeholder="كود المستخدم">
-            <i class="fas fa-id-badge input-icon"></i>
-        </div>
-        
-        <!-- حقل كلمة السر مع زر العين -->
-        <div class="input-group">
+        <input type="text" id="loginCode" placeholder="كود المستخدم">
+        <div class="password-wrapper">
             <input type="password" id="loginPass" placeholder="كلمة السر">
-            <i class="fas fa-lock input-icon"></i>
-            <button type="button" class="toggle-password" onclick="togglePasswordVisibility()">
-                <i class="fas fa-eye" id="eyeIcon"></i>
-            </button>
+            <button class="toggle-password" onclick="togglePassword('loginPass')"><i class="fas fa-eye"></i></button>
         </div>
         
         <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;">
@@ -266,9 +293,11 @@
         <div class="brand">Axentro</div>
         <p>نظام حضور وانصراف ومتابعة الموظفين</p>
         <p>© 2024 Axentro – All Rights Reserved</p>
+        <p>Powered by Axentro System</p>
         <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
-            <img src="qr-links.png" alt="QR Code" class="qr-code">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://axentro-official.github.io/axentro-website/links.html" alt="QR Code" class="qr-code">
         </a>
+        <p style="margin-top: 8px;"><a href="https://axentro-official.github.io/axentro-website/links.html" style="color: #3b82f6;">Scan Me < Click On Me</a></p>
     </footer>
 </div>
 
@@ -276,8 +305,8 @@
 <div id="registerScreen" class="overlay hidden">
     <div class="card" style="max-width: 400px; width: 100%;">
         <h3 style="margin-bottom: 20px; text-align:center;"><i class="fas fa-id-card"></i> تسجيل موظف جديد</h3>
-        <input type="text" id="regName" placeholder="اسم الموظف الثلاثي" style="margin-bottom: 12px;">
-        <input type="email" id="regEmail" placeholder="البريد الإلكتروني (لإرسال البيانات)" style="margin-bottom: 12px;">
+        <input type="text" id="regName" placeholder="اسم الموظف الثلاثي">
+        <input type="email" id="regEmail" placeholder="البريد الإلكتروني (لإرسال البيانات)">
         <button class="btn btn-reg" onclick="startRegistration()">
             <i class="fas fa-camera"></i> التقاط الوجه وتسجيل
         </button>
@@ -287,9 +316,11 @@
      <footer style="position: relative; margin-top: 20px;">
         <div class="brand">Axentro</div>
         <p>© 2024 Axentro – All Rights Reserved</p>
+        <p>Powered by Axentro System</p>
         <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
-            <img src="qr-links.png" alt="QR Code" class="qr-code">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://axentro-official.github.io/axentro-website/links.html" alt="QR Code" class="qr-code">
         </a>
+        <p><a href="https://axentro-official.github.io/axentro-website/links.html" style="color: #3b82f6;">Scan Me < Click On Me</a></p>
     </footer>
 </div>
 
@@ -297,7 +328,7 @@
 <div class="app-container" id="mainApp" style="display: none;">
     <h1>نظام متابعة الموظفين</h1>
     
-    <!-- Status Bar -->
+    <!-- Status Bar with Connection Status -->
     <div class="status-bar" id="statusBar">
         <span class="status-dot online" id="connDot"></span>
         <span id="connText">متصل بالخادم</span>
@@ -314,6 +345,10 @@
         <div class="stat-card">
             <h2 id="empCount">0</h2>
             <p>إجمالي الموظفين المسجلين</p>
+        </div>
+        
+        <div class="admin-tools">
+            <button class="btn btn-action btn-change-pw" onclick="openChangePwModal()"><i class="fas fa-key"></i> تغيير كلمة سر موظف</button>
         </div>
         
         <div class="card" style="margin-top: 20px;">
@@ -333,9 +368,11 @@
         <div class="brand">Axentro</div>
         <p>نظام حضور وانصراف ومتابعة الموظفين</p>
         <p>© 2024 Axentro – All Rights Reserved</p>
+        <p>Powered by Axentro System</p>
         <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
-            <img src="qr-links.png" alt="QR Code" class="qr-code">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://axentro-official.github.io/axentro-website/links.html" alt="QR Code" class="qr-code">
         </a>
+        <p><a href="https://axentro-official.github.io/axentro-website/links.html" style="color: #3b82f6;">Scan Me < Click On Me</a></p>
     </footer>
 </div>
 
@@ -355,6 +392,9 @@
     let selectedEmp = null;
     let regMode = false; 
     let regData = {}; 
+    let animationFrameId = null;
+    let lastDetectionTime = 0;
+    const DETECTION_INTERVAL = 150; // milliseconds
     
     // --- Elements ---
     const $ = id => document.getElementById(id);
@@ -365,30 +405,24 @@
         const t = $('toast'); t.textContent = msg; t.className = `toast show ${type}`;
         setTimeout(() => t.classList.remove('show'), 4000);
     };
-    const setStatus = (txt, load = false) => {
+    const setStatus = (txt) => {
         $('connText').textContent = txt;
     };
-
-    // --- Password Toggle ---
-    function togglePasswordVisibility() {
-        const passInput = $('loginPass');
-        const eyeIcon = $('eyeIcon');
-        if (passInput.type === 'password') {
-            passInput.type = 'text';
-            eyeIcon.classList.remove('fa-eye');
-            eyeIcon.classList.add('fa-eye-slash');
+    
+    // Toggle password visibility
+    function togglePassword(inputId) {
+        const input = $(inputId);
+        if (input.type === 'password') {
+            input.type = 'text';
         } else {
-            passInput.type = 'password';
-            eyeIcon.classList.remove('fa-eye-slash');
-            eyeIcon.classList.add('fa-eye');
+            input.type = 'password';
         }
     }
-
+    
     // --- Initialization ---
     async function init() {
         try {
-            setStatus('تحميل النماذج...', true);
-            // تحميل النماذج بشكل متزامن لضمان العمل
+            setStatus('تحميل النماذج...');
             await faceapi.nets.ssdMobilenetv1.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
@@ -413,7 +447,7 @@
             showApp();
         }
     }
-
+    
     // --- Auth ---
     async function handleLogin() {
         const code = $('loginCode').value.trim();
@@ -443,10 +477,10 @@
     function refreshData() {
        if(user && user.isAdmin) {
            loadEmployees();
-           showToast('جاري تحديث البيانات...', 'info');
+           showToast('جاري تحديث البيانات...', 'success');
        }
     }
-
+    
     // --- App Logic ---
     async function showApp() {
         $('loginScreen').classList.add('hidden');
@@ -455,8 +489,8 @@
 
         if (user.isAdmin) {
             $('adminPanel').style.display = 'block';
-            $('actionBtns').style.display = 'none'; 
-            loadEmployees();
+            $('actionBtns').style.display = 'none';
+            await loadEmployees();
         } else {
             $('adminPanel').style.display = 'none';
             $('actionBtns').style.display = 'flex';
@@ -482,7 +516,40 @@
             setStatus('غير متصل');
         }
     }
-
+    
+    // --- Change Password for Admin ---
+    function openChangePwModal() {
+        $('targetEmpCode').value = '';
+        $('newPassword').value = '';
+        $('changePwModal').classList.add('active');
+    }
+    function closeChangePwModal() {
+        $('changePwModal').classList.remove('active');
+    }
+    async function submitChangePassword() {
+        const code = $('targetEmpCode').value.trim();
+        const newPass = $('newPassword').value.trim();
+        if (!code || !newPass) {
+            showToast('يرجى إدخال الكود وكلمة السر الجديدة', 'error');
+            return;
+        }
+        try {
+            const res = await fetch(URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'changePassword', code: code, newPassword: newPass, oldPassword: null })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('تم تغيير كلمة السر بنجاح', 'success');
+                closeChangePwModal();
+            } else {
+                showToast(data.error || 'فشل التغيير', 'error');
+            }
+        } catch(e) {
+            showToast('خطأ في الاتصال', 'error');
+        }
+    }
+    
     // --- Registration ---
     function showRegisterScreen() {
         $('loginScreen').classList.add('hidden');
@@ -507,13 +574,11 @@
             showToast('فشل فتح الكاميرا', 'error');
         }
     }
-
-    // --- Camera (Optimized) ---
+    
+    // --- Camera with performance optimization ---
     async function openCamera() {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } 
-            });
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
             video.srcObject = stream;
             await video.play(); 
             
@@ -522,9 +587,49 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
-            drawFaceBox();
+            // Start detection loop with throttling
+            startDetectionLoop();
             return true;
         } catch (e) { return false; }
+    }
+    
+    function startDetectionLoop() {
+        function detect() {
+            if (!video.srcObject || !$('cameraOverlay').classList.contains('active')) return;
+            const now = Date.now();
+            if (now - lastDetectionTime >= DETECTION_INTERVAL) {
+                lastDetectionTime = now;
+                drawFaceBox();
+            }
+            requestAnimationFrame(detect);
+        }
+        detect();
+    }
+    
+    async function drawFaceBox() {
+        if (!video.srcObject || video.videoWidth === 0) return;
+        try {
+            const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (detection) {
+                const box = detection.detection.box;
+                ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3;
+                ctx.strokeRect(box.x, box.y, box.width, box.height);
+                
+                // Corners
+                const cLen = 20;
+                ctx.strokeStyle = '#10b981'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(box.x, box.y+cLen); ctx.lineTo(box.x, box.y); ctx.lineTo(box.x+cLen, box.y); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y); ctx.lineTo(box.x+box.width, box.y); ctx.lineTo(box.x+box.width, box.y+cLen); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(box.x, box.y+box.height-cLen); ctx.lineTo(box.x, box.y+box.height); ctx.lineTo(box.x+cLen, box.y+box.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height-cLen); ctx.stroke();
+
+                ctx.fillStyle = '#10b981'; ctx.font = 'bold 16px sans-serif';
+                ctx.fillText('وجه مكتشف', box.x, box.y - 10);
+            }
+        } catch(e) {
+            // ignore
+        }
     }
 
     function closeCamera() {
@@ -532,32 +637,9 @@
         video.srcObject = null;
         $('cameraOverlay').classList.remove('active');
         regMode = false;
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
     }
-
-    async function drawFaceBox() {
-        if (!video.srcObject) return;
-        // استخدام detectSingleFace لسرعة أكبر
-        const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (detection) {
-            const box = detection.detection.box;
-            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3;
-            ctx.strokeRect(box.x, box.y, box.width, box.height);
-            
-            // Corners
-            const cLen = 20;
-            ctx.strokeStyle = '#10b981'; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.moveTo(box.x, box.y+cLen); ctx.lineTo(box.x, box.y); ctx.lineTo(box.x+cLen, box.y); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y); ctx.lineTo(box.x+box.width, box.y); ctx.lineTo(box.x+box.width, box.y+cLen); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(box.x, box.y+box.height-cLen); ctx.lineTo(box.x, box.y+box.height); ctx.lineTo(box.x+cLen, box.y+box.height); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height-cLen); ctx.stroke();
-
-            ctx.fillStyle = '#10b981'; ctx.font = 'bold 16px sans-serif';
-            ctx.fillText('وجه مكتشف', box.x, box.y - 10);
-        }
-        requestAnimationFrame(drawFaceBox);
-    }
-
+    
     // --- Capture ---
     async function handleCapture() {
         if (!models) return showToast('النماذج غير جاهزة', 'error');
@@ -595,7 +677,7 @@
         }
         $('captureBtn').disabled = false;
     }
-
+    
     // --- Attendance ---
     async function handleAttendance(type) {
         let target = selectedEmp;
@@ -622,7 +704,7 @@
             showToast(`تم تسجيل ${type} بنجاح`, 'success');
         } catch (e) { showToast('فشل الإرسال', 'error'); }
     }
-
+    
     // --- Search & Modal (Admin) ---
     $('searchInput')?.addEventListener('input', (e) => {
         const q = e.target.value.toLowerCase();
@@ -642,12 +724,15 @@
         const emp = employees.find(e => e.code === code);
         if(!emp) return;
         
-        selectedEmp = emp; 
+        selectedEmp = emp;
         $('searchInput').value = emp.name;
         $('searchResults').innerHTML = '';
-        $('actionBtns').style.display = 'flex'; 
+        $('actionBtns').style.display = 'flex';
         
         $('modalTitle').textContent = emp.name;
+        $('modalBody').innerHTML = '<center><div class="spinner"></div></center>';
+        $('detailModal').classList.add('active');
+        
         $('modalBody').innerHTML = `
             <div style="text-align:center; margin-bottom:20px;">
                 <i class="fas fa-user-circle" style="font-size:50px; color:#3b82f6;"></i>
@@ -658,8 +743,10 @@
                 <button class="btn btn-att" onclick="handleModalAction('حضور')"><i class="fas fa-check"></i> تسجيل حضور</button>
                 <button class="btn btn-leave" onclick="handleModalAction('انصراف')"><i class="fas fa-times"></i> تسجيل انصراف</button>
             </div>
+            <div style="margin-top:20px; text-align:center; color:#64748b; font-size:12px;">
+                يمكنك تسجيل الحضور من هنا مباشرة.
+            </div>
         `;
-        $('detailModal').classList.add('active');
     }
     
     function handleModalAction(type) {
@@ -670,7 +757,7 @@
     function closeModal() {
         $('detailModal').classList.remove('active');
     }
-
+    
     // --- Location ---
     let currentLoc = null;
     function getLocation() {
@@ -684,7 +771,7 @@
             });
         }
     }
-
+    
     // Start
     init();
 </script>
