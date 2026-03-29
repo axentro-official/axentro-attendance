@@ -3,23 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Axentro | نظام الحضور الذكي</title>
+    <title>Axentro | نظام متابعة الموظفين</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         :root {
             --primary: #3b82f6; --primary-dark: #2563eb;
             --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
-            --dark: #0f172a; --card-bg: rgba(30, 41, 59, 0.6);
+            --dark: #0f172a; --card-bg: rgba(30, 41, 59, 0.7);
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
             background: linear-gradient(145deg, #0a0f1e 0%, #0f172a 100%);
             color: #f1f5f9; direction: rtl; min-height: 100vh;
-            overflow-x: hidden;
+            display: flex; flex-direction: column; overflow-x: hidden;
         }
-        .container { max-width: 550px; margin: auto; padding: 20px; position: relative; z-index: 1; }
+        
+        /* Container takes available space */
+        .app-container {
+            flex: 1;
+            width: 100%;
+            max-width: 550px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
         h1 {
             font-size: 28px; text-align: center;
             background: linear-gradient(135deg, #fff, #a5f3fc);
@@ -27,11 +38,15 @@
             margin-bottom: 24px;
         }
 
-        /* --- Camera --- */
+        /* --- Camera Fix (z-index added) --- */
         .camera-container {
             background: #000; border-radius: 24px; overflow: hidden;
-            display: none; position: relative; aspect-ratio: 4/3;
-            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.6);
+            display: none; position: fixed; /* Changed to fixed for overlay */
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 90%; max-width: 500px; aspect-ratio: 4/3;
+            box-shadow: 0 20px 60px -10px rgba(0,0,0,0.9);
+            z-index: 1001; /* Higher than overlay */
+            border: 2px solid var(--primary);
         }
         .camera-container.active { display: block; }
         video { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
@@ -51,14 +66,16 @@
             background: var(--card-bg); backdrop-filter: blur(12px);
             border-radius: 24px; padding: 24px; margin-bottom: 20px;
             border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
         }
         input {
             width: 100%; padding: 14px 20px; border-radius: 50px;
-            background: rgba(0,0,0,0.4); border: 1px solid #334155;
+            background: rgba(0,0,0,0.5); border: 1px solid #334155;
             color: white; font-size: 16px; outline: none; margin-bottom: 12px;
             transition: 0.2s;
         }
         input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
+        input::placeholder { color: #94a3b8; }
         
         /* --- Buttons --- */
         .btn {
@@ -88,24 +105,48 @@
         /* --- Overlays --- */
         .overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(10, 15, 30, 0.95); backdrop-filter: blur(10px);
+            background: rgba(10, 15, 30, 0.98); backdrop-filter: blur(15px);
             display: flex; align-items: center; justify-content: center; z-index: 100;
             padding: 20px;
         }
         .overlay.hidden { display: none; }
         
+        /* --- Footer --- */
+        footer {
+            background: rgba(15, 23, 42, 0.8);
+            padding: 30px 20px;
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: auto; /* Pushes footer to bottom */
+        }
+        footer .brand {
+            font-size: 18px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text; color: transparent;
+            margin-bottom: 10px;
+        }
+        footer p { color: #64748b; font-size: 12px; margin-bottom: 5px; }
+        footer .qr-code {
+            width: 80px; height: 80px;
+            background: white; padding: 5px; border-radius: 10px;
+            margin-top: 15px;
+            transition: transform 0.2s;
+        }
+        footer .qr-code:hover { transform: scale(1.1); }
+
         /* --- Toast --- */
         .toast {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px);
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(100px);
             background: #1e293b; color: white; padding: 12px 24px; border-radius: 50px;
-            font-size: 14px; z-index: 200; transition: 0.3s; opacity: 0;
-            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 14px; z-index: 3000; transition: 0.3s; opacity: 0;
+            border: 1px solid rgba(255,255,255,0.1); text-align: center;
+            max-width: 90%;
         }
         .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
         .toast.success { background: var(--success); }
         .toast.error { background: var(--danger); }
 
-        /* --- Logout --- */
         .logout-btn {
             position: fixed; top: 20px; left: 20px; z-index: 50;
             background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2);
@@ -117,11 +158,11 @@
 
 <!-- Login Screen -->
 <div id="loginScreen" class="overlay">
-    <div class="card" style="max-width: 400px; width: 100%;">
+    <div class="card" style="max-width: 400px; width: 100%; margin-bottom: 20px;">
         <h1 style="margin-bottom: 10px;"><i class="fas fa-fingerprint"></i> Axentro</h1>
-        <p style="color: #94a3b8; margin-bottom: 24px;">مرحباً بك، يرجى تسجيل الدخول</p>
+        <p style="color: #94a3b8; margin-bottom: 24px;">نظام متابعة الحضور والانصراف</p>
         
-        <input type="text" id="loginCode" placeholder="كود المستخدم (ADMIN / EMP001)">
+        <input type="text" id="loginCode" placeholder="كود المستخدم">
         <input type="password" id="loginPass" placeholder="كلمة السر">
         
         <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;">
@@ -130,10 +171,6 @@
         <button class="btn btn-reg" onclick="showRegisterScreen()">
             <i class="fas fa-user-plus"></i> تسجيل موظف جديد
         </button>
-        <p style="font-size: 12px; color: #64748b; margin-top: 16px;">
-            المدير: ADMIN / 1407<br>
-            الموظف: استخدم الكود وكلمة السر المرسلة
-        </p>
     </div>
 </div>
 
@@ -142,7 +179,7 @@
     <div class="card" style="max-width: 400px; width: 100%;">
         <h3 style="margin-bottom: 20px;"><i class="fas fa-id-card"></i> تسجيل موظف جديد</h3>
         <input type="text" id="regName" placeholder="اسم الموظف الثلاثي">
-        <input type="email" id="regEmail" placeholder="البريد الإلكتروني (لاستلام كلمة السر)">
+        <input type="email" id="regEmail" placeholder="البريد الإلكتروني (لإرسال البيانات)">
         <button class="btn btn-reg" onclick="startRegistration()">
             <i class="fas fa-camera"></i> التقاط الوجه وتسجيل
         </button>
@@ -151,10 +188,10 @@
 </div>
 
 <!-- Main App -->
-<div class="container" id="mainApp" style="display: none;">
+<div class="app-container" id="mainApp" style="display: none;">
     <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> خروج</button>
     
-    <h1>نظام الحضور والانصراف</h1>
+    <h1>نظام متابعة الموظفين</h1>
     
     <div class="status-bar" id="statusBar">
         <div class="spinner"></div> <span>جاري التحميل...</span>
@@ -163,6 +200,7 @@
         <i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span>
     </div>
 
+    <!-- Camera Container (Now separate for better z-index control) -->
     <div class="camera-container" id="camContainer">
         <video id="video" autoplay muted playsinline></video>
         <canvas id="canvas" class="face-canvas"></canvas>
@@ -173,8 +211,7 @@
 
     <div class="card" id="adminPanel" style="display: none;">
         <h3 style="margin-bottom: 12px;"><i class="fas fa-user-shield"></i> لوحة المدير</h3>
-        <p style="font-size:14px; color:#94a3b8;">يمكنك البحث عن موظف لتسجيل حضوره يدوياً.</p>
-        <input type="text" id="searchInput" placeholder="ابحث باسم الموظف..." style="margin-top: 10px;">
+        <input type="text" id="searchInput" placeholder="ابحث باسم الموظف أو الكود..." style="margin-top: 10px;">
         <div id="searchResults" style="margin-top: 10px; text-align: right; font-size: 14px;"></div>
     </div>
 
@@ -183,6 +220,15 @@
         <button class="btn btn-leave" onclick="handleAttendance('انصراف')"><i class="fas fa-times"></i> انصراف</button>
     </div>
 </div>
+
+<!-- Footer -->
+<footer id="mainFooter">
+    <div class="brand">Axentro</div>
+    <p>نظام حضور وانصراف ومتابعة الموظفين</p>
+    <p>© 2024 Axentro – All Rights Reserved</p>
+    <p style="margin-top: 5px; font-size: 10px;">By Axentro Team</p>
+    <img src="qr-links.png" alt="QR Code" class="qr-code">
+</footer>
 
 <!-- Toast -->
 <div id="toast" class="toast"></div>
@@ -196,10 +242,10 @@
     let models = false;
     let stream = null;
     let employees = [];
-    let localData = []; // Cached faces
+    let localData = []; 
     let selectedEmp = null;
-    let regMode = false; // Registration flag
-    let regData = {}; // Temp registration data
+    let regMode = false; 
+    let regData = {}; 
     
     // --- Elements ---
     const $ = id => document.getElementById(id);
@@ -208,7 +254,7 @@
     // --- Utils ---
     const showToast = (msg, type = '') => {
         const t = $('toast'); t.textContent = msg; t.className = `toast show ${type}`;
-        setTimeout(() => t.classList.remove('show'), 3000);
+        setTimeout(() => t.classList.remove('show'), 4000);
     };
     const setStatus = (txt, load = false) => {
         $('statusBar').innerHTML = load ? `<div class="spinner"></div><span>${txt}</span>` : `<span>${txt}</span>`;
@@ -224,7 +270,7 @@
             await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             models = true;
             setStatus('النظام جاهز ✔');
-        } catch (e) { setStatus('فشل تحميل النماذج'); return; }
+        } catch (e) { setStatus('فشل تحميل النماذج'); console.error(e); return; }
 
         // Load Local Data
         const stored = localStorage.getItem('axentro_data');
@@ -265,7 +311,10 @@
     function logout() {
         sessionStorage.removeItem('user');
         user = null;
-        location.reload();
+        $('mainApp').style.display = 'none';
+        $('mainFooter').style.display = 'block';
+        $('loginScreen').classList.remove('hidden');
+        $('statusBar').innerHTML = '<span>النظام جاهز ✔</span>';
     }
 
     // --- App Logic ---
@@ -273,19 +322,22 @@
         $('loginScreen').classList.add('hidden');
         $('registerScreen').classList.add('hidden');
         $('mainApp').style.display = 'block';
+        $('mainFooter').style.display = 'block'; // Keep footer visible or hide if you want
 
         if (user.isAdmin) {
             $('adminPanel').style.display = 'block';
-            // Load employees list for admin search
+            $('statusBar').innerHTML = `<span>مرحباً المدير</span>`;
             const res = await fetch(`${URL}?action=getEmployees`);
             const d = await res.json();
             if(d.success) employees = d.employees;
         } else {
             $('adminPanel').style.display = 'none';
-            // Load current employee image
             selectedEmp = localData.find(e => e.code === user.code);
             if(!selectedEmp) selectedEmp = employees.find(e => e.code === user.code);
             if(selectedEmp) setStatus(`مرحباً ${user.name}`);
+            
+            // Check if first login (optional UI hint)
+            showToast('مرحباً بك! يمكنك تسجيل حضورك الآن.', 'success');
         }
     }
 
@@ -319,7 +371,9 @@
         try {
             stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
             video.srcObject = stream;
-            await video.play();
+            // Important: play inside a user interaction event flow or immediately
+            await video.play(); 
+            
             $('camContainer').classList.add('active');
             
             // Setup Canvas
@@ -329,7 +383,10 @@
             // Start Drawing Loop
             drawFaceBox();
             return true;
-        } catch (e) { return false; }
+        } catch (e) {
+            console.error(e);
+            return false; 
+        }
     }
 
     function closeCamera() {
@@ -339,39 +396,30 @@
         regMode = false;
     }
 
-    // Drawing Face Box (The requested fix)
+    // Drawing Face Box
     async function drawFaceBox() {
         if (!video.srcObject) return;
         
-        // Detect face
         const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
         
-        // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (detection) {
             const box = detection.detection.box;
             
-            // Draw Box
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 3;
             ctx.strokeRect(box.x, box.y, box.width, box.height);
             
-            // Draw Corners
             const cLen = 20;
             ctx.strokeStyle = '#10b981';
             ctx.lineWidth = 4;
             
-            // Top-Left
             ctx.beginPath(); ctx.moveTo(box.x, box.y+cLen); ctx.lineTo(box.x, box.y); ctx.lineTo(box.x+cLen, box.y); ctx.stroke();
-            // Top-Right
             ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y); ctx.lineTo(box.x+box.width, box.y); ctx.lineTo(box.x+box.width, box.y+cLen); ctx.stroke();
-            // Bottom-Left
             ctx.beginPath(); ctx.moveTo(box.x, box.y+box.height-cLen); ctx.lineTo(box.x, box.y+box.height); ctx.lineTo(box.x+cLen, box.y+box.height); ctx.stroke();
-            // Bottom-Right
             ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height-cLen); ctx.stroke();
 
-            // Label
             ctx.fillStyle = '#10b981';
             ctx.font = 'bold 16px sans-serif';
             ctx.fillText('وجه مكتشف', box.x, box.y - 10);
@@ -403,7 +451,6 @@
         const imgData = c.toDataURL('image/jpeg');
 
         if (regMode) {
-            // Register New Employee
             const payload = {
                 action: 'register',
                 name: regData.name,
@@ -413,18 +460,22 @@
             };
             
             try {
-                await fetch(URL, { method: 'POST', body: JSON.stringify(payload) });
+                const response = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) });
+                const result = await response.json(); // Parse response to check for errors
                 
-                // Save Locally
-                const newEmp = { name: regData.name, code: 'EMP_NEW', imageData: imgData, descriptor: detection.descriptor };
-                localData.push(newEmp);
-                localStorage.setItem('axentro_data', JSON.stringify(localData));
-                
-                showToast('تم التسجيل بنجاح! سيصلك الكود على البريد.', 'success');
-                closeCamera();
-                showLoginScreen();
+                if(result.success) {
+                    const newEmp = { name: regData.name, code: result.code || 'EMP_NEW', imageData: imgData };
+                    localData.push(newEmp);
+                    localStorage.setItem('axentro_data', JSON.stringify(localData));
+                    
+                    showToast('تم التسجيل بنجاح! راجع بريدك الإلكتروني للحصول على كود الدخول وكلمة السر.', 'success');
+                    closeCamera();
+                    showLoginScreen();
+                } else {
+                    showToast(result.error || 'حدث خطأ أثناء التسجيل', 'error');
+                }
             } catch (e) {
-                showToast('خطأ في التسجيل', 'error');
+                showToast('خطأ في الاتصال بالخادم', 'error');
             }
         }
         
@@ -434,7 +485,6 @@
 
     // --- Attendance ---
     async function handleAttendance(type) {
-        // If admin, check if selected employee from search
         let target = selectedEmp;
         
         if (user.isAdmin) {
@@ -445,7 +495,6 @@
             target = user;
         }
 
-        // Check local image
         const localEmp = localData.find(e => e.code === target.code || e.name === target.name);
         if (!localEmp || !localEmp.imageData) return showToast('لا توجد صورة مسجلة لهذا الموظف محلياً، يرجى إعادة التسجيل.', 'error');
 
