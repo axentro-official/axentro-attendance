@@ -209,7 +209,7 @@
     <h1 id="mainAppTitle">نظام متابعة الموظفين</h1>
     <div class="status-bar" id="statusBar">
         <span class="status-dot online" id="connDot"></span>
-        <span id="connText">متصل بالخادم</span>
+        <span id="connText">النظام جاهز</span>
         <button class="btn btn-action btn-login" onclick="refreshData()" title="تحديث"><i class="fas fa-sync-alt"></i></button>
         <button class="btn btn-action btn-leave" onclick="logout()" title="خروج"><i class="fas fa-sign-out-alt"></i></button>
     </div>
@@ -287,9 +287,6 @@
         if (window.PublicKeyCredential) { $('fingerprintLoginBtn').style.display = 'flex'; }
     });
 
-    // ==========================================
-    // نظام بصمة الإصبع (WebAuthn API)
-    // ==========================================
     function bufferToBase64(buffer) { let binary = ''; const bytes = new Uint8Array(buffer); for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]); return btoa(binary); }
     function base64ToBuffer(base64) { const binary = atob(base64); const bytes = new Uint8Array(binary.length); for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i); return bytes.buffer; }
 
@@ -318,7 +315,7 @@
                     if (Date.now() - sessionObj.timestamp < TEN_HOURS) {
                         user = sessionObj.data;
                         if (!user.isAdmin) { const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`); const empData = await empRes.json(); sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null; }
-                        showApp();
+                        showApp(); setStatus('النظام جاهز');
                     } else { playSound('login-error'); showToast('انتهت صلاحية الجلسة المحفوظة (10 ساعات)، يرجى تسجيل الدخول بكلمة السر.', 'error'); logout(); }
                 }
             }
@@ -326,28 +323,70 @@
     }
 
     // ==========================================
-    // النظام الأساسي
+    // تهيئة النظام (تم حل مشكلة التجميد هنا)
     // ==========================================
     async function init() {
-        try {
-            setStatus('تحميل نماذج الذكاء الاصطناعي...');
-            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
-            await faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
-            lightModels = true; loadHeavyModels(); setStatus('النظام جاهز');
-        } catch (e) { setStatus('فشل تحميل النماذج'); }
-        getLocation();
-        
         const savedSessionStr = localStorage.getItem('rememberedUser');
         const savedTempStr = sessionStorage.getItem('user');
         let savedUser = null;
-        if (savedSessionStr) {
-            try { const sessionObj = JSON.parse(savedSessionStr); const TEN_HOURS = 10 * 60 * 60 * 1000; if (Date.now() - sessionObj.timestamp < TEN_HOURS) { savedUser = sessionObj.data; } else { localStorage.removeItem('rememberedUser'); localStorage.removeItem('axentro_fp_id'); } } catch (e) { localStorage.removeItem('rememberedUser'); }
-        } else if (savedTempStr) { savedUser = JSON.parse(savedTempStr); }
 
+        // 1. ملء الخانات تلقائياً إذا كان "تذكرني" مفعل
+        const savedLogin = localStorage.getItem('axentro_saved_login');
+        if (savedLogin) {
+            try {
+                const loginData = JSON.parse(savedLogin);
+                $('loginCode').value = loginData.code || '';
+                $('loginPass').value = loginData.pass || '';
+                $('rememberMe').checked = true;
+            } catch(e) {}
+        }
+
+        // 2. منع التجميد 5 ثواني: إخفاء شاشة الدخول فوراً إذا كان هناك جلسة
+        if (savedSessionStr) {
+            try { 
+                const sessionObj = JSON.parse(savedSessionStr); 
+                const TEN_HOURS = 10 * 60 * 60 * 1000;
+                if (Date.now() - sessionObj.timestamp < TEN_HOURS) { 
+                    savedUser = sessionObj.data; 
+                    $('loginScreen').classList.add('hidden'); 
+                    $('registerScreen').classList.add('hidden'); 
+                    $('mainApp').style.display = 'block'; 
+                    setStatus('جاري تحميل النظام...'); 
+                } else { 
+                    localStorage.removeItem('rememberedUser'); 
+                    localStorage.removeItem('axentro_fp_id'); 
+                } 
+            } catch (e) { localStorage.removeItem('rememberedUser'); }
+        } else if (savedTempStr) {
+            savedUser = JSON.parse(savedTempStr);
+            $('loginScreen').classList.add('hidden'); 
+            $('registerScreen').classList.add('hidden'); 
+            $('mainApp').style.display = 'block';
+            setStatus('جاري تحميل النظام...');
+        }
+
+        // 3. تحميل النماذج في الخلفية
+        try {
+            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
+            await faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
+            lightModels = true; 
+            loadHeavyModels(); 
+            if(!savedUser) setStatus('النظام جاهز');
+        } catch (e) { setStatus('فشل تحميل النماذج'); }
+        
+        getLocation();
+        
+        // 4. استكمال الجلسة المحفوظة بعد تحميل النماذج
         if (savedUser) { 
             user = savedUser; 
-            if (!user.isAdmin) { const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`); const empData = await empRes.json(); sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null; }
+            setStatus('جاري تحميل بيانات الوجه...');
+            if (!user.isAdmin) {
+                const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
+                const empData = await empRes.json();
+                sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null;
+            }
             showApp(); 
+            setStatus('النظام جاهز'); // التأكد من ظهورها أخيراً
         }
     }
 
@@ -363,7 +402,17 @@
             if (data.success) {
                 user = { name: data.name, code: data.code, isAdmin: data.isAdmin, isFirstLogin: data.isFirstLogin };
                 playSound('login-success');
-                if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data: user, timestamp: Date.now() })); } else { sessionStorage.setItem('user', JSON.stringify(user)); localStorage.removeItem('axentro_fp_id'); }
+                
+                // حفظ بيانات الدخول في الخانات (منفصل عن الجلسة)
+                if($('rememberMe').checked) { 
+                    localStorage.setItem('rememberedUser', JSON.stringify({ data: user, timestamp: Date.now() })); 
+                    localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass }));
+                } else { 
+                    sessionStorage.setItem('user', JSON.stringify(user)); 
+                    localStorage.removeItem('axentro_saved_login');
+                    localStorage.removeItem('axentro_fp_id'); // مسح البصمة فقط إذا ألغى تذكرني
+                }
+
                 setStatus('جاري تحميل بيانات الوجه...');
                 const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(data.code)}`);
                 const empData = await empRes.json();
@@ -375,15 +424,26 @@
                 } else if (!data.isAdmin && data.isFirstLogin) { $('forcePwModal').classList.add('active'); }
                 else {
                     showApp();
+                    setStatus('النظام جاهز');
                     if($('rememberMe').checked && window.PublicKeyCredential) { setTimeout(() => registerFingerprint(), 1000); }
                 }
             } else { playSound('login-error'); showToast(data.error || 'بيانات خاطئة', 'error'); setStatus('النظام جاهز'); }
         } catch (e) { playSound('login-error'); showToast('خطأ في الاتصال بالخادم', 'error'); setStatus('غير متصل'); }
     }
 
-    async function submitFirstPwChange() { const newPw = $('firstNewPw').value.trim(); if (!newPw || newPw.length < 4) return showToast('كلمة السر ضعيفة (4 أحرف على الأقل)', 'error'); try { const res = await fetch(URL, { method: 'POST', body: JSON.stringify({ action: 'changePassword', code: user.code, oldPassword: null, newPassword: newPw }) }); const data = await res.json(); if (data.success) { $('forcePwModal').classList.remove('active'); showToast('تم تحديث كلمة السر بنجاح', 'success'); showApp(); } else { showToast(data.error, 'error'); } } catch(e) { showToast('خطأ في الاتصال', 'error'); } }
+    async function submitFirstPwChange() { const newPw = $('firstNewPw').value.trim(); if (!newPw || newPw.length < 4) return showToast('كلمة السر ضعيفة (4 أحرف على الأقل)', 'error'); try { const res = await fetch(URL, { method: 'POST', body: JSON.stringify({ action: 'changePassword', code: user.code, oldPassword: null, newPassword: newPw }) }); const data = await res.json(); if (data.success) { $('forcePwModal').classList.remove('active'); showToast('تم تحديث كلمة السر بنجاح', 'success'); showApp(); setStatus('النظام جاهز'); } else { showToast(data.error, 'error'); } } catch(e) { showToast('خطأ في الاتصال', 'error'); } }
 
-    function logout() { playSound('logout-success'); localStorage.removeItem('rememberedUser'); localStorage.removeItem('axentro_fp_id'); sessionStorage.removeItem('user'); user = null; sessionDescriptor = null; $('mainApp').style.display = 'none'; $('loginScreen').classList.remove('hidden'); }
+    function logout() { 
+        playSound('logout-success'); 
+        localStorage.removeItem('rememberedUser'); // مسح الجلسة فقط
+        // تم إزالة مسح بصمة الإصبع وبيانات الخانات من هنا
+        sessionStorage.removeItem('user'); 
+        user = null; sessionDescriptor = null; 
+        $('mainApp').style.display = 'none'; 
+        $('loginScreen').classList.remove('hidden'); 
+        setStatus('النظام جاهز'); 
+    }
+    
     function refreshData() { if(user?.isAdmin) { loadEmployees(); showToast('تم التحديث', 'success'); } }
     
     function showApp() {
@@ -421,7 +481,7 @@
     async function openCamera() { try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }); video.srcObject = stream; await video.play(); $('cameraOverlay').classList.add('active'); $('camStatus').textContent = 'جاري البحث عن الوجه...'; canvas.width = video.videoWidth; canvas.height = video.videoHeight; startDetectionLoop(); return true; } catch (e) { return false; } }
     function startDetectionLoop() { async function detect() { if (!video.srcObject || !$('cameraOverlay').classList.contains('active')) return; await drawFaceBox(); requestAnimationFrame(detect); } detect(); }
     
-    async function drawFaceBox() { if (!video.srcObject || video.videoWidth === 0) return; try { const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })).withFaceLandmarks(true); ctx.clearRect(0, 0, canvas.width, canvas.height); if (detection) { const box = detection.detection.box; ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3; ctx.strokeRect(box.x, box.y, box.width, box.height); const cLen = 25; ctx.strokeStyle = '#10b981'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(box.x, box.y+cLen); ctx.lineTo(box.x, box.y); ctx.lineTo(box.x+cLen, box.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y); ctx.lineTo(box.x+box.width, box.y); ctx.lineTo(box.x+box.width, box.y+cLen); ctx.stroke(); ctx.beginPath(); ctx.moveTo(box.x, box.y+box.height-cLen); ctx.lineTo(box.x, box.y+box.height); ctx.lineTo(box.x+cLen, box.y+box.height); ctx.stroke(); ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height-cLen); ctx.stroke(); $('camStatus').innerHTML = '<i class="fas fa-check-circle"></i> تم اكتشاف الوجه، جاري الالتقاط التلقائي...'; if (!autoCaptureTimeout) { autoCaptureTimeout = setTimeout(() => performCapture(), 1500); } } else { $('camStatus').innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...'; if (autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout = null; } } } catch(e) {} }
+    async function drawFaceBox() { if (!video.srcObject || video.videoWidth === 0) return; try { const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })).withFaceLandmarks(true); ctx.clearRect(0, 0, canvas.width, canvas.height); if (detection) { const box = detection.detection.box; ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3; ctx.strokeRect(box.x, box.y, box.width, box.height); const cLen = 25; ctx.strokeStyle = '#10b981'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(box.x, box.y+cLen); ctx.lineTo(box.x, box.y); ctx.lineTo(box.x+cLen, box.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y); ctx.lineTo(box.x+box.width, box.y); ctx.lineTo(box.x+box.width, box.y+cLen); ctx.stroke(); ctx.beginPath(); ctx.moveTo(box.x, box.y+box.height-cLen); ctx.lineTo(box.x, box.y+box.height); ctx.lineTo(box.x+cLen, box.y+box.height); ctx.stroke(); ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height-cLen); ctx.stroke(); $('camStatus').innerHTML = '<i class="fas fa-check-circle"></i> تم اكتشاف الوجه، جاري الالتقاط التلقائي...'; if (!autoCaptureTimeout) { autoCaptureTimeout = setTimeout(() => performCapture(), 1200); } } else { $('camStatus').innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...'; if (autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout = null; } } } catch(e) {} }
 
     function closeCamera() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } video.srcObject = null; $('cameraOverlay').classList.remove('active'); regMode = false; attMode = false; updateFaceMode = false; attType = ''; if (autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout = null; } }
     
@@ -458,38 +518,17 @@
 
     function euclideanDistance(desc1, desc2) { let sum = 0; for (let i = 0; i < desc1.length; i++) { sum += Math.pow(desc1[i] - desc2[i], 2); } return Math.sqrt(sum); }
     
-    // ==========================================
-    // دالة تسجيل الحضور والانصراف المحدثة (البصمة ثم الوجه)
-    // ==========================================
     async function handleAttendance(type) {
         if (!sessionDescriptor) return showToast('بيانات الوجه غير مسجلة، تواصل مع الأدمن.', 'error');
-        
         const savedFpId = localStorage.getItem('axentro_fp_id');
-        
         if (savedFpId && window.PublicKeyCredential) {
             setStatus('ضع إصبعك للمتابعة...');
             try {
                 const challenge = new Uint8Array(32); crypto.getRandomValues(challenge);
-                const assertion = await navigator.credentials.get({
-                    publicKey: { challenge: challenge, allowCredentials: [{ id: base64ToBuffer(savedFpId), type: 'public-key' }], userVerification: "required" }
-                });
-                
-                if (assertion) {
-                    attMode = true; attType = type;
-                    const opened = await openCamera(); 
-                    if (!opened) { attMode = false; showToast('فشل فتح الكاميرا', 'error'); }
-                }
-            } catch (e) {
-                if(e.name === 'NotAllowedError') showToast('تم إلغاء عملية البصمة', 'error');
-                else showToast('فشل التحقق من البصمة', 'error');
-                setStatus('النظام جاهز');
-            }
-        } else {
-            // إذا لم يسجل بصمة إصبع، نفتح الكاميرا مباشرة (الوضع العادي)
-            attMode = true; attType = type;
-            const opened = await openCamera(); 
-            if (!opened) { attMode = false; showToast('فشل فتح الكاميرا', 'error'); }
-        }
+                const assertion = await navigator.credentials.get({ publicKey: { challenge: challenge, allowCredentials: [{ id: base64ToBuffer(savedFpId), type: 'public-key' }], userVerification: "required" } });
+                if (assertion) { attMode = true; attType = type; const opened = await openCamera(); if (!opened) { attMode = false; showToast('فشل فتح الكاميرا', 'error'); setStatus('النظام جاهز'); } else { setStatus('جاري التحقق من الوجه...'); } }
+            } catch (e) { if(e.name === 'NotAllowedError') showToast('تم إلغاء عملية البصمة', 'error'); else showToast('فشل التحقق من البصمة', 'error'); setStatus('النظام جاهز'); }
+        } else { attMode = true; attType = type; const opened = await openCamera(); if (!opened) { attMode = false; showToast('فشل فتح الكاميرا', 'error'); } else { setStatus('جاري التحقق من الوجه...'); } }
     }
     
     let currentLoc = null;
