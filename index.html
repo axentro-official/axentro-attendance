@@ -20,15 +20,16 @@
             display: flex; flex-direction: column; overflow-x: hidden;
         }
         
-        /* Container takes available space */
+        /* --- Animations --- */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        
+        /* --- Container --- */
         .app-container {
-            flex: 1;
-            width: 100%;
-            max-width: 550px;
-            margin: 0 auto;
-            padding: 20px;
-            position: relative;
-            z-index: 1;
+            flex: 1; width: 100%; max-width: 550px; margin: 0 auto;
+            padding: 20px; position: relative; z-index: 1;
+            animation: fadeIn 0.5s ease-out;
         }
 
         h1 {
@@ -38,28 +39,37 @@
             margin-bottom: 24px;
         }
 
-        /* --- Camera Fix (z-index added) --- */
+        /* --- Camera Overlay (Fixed Z-Index) --- */
+        .camera-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 2000;
+            display: none; align-items: center; justify-content: center;
+            flex-direction: column;
+        }
+        .camera-overlay.active { display: flex; }
+        
         .camera-container {
             background: #000; border-radius: 24px; overflow: hidden;
-            display: none; position: fixed; /* Changed to fixed for overlay */
-            top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 90%; max-width: 500px; aspect-ratio: 4/3;
+            position: relative; width: 90%; max-width: 500px; aspect-ratio: 4/3;
             box-shadow: 0 20px 60px -10px rgba(0,0,0,0.9);
-            z-index: 1001; /* Higher than overlay */
             border: 2px solid var(--primary);
         }
-        .camera-container.active { display: block; }
         video { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
         .face-canvas { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 10; }
         .capture-btn {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            margin-top: 20px; background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white; border: none; padding: 12px 32px; border-radius: 50px;
             font-size: 16px; font-weight: bold; cursor: pointer; z-index: 20;
             display: flex; align-items: center; gap: 8px;
             box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+            transition: transform 0.2s;
         }
-        .capture-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .capture-btn:active { transform: scale(0.95); }
+        .close-cam { 
+            position: absolute; top: 20px; right: 20px; z-index: 30; 
+            background: rgba(0,0,0,0.5); border: none; color: white; 
+            width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer;
+        }
 
         /* --- Cards & Inputs --- */
         .card {
@@ -67,7 +77,10 @@
             border-radius: 24px; padding: 24px; margin-bottom: 20px;
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 15px 35px -10px rgba(0,0,0,0.6); }
+        
         input {
             width: 100%; padding: 14px 20px; border-radius: 50px;
             background: rgba(0,0,0,0.5); border: 1px solid #334155;
@@ -82,79 +95,140 @@
             width: 100%; padding: 14px; border-radius: 50px; border: none;
             font-size: 16px; font-weight: 600; cursor: pointer;
             display: flex; align-items: center; justify-content: center; gap: 8px;
-            transition: 0.2s; color: white;
+            transition: 0.2s; color: white; position: relative; overflow: hidden;
         }
+        .btn:active { transform: scale(0.98); }
+        .btn::after { content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0; background: rgba(255,255,255,0.2); border-radius: 50%; transform: translate(-50%, -50%); transition: width 0.3s, height 0.3s; }
+        .btn:active::after { width: 200px; height: 200px; }
+        
         .btn-login { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
         .btn-reg { background: linear-gradient(135deg, var(--warning), #d97706); }
         .btn-att { background: linear-gradient(135deg, var(--success), #059669); }
         .btn-leave { background: linear-gradient(135deg, var(--danger), #dc2626); }
-        .btn:active { transform: scale(0.98); }
+        .btn-action { padding: 8px 16px; width: auto; font-size: 14px; }
+        .btn-refresh { background: var(--primary); }
+        .btn-logout { background: var(--danger); }
         
         .action-group { display: flex; gap: 12px; margin-top: 20px; }
         .action-group .btn { flex: 1; }
 
-        /* --- Status --- */
+        /* --- Connection Status Bar --- */
         .status-bar {
             background: rgba(15, 23, 42, 0.7); padding: 10px 20px;
             border-radius: 50px; display: flex; align-items: center; justify-content: center; gap: 10px;
             font-size: 14px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1);
         }
-        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .status-dot.online { background: var(--success); animation: pulse 2s infinite; }
+        .status-dot.offline { background: var(--danger); }
+        
+        /* --- Admin Dashboard --- */
+        .stat-card {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            padding: 20px; border-radius: 20px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-card h2 { font-size: 40px; color: var(--primary); margin-bottom: 5px; }
+        .stat-card p { color: #94a3b8; font-size: 14px; }
+
+        .admin-tools { display: flex; gap: 10px; margin-top: 15px; justify-content: center; }
+        
+        .search-results { max-height: 300px; overflow-y: auto; margin-top: 10px; border-radius: 12px; }
+        .search-item {
+            padding: 15px; border-bottom: 1px solid #334155; cursor: pointer;
+            transition: background 0.2s; text-align: right;
+        }
+        .search-item:hover { background: rgba(59, 130, 246, 0.1); }
 
         /* --- Overlays --- */
         .overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(10, 15, 30, 0.98); backdrop-filter: blur(15px);
-            display: flex; align-items: center; justify-content: center; z-index: 100;
-            padding: 20px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100;
+            padding: 20px; overflow-y: auto;
         }
         .overlay.hidden { display: none; }
         
-        /* --- Footer --- */
+        /* --- Footer (Global) --- */
         footer {
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(15, 23, 42, 0.9);
             padding: 30px 20px;
             text-align: center;
             border-top: 1px solid rgba(255,255,255,0.1);
-            margin-top: auto; /* Pushes footer to bottom */
+            margin-top: auto; 
+            width: 100%;
         }
         footer .brand {
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 18px; font-weight: bold;
             background: linear-gradient(135deg, #fff, #94a3b8);
-            -webkit-background-clip: text; color: transparent;
-            margin-bottom: 10px;
+            -webkit-background-clip: text; color: transparent; margin-bottom: 10px;
         }
         footer p { color: #64748b; font-size: 12px; margin-bottom: 5px; }
         footer .qr-code {
             width: 80px; height: 80px;
             background: white; padding: 5px; border-radius: 10px;
-            margin-top: 15px;
-            transition: transform 0.2s;
+            margin-top: 15px; transition: transform 0.2s;
         }
-        footer .qr-code:hover { transform: scale(1.1); }
+        footer .qr-code:hover { transform: scale(1.1) rotate(5deg); }
 
         /* --- Toast --- */
         .toast {
             position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(100px);
             background: #1e293b; color: white; padding: 12px 24px; border-radius: 50px;
             font-size: 14px; z-index: 3000; transition: 0.3s; opacity: 0;
-            border: 1px solid rgba(255,255,255,0.1); text-align: center;
-            max-width: 90%;
+            border: 1px solid rgba(255,255,255,0.1); text-align: center; max-width: 90%;
         }
         .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
         .toast.success { background: var(--success); }
         .toast.error { background: var(--danger); }
 
-        .logout-btn {
-            position: fixed; top: 20px; left: 20px; z-index: 50;
-            background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2);
-            padding: 8px 16px; border-radius: 50px; cursor: pointer; font-size: 14px;
+        /* --- Modal --- */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); backdrop-filter: blur(5px);
+            display: none; align-items: center; justify-content: center; z-index: 1500;
+            padding: 20px;
         }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: #1e293b; width: 100%; max-width: 500px;
+            border-radius: 24px; padding: 30px; text-align: right;
+            position: relative; animation: slideIn 0.3s ease-out;
+            max-height: 90vh; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .modal-close {
+            position: absolute; top: 15px; left: 15px; background: none;
+            border: none; color: white; font-size: 24px; cursor: pointer;
+        }
+        .report-row {
+            display: flex; justify-content: space-between; padding: 10px;
+            border-bottom: 1px solid #334155; font-size: 14px;
+        }
+        .report-row span { color: #cbd5e1; }
     </style>
 </head>
 <body>
+
+<!-- Camera Overlay -->
+<div id="cameraOverlay" class="camera-overlay">
+    <button class="close-cam" onclick="closeCamera()"><i class="fas fa-times"></i></button>
+    <div class="camera-container" id="camContainer">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="canvas" class="face-canvas"></canvas>
+    </div>
+    <button class="capture-btn" id="captureBtn" onclick="handleCapture()">
+        <i class="fas fa-camera"></i> التقاط
+    </button>
+</div>
+
+<!-- Detail Modal -->
+<div id="detailModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+        <h2 style="text-align:center; margin-bottom:20px;" id="modalTitle">تفاصيل الموظف</h2>
+        <div id="modalBody"></div>
+    </div>
+</div>
 
 <!-- Login Screen -->
 <div id="loginScreen" class="overlay">
@@ -172,12 +246,21 @@
             <i class="fas fa-user-plus"></i> تسجيل موظف جديد
         </button>
     </div>
+    <!-- Footer in Login -->
+    <footer style="position: relative; margin-top: 20px;">
+        <div class="brand">Axentro</div>
+        <p>نظام حضور وانصراف ومتابعة الموظفين</p>
+        <p>© 2024 Axentro – All Rights Reserved</p>
+        <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
+            <img src="qr-links.png" alt="QR Code" class="qr-code">
+        </a>
+    </footer>
 </div>
 
 <!-- Register Screen -->
 <div id="registerScreen" class="overlay hidden">
     <div class="card" style="max-width: 400px; width: 100%;">
-        <h3 style="margin-bottom: 20px;"><i class="fas fa-id-card"></i> تسجيل موظف جديد</h3>
+        <h3 style="margin-bottom: 20px; text-align:center;"><i class="fas fa-id-card"></i> تسجيل موظف جديد</h3>
         <input type="text" id="regName" placeholder="اسم الموظف الثلاثي">
         <input type="email" id="regEmail" placeholder="البريد الإلكتروني (لإرسال البيانات)">
         <button class="btn btn-reg" onclick="startRegistration()">
@@ -185,50 +268,61 @@
         </button>
         <button class="btn" onclick="showLoginScreen()" style="background: #334155; margin-top: 10px;">رجوع</button>
     </div>
+     <!-- Footer in Register -->
+     <footer style="position: relative; margin-top: 20px;">
+        <div class="brand">Axentro</div>
+        <p>© 2024 Axentro – All Rights Reserved</p>
+        <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
+            <img src="qr-links.png" alt="QR Code" class="qr-code">
+        </a>
+    </footer>
 </div>
 
 <!-- Main App -->
 <div class="app-container" id="mainApp" style="display: none;">
-    <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> خروج</button>
-    
     <h1>نظام متابعة الموظفين</h1>
     
+    <!-- Status Bar with Connection Status -->
     <div class="status-bar" id="statusBar">
-        <div class="spinner"></div> <span>جاري التحميل...</span>
+        <span class="status-dot online" id="connDot"></span>
+        <span id="connText">متصل بالخادم</span>
+        <button class="btn btn-action btn-refresh" onclick="refreshData()" title="تحديث"><i class="fas fa-sync-alt"></i></button>
+        <button class="btn btn-action btn-logout" onclick="logout()" title="خروج"><i class="fas fa-sign-out-alt"></i></button>
     </div>
+    
     <div class="status-bar" id="locBar" style="font-size: 12px;">
         <i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span>
     </div>
 
-    <!-- Camera Container (Now separate for better z-index control) -->
-    <div class="camera-container" id="camContainer">
-        <video id="video" autoplay muted playsinline></video>
-        <canvas id="canvas" class="face-canvas"></canvas>
-        <button class="capture-btn" id="captureBtn" onclick="handleCapture()">
-            <i class="fas fa-camera"></i> التقاط
-        </button>
+    <!-- Admin Panel -->
+    <div id="adminPanel" style="display: none;">
+        <div class="stat-card">
+            <h2 id="empCount">0</h2>
+            <p>إجمالي الموظفين المسجلين</p>
+        </div>
+        
+        <div class="card" style="margin-top: 20px;">
+            <h3 style="margin-bottom:12px;"><i class="fas fa-search"></i> بحث الموظفين</h3>
+            <input type="text" id="searchInput" placeholder="اكتب حرف أو كود للبحث السريع..." style="margin-bottom:0;">
+            <div id="searchResults" class="search-results"></div>
+        </div>
     </div>
 
-    <div class="card" id="adminPanel" style="display: none;">
-        <h3 style="margin-bottom: 12px;"><i class="fas fa-user-shield"></i> لوحة المدير</h3>
-        <input type="text" id="searchInput" placeholder="ابحث باسم الموظف أو الكود..." style="margin-top: 10px;">
-        <div id="searchResults" style="margin-top: 10px; text-align: right; font-size: 14px;"></div>
-    </div>
-
-    <div class="action-group" id="actionBtns">
+    <div class="action-group" id="actionBtns" style="margin-top: 30px;">
         <button class="btn btn-att" onclick="handleAttendance('حضور')"><i class="fas fa-check"></i> حضور</button>
         <button class="btn btn-leave" onclick="handleAttendance('انصراف')"><i class="fas fa-times"></i> انصراف</button>
     </div>
+    
+    <!-- Footer in Main App -->
+    <footer style="margin-top: 40px;">
+        <div class="brand">Axentro</div>
+        <p>نظام حضور وانصراف ومتابعة الموظفين</p>
+        <p>© 2024 Axentro – All Rights Reserved</p>
+        <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank">
+            <img src="qr-links.png" alt="QR Code" class="qr-code">
+        </a>
+    </footer>
 </div>
-
-<!-- Footer -->
-<footer id="mainFooter">
-    <div class="brand">Axentro</div>
-    <p>نظام حضور وانصراف ومتابعة الموظفين</p>
-    <p>© 2024 Axentro – All Rights Reserved</p>
-    <p style="margin-top: 5px; font-size: 10px;">By Axentro Team</p>
-    <img src="qr-links.png" alt="QR Code" class="qr-code">
-</footer>
 
 <!-- Toast -->
 <div id="toast" class="toast"></div>
@@ -257,29 +351,32 @@
         setTimeout(() => t.classList.remove('show'), 4000);
     };
     const setStatus = (txt, load = false) => {
-        $('statusBar').innerHTML = load ? `<div class="spinner"></div><span>${txt}</span>` : `<span>${txt}</span>`;
+        // Keep status text simple
+        $('connText').textContent = txt;
     };
 
     // --- Initialization ---
     async function init() {
-        // Load Face-API Models
         try {
-            setStatus('تحميل نماذج الذكاء...', true);
+            setStatus('تحميل النماذج...', true);
             await faceapi.nets.ssdMobilenetv1.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             models = true;
-            setStatus('النظام جاهز ✔');
-        } catch (e) { setStatus('فشل تحميل النماذج'); console.error(e); return; }
+            setStatus('متصل بالخادم');
+            $('connDot').classList.add('online');
+            $('connDot').classList.remove('offline');
+        } catch (e) { 
+            setStatus('غير متصل');
+            $('connDot').classList.remove('online');
+            $('connDot').classList.add('offline');
+            return; 
+        }
 
-        // Load Local Data
         const stored = localStorage.getItem('axentro_data');
         if(stored) localData = JSON.parse(stored);
-
-        // Location
         getLocation();
 
-        // Check Session
         const savedUser = sessionStorage.getItem('user');
         if (savedUser) {
             user = JSON.parse(savedUser);
@@ -293,7 +390,6 @@
         const pass = $('loginPass').value.trim();
         if (!code || !pass) return showToast('يرجى إدخال الكود وكلمة السر', 'error');
         
-        setStatus('جاري التحقق...', true);
         try {
             const res = await fetch(`${URL}?action=verifyLogin&code=${encodeURIComponent(code)}&password=${encodeURIComponent(pass)}`);
             const data = await res.json();
@@ -305,16 +401,20 @@
                 showToast(data.error || 'بيانات خاطئة', 'error');
             }
         } catch (e) { showToast('خطأ في الاتصال', 'error'); }
-        setStatus('النظام جاهز ✔');
     }
 
     function logout() {
         sessionStorage.removeItem('user');
         user = null;
         $('mainApp').style.display = 'none';
-        $('mainFooter').style.display = 'block';
         $('loginScreen').classList.remove('hidden');
-        $('statusBar').innerHTML = '<span>النظام جاهز ✔</span>';
+    }
+    
+    function refreshData() {
+       if(user && user.isAdmin) {
+           loadEmployees();
+           showToast('جاري تحديث البيانات...', 'info');
+       }
     }
 
     // --- App Logic ---
@@ -322,22 +422,34 @@
         $('loginScreen').classList.add('hidden');
         $('registerScreen').classList.add('hidden');
         $('mainApp').style.display = 'block';
-        $('mainFooter').style.display = 'block'; // Keep footer visible or hide if you want
 
         if (user.isAdmin) {
             $('adminPanel').style.display = 'block';
-            $('statusBar').innerHTML = `<span>مرحباً المدير</span>`;
-            const res = await fetch(`${URL}?action=getEmployees`);
-            const d = await res.json();
-            if(d.success) employees = d.employees;
+            $('actionBtns').style.display = 'none'; // Hide attendance buttons for admin initially
+            loadEmployees();
         } else {
             $('adminPanel').style.display = 'none';
+            $('actionBtns').style.display = 'flex';
             selectedEmp = localData.find(e => e.code === user.code);
-            if(!selectedEmp) selectedEmp = employees.find(e => e.code === user.code);
-            if(selectedEmp) setStatus(`مرحباً ${user.name}`);
-            
-            // Check if first login (optional UI hint)
-            showToast('مرحباً بك! يمكنك تسجيل حضورك الآن.', 'success');
+            if(selectedEmp) showToast(`مرحباً ${user.name}`, 'success');
+        }
+    }
+    
+    async function loadEmployees() {
+        try {
+            const res = await fetch(`${URL}?action=getEmployees`);
+            const d = await res.json();
+            if(d.success) {
+                employees = d.employees;
+                $('empCount').textContent = employees.length;
+                $('connDot').classList.add('online');
+                $('connDot').classList.remove('offline');
+                setStatus('متصل');
+            }
+        } catch(e) {
+            $('connDot').classList.remove('online');
+            $('connDot').classList.add('offline');
+            setStatus('غير متصل');
         }
     }
 
@@ -366,121 +478,89 @@
         }
     }
 
-    // --- Camera & Face Detection ---
+    // --- Camera ---
     async function openCamera() {
         try {
             stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
             video.srcObject = stream;
-            // Important: play inside a user interaction event flow or immediately
             await video.play(); 
             
-            $('camContainer').classList.add('active');
+            $('cameraOverlay').classList.add('active');
             
-            // Setup Canvas
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
-            // Start Drawing Loop
             drawFaceBox();
             return true;
-        } catch (e) {
-            console.error(e);
-            return false; 
-        }
+        } catch (e) { return false; }
     }
 
     function closeCamera() {
         if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
         video.srcObject = null;
-        $('camContainer').classList.remove('active');
+        $('cameraOverlay').classList.remove('active');
         regMode = false;
     }
 
-    // Drawing Face Box
     async function drawFaceBox() {
         if (!video.srcObject) return;
-        
         const detection = await faceapi.detectSingleFace(video).withFaceLandmarks();
-        
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         if (detection) {
             const box = detection.detection.box;
-            
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3;
             ctx.strokeRect(box.x, box.y, box.width, box.height);
             
+            // Corners
             const cLen = 20;
-            ctx.strokeStyle = '#10b981';
-            ctx.lineWidth = 4;
-            
+            ctx.strokeStyle = '#10b981'; ctx.lineWidth = 4;
             ctx.beginPath(); ctx.moveTo(box.x, box.y+cLen); ctx.lineTo(box.x, box.y); ctx.lineTo(box.x+cLen, box.y); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y); ctx.lineTo(box.x+box.width, box.y); ctx.lineTo(box.x+box.width, box.y+cLen); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(box.x, box.y+box.height-cLen); ctx.lineTo(box.x, box.y+box.height); ctx.lineTo(box.x+cLen, box.y+box.height); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height); ctx.lineTo(box.x+box.width, box.y+box.height-cLen); ctx.stroke();
 
-            ctx.fillStyle = '#10b981';
-            ctx.font = 'bold 16px sans-serif';
+            ctx.fillStyle = '#10b981'; ctx.font = 'bold 16px sans-serif';
             ctx.fillText('وجه مكتشف', box.x, box.y - 10);
         }
-        
         requestAnimationFrame(drawFaceBox);
     }
 
-    // --- Capture Action ---
+    // --- Capture ---
     async function handleCapture() {
         if (!models) return showToast('النماذج غير جاهزة', 'error');
         
         $('captureBtn').disabled = true;
-        setStatus('جاري المعالجة...', true);
-
         const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
         
         if (!detection) {
-            showToast('لم يتم اكتشاف وجه، حاول مرة أخرى', 'error');
+            showToast('لم يتم اكتشاف وجه', 'error');
             $('captureBtn').disabled = false;
-            setStatus('النظام جاهز ✔');
             return;
         }
 
-        // Capture Image
         const c = document.createElement('canvas');
         c.width = video.videoWidth; c.height = video.videoHeight;
         c.getContext('2d').drawImage(video, 0, 0);
         const imgData = c.toDataURL('image/jpeg');
 
         if (regMode) {
-            const payload = {
-                action: 'register',
-                name: regData.name,
-                email: regData.email,
-                descriptor: Array.from(detection.descriptor),
-                imageData: imgData
-            };
+            const payload = { action: 'register', name: regData.name, email: regData.email, descriptor: Array.from(detection.descriptor), imageData: imgData };
             
             try {
                 const response = await fetch(URL, { method: 'POST', body: JSON.stringify(payload) });
-                const result = await response.json(); // Parse response to check for errors
+                const result = await response.json();
                 
                 if(result.success) {
                     const newEmp = { name: regData.name, code: result.code || 'EMP_NEW', imageData: imgData };
                     localData.push(newEmp);
                     localStorage.setItem('axentro_data', JSON.stringify(localData));
-                    
-                    showToast('تم التسجيل بنجاح! راجع بريدك الإلكتروني للحصول على كود الدخول وكلمة السر.', 'success');
+                    showToast('تم التسجيل بنجاح! راجع بريدك الإلكتروني.', 'success');
                     closeCamera();
                     showLoginScreen();
-                } else {
-                    showToast(result.error || 'حدث خطأ أثناء التسجيل', 'error');
-                }
-            } catch (e) {
-                showToast('خطأ في الاتصال بالخادم', 'error');
-            }
+                } else { showToast(result.error || 'حدث خطأ', 'error'); }
+            } catch (e) { showToast('خطأ في الاتصال', 'error'); }
         }
-        
         $('captureBtn').disabled = false;
-        setStatus('النظام جاهز ✔');
     }
 
     // --- Attendance ---
@@ -502,38 +582,72 @@
         const timeStr = now.toLocaleString('ar-EG', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const dateStr = now.toLocaleDateString('ar-EG');
         
-        const payload = {
-            action: 'attendance',
-            name: target.name,
-            code: target.code,
-            type: type,
-            location: currentLoc || 'غير متوفر',
-            datetime: `${dateStr} - ${timeStr}`,
-            imageData: localEmp.imageData
-        };
+        const payload = { action: 'attendance', name: target.name, code: target.code, type: type, location: currentLoc || 'غير متوفر', datetime: `${dateStr} - ${timeStr}`, imageData: localEmp.imageData };
 
-        setStatus('جاري الإرسال...', true);
         try {
             await fetch(URL, { method: 'POST', body: JSON.stringify(payload) });
             showToast(`تم تسجيل ${type} بنجاح`, 'success');
-        } catch (e) {
-            showToast('فشل الإرسال', 'error');
-        }
-        setStatus('النظام جاهز ✔');
+        } catch (e) { showToast('فشل الإرسال', 'error'); }
     }
 
-    // --- Search (Admin) ---
+    // --- Search & Modal (Admin) ---
     $('searchInput')?.addEventListener('input', (e) => {
         const q = e.target.value.toLowerCase();
+        if(!q) { $('searchResults').innerHTML = ''; return; }
+        
         const res = employees.filter(emp => emp.name.toLowerCase().includes(q) || emp.code.toLowerCase().includes(q));
-        const html = res.map(e => `<div onclick="selectEmp('${e.name}')" style="padding:8px; cursor:pointer; border-bottom:1px solid #334155;">${e.name} (${e.code})</div>`).join('');
+        const html = res.map(e => `
+            <div class="search-item" onclick="showEmployeeDetails('${e.code}')">
+                <div style="font-weight:bold;">${e.name}</div>
+                <div style="font-size:12px; color:#94a3b8;">${e.code}</div>
+            </div>
+        `).join('');
         $('searchResults').innerHTML = html;
     });
     
-    function selectEmp(name) {
-        $('searchInput').value = name;
+    async function showEmployeeDetails(code) {
+        const emp = employees.find(e => e.code === code);
+        if(!emp) return;
+        
+        selectedEmp = emp; // Set for attendance
+        $('searchInput').value = emp.name;
         $('searchResults').innerHTML = '';
-        selectedEmp = employees.find(e => e.name === name);
+        $('actionBtns').style.display = 'flex'; // Show attendance buttons for selected employee
+        
+        // Load Report
+        $('modalTitle').textContent = emp.name;
+        $('modalBody').innerHTML = '<center><div class="spinner"></div></center>';
+        $('detailModal').classList.add('active');
+        
+        try {
+            // Fetch report (Assuming you have a getAttendance endpoint, if not, just show info)
+            // For now, just show info and option to register attendance
+            $('modalBody').innerHTML = `
+                <div style="text-align:center; margin-bottom:20px;">
+                    <i class="fas fa-user-circle" style="font-size:50px; color:#3b82f6;"></i>
+                    <h3>${emp.name}</h3>
+                    <p style="color:#94a3b8;">${emp.code}</p>
+                </div>
+                <div class="action-group">
+                    <button class="btn btn-att" onclick="handleModalAction('حضور')"><i class="fas fa-check"></i> تسجيل حضور</button>
+                    <button class="btn btn-leave" onclick="handleModalAction('انصراف')"><i class="fas fa-times"></i> تسجيل انصراف</button>
+                </div>
+                <div style="margin-top:20px; text-align:center; color:#64748b; font-size:12px;">
+                    يمكنك تسجيل الحضور من هنا مباشرة.
+                </div>
+            `;
+        } catch(e) {
+            $('modalBody').innerHTML = '<p style="text-align:center;">خطأ في تحميل البيانات</p>';
+        }
+    }
+    
+    function handleModalAction(type) {
+        handleAttendance(type);
+        closeModal();
+    }
+    
+    function closeModal() {
+        $('detailModal').classList.remove('active');
     }
 
     // --- Location ---
