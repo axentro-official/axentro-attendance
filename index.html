@@ -275,7 +275,7 @@
     let sessionDescriptor = null;
     let selectedEmp = null, regMode = false, attMode = false, updateFaceMode = false, adminVerifyMode = false, attType = '', regData = {}, autoCaptureTimeout = null;
     let targetEmpForAdmin = null;
-    let isProcessingCapture = false; // قفل الذكاء الاصطناعي لمنع الانهيار
+    let isProcessingCapture = false; 
     
     let currentLat = null, currentLon = null, headMoved = false, userImage = '', lastCamStatusText = '';
     const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 100;
@@ -283,7 +283,6 @@
     const $ = id => document.getElementById(id);
     const video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
     
-    // === الحل السحري والنهائي لمشكلة صوت الموبايل (يعتمد على ملف صامت Base64) ===
     function forceAudioUnblock() {
         try {
             const silentWav = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
@@ -295,7 +294,6 @@
     }
     document.addEventListener('touchstart', forceAudioUnblock, { passive: true });
     document.addEventListener('click', forceAudioUnblock);
-    // ============================================
 
     const setCamStatus = (html) => {
         if (html !== lastCamStatusText) {
@@ -381,7 +379,6 @@
         } catch (e) { if(e.name === 'NotAllowedError') showToast('تم إلغاء عملية البصمة', 'error'); else showToast('فشل التحقق من البصمة', 'error'); setStatus('النظام جاهز'); }
     }
 
-    // === تحميل سريع بدون تعطيل الواجهة ===
     async function init() {
         restoreSession();
         loadModelsAsync();
@@ -447,7 +444,30 @@
                 
                 if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data: user, timestamp: Date.now() })); localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass })); } else { sessionStorage.setItem('user', JSON.stringify(user)); localStorage.removeItem('axentro_saved_login'); localStorage.removeItem('axentro_fp_id'); }
                 
-                if (!data.isAdmin && data.isFirstLogin) { $('forcePwModal').classList.add('active'); setStatus('النظام جاهز'); }
+                if (!data.isAdmin && data.isFirstLogin) { 
+                    $('forcePwModal').classList.add('active'); 
+                    setStatus('النظام جاهز'); 
+                }
+                else if (data.isAdmin) {
+                    setStatus('جاري التحقق من بيانات الوجه...');
+                    try {
+                        const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(data.code)}`);
+                        const empData = await empRes.json();
+                        sessionDescriptor = (empData.success && empData.descriptor) ? empData.descriptor : null;
+                        userImage = (empData.success && empData.userImage) ? empData.userImage : '';
+                        
+                        if (!sessionDescriptor) { 
+                            showApp(); 
+                            showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'error'); 
+                            updateFaceMode = true; 
+                            const opened = await openCamera(); 
+                            if (!opened) { updateFaceMode = false; showToast('فشل فتح الكاميرا، لا يمكنك الدخول', 'error'); logout(); } 
+                        } else {
+                            showApp(); 
+                            if($('rememberMe').checked && window.PublicKeyCredential) { setTimeout(() => registerFingerprint(), 1000); } 
+                        }
+                    } catch(e) { showApp(); }
+                }
                 else {
                     showApp(); fetchUserDataInBackground();
                     if($('rememberMe').checked && window.PublicKeyCredential) { setTimeout(() => registerFingerprint(), 1000); } 
@@ -576,7 +596,12 @@
     }
     
     async function drawFaceBox() { 
-        if (!video.srcObject || video.videoWidth === 0 || isProcessingCapture) return; 
+        if (!video.srcObject || video.videoWidth === 0) return; 
+        
+        if (!lightModels) {
+            setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...');
+            return;
+        }
         
         try { 
             const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })).withFaceLandmarks(true); 
@@ -593,7 +618,7 @@
                 
                 if (regMode || updateFaceMode) {
                     setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> ثبت وجهك، جاري الالتقاط...');
-                    if (!autoCaptureTimeout) { autoCaptureTimeout = setTimeout(() => performCapture(), 300); } 
+                    if (!autoCaptureTimeout && !isProcessingCapture) { autoCaptureTimeout = setTimeout(() => performCapture(), 300); } 
                     return;
                 }
                 
@@ -608,7 +633,7 @@
                 }
                 
                 setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم اكتشاف الوجه، جاري الالتقاط...'); 
-                if (!autoCaptureTimeout) { autoCaptureTimeout = setTimeout(() => performCapture(), 300); } 
+                if (!autoCaptureTimeout && !isProcessingCapture) { autoCaptureTimeout = setTimeout(() => performCapture(), 300); } 
             } else { 
                 setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...'); 
                 if (autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout = null; } 
@@ -622,22 +647,20 @@
         $('cameraOverlay').classList.remove('active'); 
         regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false; 
         attType = ''; targetEmpForAdmin = null; headMoved = false; 
-        isProcessingCapture = false; // فتح القفل حتي لا يتعطل التطبيق
+        isProcessingCapture = false; 
         if (autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout = null; } 
     }
     
     async function performCapture() {
-        if (isProcessingCapture) return; // منع التكرار المسبب للانهيار
-        isProcessingCapture = true; // إغلاق القفل
+        if (isProcessingCapture) return; 
+        isProcessingCapture = true; 
         autoCaptureTimeout = null;
         
-        // === الحل الحاسم لمنع تجميد المتصفح وتلف الأيقونات ===
-        // تم إلغاء (While Loop) نهائياً. إذا لم تحمل النماذج، نوقف العملية بأدب ولانتجمد الصفحة.
         if (!heavyModels) { 
             playSound('faceid-error'); 
             showToast('نماذج الذكاء الاصطناعي لم تحمل بعد، انتظر قليلاً وحاول مرة أخرى', 'error');
             setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> جاري تحميل النماذج، أعد المحاولة بعد ثوانٍ...');
-            isProcessingCapture = false; // فتح القفل
+            isProcessingCapture = false; 
             return; 
         }
         
