@@ -286,9 +286,6 @@
     let autoRefreshTimer = null;
     let detectionLoopTimeout = null;
     
-    // الإصلاح السحري: متغير لحفظ آخر وجه تم التأكد من ثباته لتجنب إعادة المسح الذي يسبب الفشل
-    let lastValidDetection = null;
-    
     let livenessActive = false;
     let livenessStartYaw = null;
     let livenessMoved = false;
@@ -337,7 +334,6 @@
         livenessStartYaw = null;
         livenessMoved = false;
         stabilityCounter = 0;
-        lastValidDetection = null; // مسح الوجه المحفوظ عند إعادة التعيين
     }
     
     function updateLiveness(yaw) {
@@ -365,7 +361,6 @@
             await video.play();
             $('cameraOverlay').classList.add('active');
             lastCamStatusText = '';
-            lastValidDetection = null; // إعادة تعيين الوجه المحفوظ عند فتح الكاميرا
             
             if (!lightModels || !heavyModels) {
                 setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري فتح الكاميرا وتحميل الذكاء الاصطناعي في الخلفية...');
@@ -390,7 +385,6 @@
         regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false; firstTimeSetupMode = false;
         attType = ''; targetEmpForAdmin = null;
         isProcessingCapture = false;
-        lastValidDetection = null;
         if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
         if(detectionLoopTimeout) { clearTimeout(detectionLoopTimeout); detectionLoopTimeout=null; }
         stabilityCounter = 0;
@@ -400,7 +394,7 @@
     function startDetectionLoop() {
         if(detectionLoopTimeout) clearTimeout(detectionLoopTimeout);
         async function detect() {
-            if(!video.srcObject || !$('cameraOverlay').classList.contains('active')) return;
+            if(!video.srcObject || !$('cameraOverlay').classList.contains('active') || isProcessingCapture) return;
             await drawFaceBox();
             detectionLoopTimeout = setTimeout(detect, 250);
         }
@@ -420,9 +414,6 @@
             ctx.clearRect(0,0,canvas.width,canvas.height);
             
             if(detection) {
-                // الإصلاح السحري: حفظ الوجه الذي تم اكتشافه فوراً لاستخدامه لاحقاً دون إعادة المسح
-                lastValidDetection = detection;
-
                 const box = detection.detection.box;
                 ctx.strokeStyle = '#38bdf8'; ctx.lineWidth=3; ctx.strokeRect(box.x,box.y,box.width,box.height);
                 const cLen=25; ctx.strokeStyle='#10b981'; ctx.lineWidth=4;
@@ -475,45 +466,36 @@
         isProcessingCapture = true;
         autoCaptureTimeout = null;
         
-        // التقاط الصورة من الكاميرا مرة واحدة فقط
+        // الخطوة 1: إيقاف مراقبة الكاميرا تماماً لتحرير المعالج وتثبيت الصورة
+        if(detectionLoopTimeout) { clearTimeout(detectionLoopTimeout); detectionLoopTimeout = null; }
+
+        // التقاط صورة ثابتة للحفظ
         const c = document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight; c.getContext('2d').drawImage(video,0,0);
         const imgData = c.toDataURL('jpeg',0.7);
         
         let newDescriptor = null;
 
-        // الإصلاح السحري: في حالة التسجيل لأول مرة، نستخدم الوجه الذي سبق حفظه ولن نعيد مسح الكاميرا
-        if (regMode || firstTimeSetupMode || updateFaceMode) {
-            if (!lastValidDetection) {
-                playSound('faceid-error'); showToast('الوجه غير مستقر، حاول مرة أخرى', 'error');
-                isProcessingCapture = false; stabilityCounter = 0; return;
+        // الخطوة 2: المسح المتكامل الشامل مرة واحدة فقط (لضمان توافق النماذج وتجنب الأخطاء)
+        setCamStatus('<i class="fas fa-brain"></i> جاري المعالجة النهائية الآنية...');
+        try {
+            const detectionWithDesc = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 })).withFaceLandmarks().withFaceDescriptor();
+            
+            if(!detectionWithDesc) {
+                playSound('faceid-error'); if(navigator.vibrate) navigator.vibrate([100,50,100]);
+                setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> تم الالتقاط في لحظة غير مناسبة، جاري إعادة المحاولة...');
+                // إعادة تشغيل المراقبة دون إغلاق الكاميرا
+                isProcessingCapture = false; 
+                stabilityCounter = 0; 
+                startDetectionLoop(); 
+                return;
             }
-            setCamStatus('<i class="fas fa-brain"></i> جاري استخراج البصمة...');
-            try {
-                // استخراج البصمة مباشرة من الوجه الثابت المحفوظ (سرعة خيالية وبدون أخطاء)
-                newDescriptor = Array.from(await faceapi.computeFaceDescriptor(lastValidDetection));
-            } catch(err) {
-                console.error(err);
-                playSound('faceid-error'); showToast('حدث خطأ تقني غريب، أعد المحاولة', 'error');
-                isProcessingCapture = false; stabilityCounter = 0; return;
-            }
-        } 
-        // في حالة الحضور والانصراف والتحقق، يجب المسح الآني في تلك اللحظة لمنع الغش
-        else if (attMode || adminVerifyMode) {
-            setCamStatus('<i class="fas fa-brain"></i> جاري التحليل الآني للمطابقة...');
-            try {
-                // دمج خطوات المسح لزيادة السرعة وتقليل أخطاء الـ Looping
-                const detectionWithDesc = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 })).withFaceLandmarks().withFaceDescriptor();
-                if(!detectionWithDesc) {
-                    playSound('faceid-error'); if(navigator.vibrate) navigator.vibrate([100,50,100]);
-                    setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> حركة مفاجئة، أعد المحاولة');
-                    isProcessingCapture = false; stabilityCounter = 0; return;
-                }
-                newDescriptor = Array.from(detectionWithDesc.descriptor);
-            } catch(err) {
-                console.error(err);
-                playSound('faceid-error'); showToast('خطأ في التحليل، حاول مرة أخرى', 'error');
-                isProcessingCapture = false; stabilityCounter = 0; return;
-            }
+            newDescriptor = Array.from(detectionWithDesc.descriptor);
+        } catch(err) {
+            console.error(err);
+            playSound('faceid-error'); showToast('خطأ في التحليل، حاول مرة أخرى', 'error');
+            isProcessingCapture = false; stabilityCounter = 0;
+            startDetectionLoop(); 
+            return;
         }
 
         // ========== HANDLE DIFFERENT MODES ==========
