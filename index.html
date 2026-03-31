@@ -279,11 +279,12 @@
     let user = null;
     let lightModels = false, heavyModels = false, stream = null, employees = [];
     let sessionDescriptor = null;
-    let regMode = false, attMode = false, updateFaceMode = false, adminVerifyMode = false, attType = '', regData = {}, autoCaptureTimeout = null;
+    let regMode = false, attMode = false, updateFaceMode = false, adminVerifyMode = false, firstTimeSetupMode = false, attType = '', regData = {}, autoCaptureTimeout = null;
     let targetEmpForAdmin = null;
     let isProcessingCapture = false;
     let currentLat = null, currentLon = null, userImage = '', lastCamStatusText = '';
     let autoRefreshTimer = null;
+    let detectionLoopTimeout = null; // إصلاح الـ Looping
     
     let livenessActive = false;
     let livenessStartYaw = null;
@@ -360,13 +361,20 @@
             await video.play();
             $('cameraOverlay').classList.add('active');
             lastCamStatusText = '';
-            setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');
+            
+            // إصلاح: فتح الكاميرا فوراً وتحميل الـ Models في الخلفية دون تجميد الكاميرا
+            if (!lightModels || !heavyModels) {
+                setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري فتح الكاميرا وتحميل الذكاء الاصطناعي في الخلفية...');
+            } else {
+                setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');
+            }
+
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             stabilityCounter = 0;
             if (attMode || adminVerifyMode) resetLiveness();
             isProcessingCapture = false;
-            startDetectionLoop();
+            startDetectionLoop(); // بدء اللوب الاحترافي الجديد
             return true;
         } catch(e) { console.error(e); return false; }
     }
@@ -375,26 +383,35 @@
         if(stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; }
         video.srcObject = null;
         $('cameraOverlay').classList.remove('active');
-        regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false;
+        regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false; firstTimeSetupMode = false;
         attType = ''; targetEmpForAdmin = null;
         isProcessingCapture = false;
         if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
+        if(detectionLoopTimeout) { clearTimeout(detectionLoopTimeout); detectionLoopTimeout=null; } // إيقاف اللوب نهائياً
         stabilityCounter = 0;
         livenessActive = false;
     }
     
+    // إصلاح جوهري: استخدام setTimeout بدلاً من requestAnimationFrame لمنع التهنيج والـ Looping
     function startDetectionLoop() {
+        if(detectionLoopTimeout) clearTimeout(detectionLoopTimeout);
         async function detect() {
             if(!video.srcObject || !$('cameraOverlay').classList.contains('active')) return;
             await drawFaceBox();
-            requestAnimationFrame(detect);
+            // إعطاء المتصفح فرصة للتنفس (250 ملي ثانية) بدلاً من الإرهاق المستمر
+            detectionLoopTimeout = setTimeout(detect, 250);
         }
         detect();
     }
     
     async function drawFaceBox() {
         if(!video.srcObject || video.videoWidth===0) return;
-        if(!lightModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...'); return; }
+        
+        // إصلاح: عدم السماح بالتحقق إذا كانت النماذج الثقيلة لم تحمل بعد
+        if(!lightModels || !heavyModels) { 
+            setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي، انتظر قليلاً...'); 
+            return; 
+        }
         
         try {
             const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })).withFaceLandmarks(true);
@@ -409,7 +426,7 @@
                 ctx.beginPath(); ctx.moveTo(box.x,box.y+box.height-cLen); ctx.lineTo(box.x,box.y+box.height); ctx.lineTo(box.x+cLen,box.y+box.height); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen,box.y+box.height); ctx.lineTo(box.x+box.width,box.y+box.height); ctx.lineTo(box.x+box.width,box.y+box.height-cLen); ctx.stroke();
                 
-                if (regMode || updateFaceMode) {
+                if (regMode || updateFaceMode || firstTimeSetupMode) {
                     stabilityCounter++;
                     if (stabilityCounter >= STABLE_FRAMES_REQUIRED) {
                         setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> ثبت وجهك، جاري الالتقاط...');
@@ -453,20 +470,10 @@
         isProcessingCapture = true;
         autoCaptureTimeout = null;
         
-        if(!heavyModels) {
-            playSound('faceid-error');
-            showToast('نماذج الذكاء الاصطناعي لم تحمل بعد، انتظر قليلاً وحاول مرة أخرى', 'error');
-            setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> جاري تحميل النماذج، أعد المحاولة بعد ثوانٍ...');
-            isProcessingCapture = false;
-            stabilityCounter = 0;
-            return;
-        }
-        
         setCamStatus('<i class="fas fa-brain"></i> جاري التحليل الدقيق واستخراج البصمة...');
         
         let detection;
         try {
-            // إصلاح: استخدام النموذج الخفيف بدلاً من الثقيل لمنع توقف الكاميرا ورسالة الإضاءة الخاطئة
             detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 })).withFaceLandmarks();
         } catch(err) {
             console.error(err);
@@ -508,13 +515,35 @@
                 const result = await response.json();
                 if(result.success) {
                     playSound('faceid-success'); if(navigator.vibrate) navigator.vibrate(50);
-                    showToast('تم تسجيل الموظف الجديد بنجاح!', 'success');
-                    closeCamera(); showLoginScreen();
+                    showToast('تم إنشاء الحساب وتسجيل بصمة الوجه بنجاح! سجل دخولك الآن.', 'success');
+                    closeCamera(); 
+                    showLoginScreen(); // إرجاع للموظف الجديد لشاشة الدخول
                 } else {
                     playSound('faceid-error'); showToast(result.error || 'حدث خطأ', 'error');
                     closeCamera();
                 }
             } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال بالشيت', 'error'); closeCamera(); }
+        }
+        else if(firstTimeSetupMode) {
+            // إصلاح: وضع تسجيل البصمة لأول مرة (للأدمن أو الموظف القديم الذي ليس له بصمة)
+            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بصمة الوجه...');
+            const payload = { action:'updateFace', code:user.code, descriptor:newDescriptor, imageData:imgData };
+            try {
+                const response = await fetch(URL, { method:'POST', body:JSON.stringify(payload) });
+                const result = await response.json();
+                if(result.success) {
+                    playSound('faceid-success');
+                    showToast('تم تسجيل بصمة وجهك بنجاح! يمكنك الآن تسجيل الدخول بالبصمة.', 'success');
+                    closeCamera(); 
+                    if(user) logout(); // تسجيل خروج آمن لمنع الدخول بدون مطابقة
+                    showLoginScreen(); // إرجاع إجباري لشاشة تسجيل الدخول
+                } else {
+                    playSound('faceid-error'); showToast('فشل الحفظ', 'error');
+                    closeCamera();
+                    if(user) logout();
+                    showLoginScreen();
+                }
+            } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال', 'error'); closeCamera(); if(user) logout(); showLoginScreen(); }
         }
         else if(updateFaceMode) {
             setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بصمة الوجه...');
@@ -524,7 +553,7 @@
                 const result = await response.json();
                 if(result.success) {
                     playSound('faceid-success'); sessionDescriptor = newDescriptor;
-                    showToast('تم تسجيل بصمة وجهك بنجاح!', 'success');
+                    showToast('تم تحديث بصمة وجهك بنجاح!', 'success');
                     closeCamera(); showApp();
                 } else {
                     playSound('faceid-error'); showToast('فشل التحديث', 'error');
@@ -609,7 +638,6 @@
             await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             lightModels = true;
-            // إصلاح: إزالة النموذج الثقيل جداً SsdMobilenetv1 لتسريع التحميل بشكل كبير ومنع التوقف
             await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             heavyModels = true;
@@ -622,16 +650,15 @@
         try {
             const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
             const empData = await empRes.json();
-            // إصلاح جوهري: التأكد من أن المصفوفة ليست فاضية لتجنب المطابقة مع لا شئ
             sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
             userImage = (empData.success && empData.userImage) ? empData.userImage : '';
             
-            // إصلاح: فتح الكاميرا تلقائياً لتسجيل البصمة لأي مستخدم (موظف أو أدمن) يفتقد البصمة
-            if(!sessionDescriptor && !updateFaceMode) {
+            // إصلاح: إذا لم توجد بصمة، يفتح الكاميرا في وضع "التسجيل لأول مرة"
+            if(!sessionDescriptor && !$('cameraOverlay').classList.contains('active')) {
                 showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
-                updateFaceMode = true;
+                firstTimeSetupMode = true; // استخدام الوضع الجديد
                 const opened = await openCamera();
-                if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا','error'); }
+                if(!opened) { firstTimeSetupMode=false; showToast('فشل فتح الكاميرا','error'); }
             }
         } catch(e) {}
         setStatus('النظام جاهز');
@@ -654,26 +681,14 @@
                     localStorage.removeItem('axentro_saved_login');
                     localStorage.removeItem('axentro_fp_id');
                 }
+                
                 if(!data.isAdmin && data.isFirstLogin) {
                     $('forcePwModal').classList.add('active');
                     setStatus('النظام جاهز');
-                } else if(data.isAdmin) {
-                    setStatus('جاري التحقق من بيانات الوجه...');
-                    const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(data.code)}`);
-                    const empData = await empRes.json();
-                    sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
-                    userImage = (empData.success && empData.userImage) ? empData.userImage : '';
-                    if(!sessionDescriptor) {
-                        showApp(); showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'error');
-                        updateFaceMode = true;
-                        const opened = await openCamera();
-                        if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا', 'error'); logout(); }
-                    } else {
-                        showApp();
-                        if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000);
-                    }
                 } else {
-                    showApp(); fetchUserDataInBackground();
+                    // إصلاح تسريع تسجيل الدخول: عرض الواجهة فوراً وتحميل البصمة في الخلفية
+                    showApp(); 
+                    fetchUserDataInBackground(); 
                     if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000);
                 }
             } else { playSound('login-error'); showToast(data.error||'بيانات خاطئة','error'); setStatus('النظام جاهز'); }
@@ -688,16 +703,12 @@
             const data = await res.json();
             if(data.success) {
                 $('forcePwModal').classList.remove('active');
-                showToast('تم تحديث كلمة السر بنجاح','success');
+                showToast('تم تحديث كلمة السر، سجل بصمة وجهك الآن','success');
                 showApp();
-                const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
-                const empData = await empRes.json();
-                sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
-                if(!sessionDescriptor) {
-                    updateFaceMode = true;
-                    const opened = await openCamera();
-                    if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا','error'); logout(); }
-                }
+                // إصلاح: فتح الكاميرا في وضع التسجيل لأول مرة
+                firstTimeSetupMode = true;
+                const opened = await openCamera();
+                if(!opened) { firstTimeSetupMode=false; showToast('فشل فتح الكاميرا','error'); logout(); }
             } else { playSound('login-error'); showToast(data.error,'error'); }
         } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال','error'); }
     }
@@ -707,7 +718,8 @@
         if(autoRefreshTimer) clearInterval(autoRefreshTimer);
         localStorage.removeItem('rememberedUser'); sessionStorage.removeItem('user');
         user = null; sessionDescriptor = null; userImage = '';
-        $('mainApp').style.display='none'; $('loginScreen').classList.remove('hidden');
+        $('mainApp').style.display='none'; 
+        $('loginScreen').classList.remove('hidden');
         setStatus('النظام جاهز');
     }
     
@@ -774,13 +786,13 @@
     async function adminDirectAtt(type, code, name) {
         if(!sessionDescriptor) {
             showToast('لم تقم بتسجيل بصمة وجهك بعد، جاري فتح الكاميرا...','error');
-            updateFaceMode = true;
+            firstTimeSetupMode = true; // استخدام الوضع الجديد
             const opened = await openCamera();
-            if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا','error'); }
+            if(!opened) { firstTimeSetupMode=false; showToast('فشل فتح الكاميرا','error'); }
             return;
         }
         adminVerifyMode = true; targetEmpForAdmin = { type, code, name };
-        attMode=false; regMode=false; updateFaceMode=false;
+        attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false;
         const opened = await openCamera();
         if(!opened) { adminVerifyMode=false; targetEmpForAdmin=null; showToast('فشل فتح الكاميرا','error'); }
     }
@@ -794,14 +806,14 @@
                 const challenge = new Uint8Array(32); crypto.getRandomValues(challenge);
                 const assertion = await navigator.credentials.get({ publicKey: { challenge, allowCredentials:[{ id:base64ToBuffer(savedFpId), type:'public-key' }], userVerification:"required" } });
                 if(assertion) {
-                    attMode=true; attType=type; adminVerifyMode=false; regMode=false; updateFaceMode=false;
+                    attMode=true; attType=type; adminVerifyMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false;
                     const opened = await openCamera();
                     if(!opened) { attMode=false; showToast('فشل فتح الكاميرا','error'); setStatus('النظام جاهز'); }
                     else setStatus('جاري التحقق من الوجه...');
                 }
             } catch(e) { if(e.name==='NotAllowedError') showToast('تم إلغاء عملية البصمة','error'); else showToast('فشل التحقق من البصمة','error'); setStatus('النظام جاهز'); }
         } else {
-            attMode=true; attType=type; adminVerifyMode=false; regMode=false; updateFaceMode=false;
+            attMode=true; attType=type; adminVerifyMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false;
             const opened = await openCamera();
             if(!opened) { attMode=false; showToast('فشل فتح الكاميرا','error'); }
             else setStatus('جاري التحقق من الوجه...');
@@ -870,6 +882,7 @@
     
     function showRegisterScreen() { $('loginScreen').classList.add('hidden'); $('registerScreen').classList.remove('hidden'); }
     function showLoginScreen() { $('registerScreen').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); }
+    
     async function startRegistration() {
         const name = $('regName').value.trim(), email = $('regEmail').value.trim();
         if(!name||!email) return showToast('يرجى إدخال الاسم والبريد','error');
