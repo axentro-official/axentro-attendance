@@ -270,14 +270,10 @@
 <script>
     // ==================== CONFIGURATION ====================
     const URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
-    const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
     const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 100;
     const MATCH_THRESHOLD = 0.55;
     const AUTO_REFRESH_INTERVAL = 30000;
-    const STABLE_FRAMES_REQUIRED = 4; 
-    const DETECTION_INTERVAL = 80; 
-    const LIVENESS_THRESHOLD = 0.04; 
-    const FACE_SCORE_THRESHOLD = 0.35; 
+    const STABLE_FRAMES_REQUIRED = 8; 
     
     // ==================== GLOBAL STATE ====================
     let user = null;
@@ -286,21 +282,13 @@
     let regMode = false, attMode = false, updateFaceMode = false, adminVerifyMode = false, attType = '', regData = {}, autoCaptureTimeout = null;
     let targetEmpForAdmin = null;
     let isProcessingCapture = false;
-    let currentLat = null, currentLon = null, currentLoc = 'غير متوفر', userImage = '', lastCamStatusText = '';
+    let currentLat = null, currentLon = null, userImage = '', lastCamStatusText = '';
     let autoRefreshTimer = null;
     
     let livenessActive = false;
     let livenessStartYaw = null;
     let livenessMoved = false;
     let stabilityCounter = 0;
-    let firstTimeFaceReg = false;
-    
-    let lastDetectionTime = 0;
-    let detectionAnimFrameId = null;
-    let isDetecting = false;
-    let cachedDetection = null;
-    let faceLostGraceCount = 0;
-    const FACE_LOST_GRACE_MAX = 3;
     
     // ==================== DOM HELPERS ====================
     const $ = id => document.getElementById(id);
@@ -351,14 +339,14 @@
         if (!livenessActive) return true;
         if (livenessStartYaw === null) {
             livenessStartYaw = yaw;
-            setCamStatus('<i class="fas fa-arrows-left-right"></i> حرك رأسك قليلاً لليمين أو اليسار...');
+            setCamStatus('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...');
             return false;
         }
         const movement = Math.abs(yaw - livenessStartYaw);
-        if (movement > LIVENESS_THRESHOLD) {
+        if (movement > 0.08) {
             livenessMoved = true;
             livenessActive = false;
-            setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق من الحركة، ثبت وجهك الآن...');
+            setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، يرجى الثبات...');
             return true;
         }
         return false;
@@ -376,46 +364,32 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             stabilityCounter = 0;
-            cachedDetection = null;
-            faceLostGraceCount = 0;
-            isProcessingCapture = false;
-            isDetecting = false;
-            lastDetectionTime = 0;
             if (attMode || adminVerifyMode) resetLiveness();
+            isProcessingCapture = false;
             startDetectionLoop();
             return true;
         } catch(e) { console.error(e); return false; }
     }
     
     function closeCamera() {
-        if(detectionAnimFrameId) { cancelAnimationFrame(detectionAnimFrameId); detectionAnimFrameId = null; }
         if(stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; }
         video.srcObject = null;
         $('cameraOverlay').classList.remove('active');
         regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false;
         attType = ''; targetEmpForAdmin = null;
         isProcessingCapture = false;
-        isDetecting = false;
-        cachedDetection = null;
         if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
         stabilityCounter = 0;
         livenessActive = false;
-        faceLostGraceCount = 0;
     }
     
     function startDetectionLoop() {
-        function detect(timestamp) {
+        async function detect() {
             if(!video.srcObject || !$('cameraOverlay').classList.contains('active')) return;
-            
-            if (!isDetecting && (timestamp - lastDetectionTime) >= DETECTION_INTERVAL) {
-                lastDetectionTime = timestamp;
-                isDetecting = true;
-                drawFaceBox().finally(() => { isDetecting = false; });
-            }
-            
-            detectionAnimFrameId = requestAnimationFrame(detect);
+            await drawFaceBox();
+            requestAnimationFrame(detect);
         }
-        detectionAnimFrameId = requestAnimationFrame(detect);
+        detect();
     }
     
     async function drawFaceBox() {
@@ -423,13 +397,10 @@
         if(!lightModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...'); return; }
         
         try {
-            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: FACE_SCORE_THRESHOLD })).withFaceLandmarks(true);
+            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })).withFaceLandmarks(true);
             ctx.clearRect(0,0,canvas.width,canvas.height);
             
             if(detection) {
-                cachedDetection = detection;
-                faceLostGraceCount = 0;
-                
                 const box = detection.detection.box;
                 ctx.strokeStyle = '#38bdf8'; ctx.lineWidth=3; ctx.strokeRect(box.x,box.y,box.width,box.height);
                 const cLen=25; ctx.strokeStyle='#10b981'; ctx.lineWidth=4;
@@ -442,7 +413,7 @@
                     stabilityCounter++;
                     if (stabilityCounter >= STABLE_FRAMES_REQUIRED) {
                         setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> ثبت وجهك، جاري الالتقاط...');
-                        if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 200);
+                        if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 300);
                     } else {
                         setCamStatus(`<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك (${stabilityCounter}/${STABLE_FRAMES_REQUIRED})...`);
                     }
@@ -454,13 +425,13 @@
                     const livenessOk = updateLiveness(yaw);
                     if (!livenessOk) {
                         if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
-                        stabilityCounter = Math.max(0, stabilityCounter - 1);
+                        stabilityCounter = 0;
                         return;
                     } else {
                         stabilityCounter++;
                         if (stabilityCounter >= STABLE_FRAMES_REQUIRED) {
                             setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم اكتشاف الوجه، جاري الالتقاط...');
-                            if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 200);
+                            if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 300);
                         } else {
                             setCamStatus(`<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك (${stabilityCounter}/${STABLE_FRAMES_REQUIRED})...`);
                         }
@@ -469,23 +440,10 @@
                 }
                 setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم اكتشاف الوجه');
             } else {
-                cachedDetection = null;
-                
-                if (attMode || adminVerifyMode) {
-                    faceLostGraceCount++;
-                    if (faceLostGraceCount <= FACE_LOST_GRACE_MAX) {
-                        setCamStatus('<i class="fas fa-spinner fa-spin"></i> تأكد من وضع وجهك أمام الكاميرا...');
-                        stabilityCounter = Math.max(0, stabilityCounter - 1);
-                        return;
-                    }
-                    resetLiveness();
-                } else {
-                    faceLostGraceCount = 0;
-                }
-                
                 setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');
                 if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
                 stabilityCounter = 0;
+                if (attMode || adminVerifyMode) resetLiveness();
             }
         } catch(e) {}
     }
@@ -496,43 +454,32 @@
         autoCaptureTimeout = null;
         
         if(!heavyModels) {
-            setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج التحليل المتقدمة، انتظر...');
-            const maxWait = 20000;
-            const startTime = Date.now();
-            while(!heavyModels && (Date.now() - startTime) < maxWait) {
-                await new Promise(r => setTimeout(r, 300));
-            }
-            if(!heavyModels) {
-                playSound('faceid-error');
-                showToast('فشل تحميل النماذج المتقدمة، تأكد من اتصال الإنترنت وحاول مرة أخرى', 'error');
-                setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i> فشل تحميل النماذج');
-                isProcessingCapture = false;
-                stabilityCounter = 0;
-                return;
-            }
+            playSound('faceid-error');
+            showToast('نماذج الذكاء الاصطناعي لم تحمل بعد، انتظر قليلاً وحاول مرة أخرى', 'error');
+            setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> جاري تحميل النماذج، أعد المحاولة بعد ثوانٍ...');
+            isProcessingCapture = false;
+            stabilityCounter = 0;
+            return;
         }
         
         setCamStatus('<i class="fas fa-brain"></i> جاري التحليل الدقيق واستخراج البصمة...');
         
         let detection;
-        if(cachedDetection) {
-            detection = cachedDetection;
-        } else {
-            try {
-                detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: FACE_SCORE_THRESHOLD })).withFaceLandmarks();
-            } catch(err) {
-                console.error(err);
-                playSound('faceid-error'); showToast('خطأ في التحليل، حاول مرة أخرى', 'error');
-                setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i> خطأ في التحليل');
-                isProcessingCapture = false;
-                stabilityCounter = 0;
-                return;
-            }
+        try {
+            // إصلاح: استخدام النموذج الخفيف بدلاً من الثقيل لمنع توقف الكاميرا ورسالة الإضاءة الخاطئة
+            detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 })).withFaceLandmarks();
+        } catch(err) {
+            console.error(err);
+            playSound('faceid-error'); showToast('خطأ في التحليل، حاول مرة أخرى', 'error');
+            setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i> خطأ في التحليل');
+            isProcessingCapture = false;
+            stabilityCounter = 0;
+            return;
         }
         
         if(!detection) {
             playSound('faceid-error'); if(navigator.vibrate) navigator.vibrate([100,50,100]);
-            setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لم يتم اكتشاف الوجه، أعد المحاولة');
+            setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> حركة مفاجئة، أعد المحاولة');
             isProcessingCapture = false;
             stabilityCounter = 0;
             return;
@@ -568,7 +515,6 @@
                     closeCamera();
                 }
             } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال بالشيت', 'error'); closeCamera(); }
-            isProcessingCapture = false;
         }
         else if(updateFaceMode) {
             setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بصمة الوجه...');
@@ -579,22 +525,15 @@
                 if(result.success) {
                     playSound('faceid-success'); sessionDescriptor = newDescriptor;
                     showToast('تم تسجيل بصمة وجهك بنجاح!', 'success');
-                    if(firstTimeFaceReg) {
-                        firstTimeFaceReg = false;
-                        closeCamera();
-                        redirectToLoginAfterFaceReg();
-                    } else {
-                        closeCamera(); showApp();
-                    }
+                    closeCamera(); showApp();
                 } else {
-                    playSound('faceid-error'); showToast(result.error || 'فشل التحديث', 'error');
+                    playSound('faceid-error'); showToast('فشل التحديث', 'error');
                     closeCamera();
                 }
             } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال', 'error'); closeCamera(); }
-            isProcessingCapture = false;
         }
         else if(adminVerifyMode) {
-            if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات وجهك كأدمن غير متوفرة!', 'error'); closeCamera(); isProcessingCapture = false; return; }
+            if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات وجهك كأدمن غير متوفرة!', 'error'); closeCamera(); return; }
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
             if(distance < MATCH_THRESHOLD) {
                 setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق من هويتك كأدمن! جاري تسجيل الموظف...');
@@ -630,7 +569,7 @@
                     isProcessingCapture = false; stabilityCounter = 0; return;
                 }
             }
-            if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة، تواصل مع الأدمن.', 'error'); closeCamera(); isProcessingCapture = false; return; }
+            if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة، تواصل مع الأدمن.', 'error'); closeCamera(); return; }
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
             if(distance < MATCH_THRESHOLD) {
                 setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق بنجاح! جاري التسجيل...');
@@ -660,47 +599,22 @@
                 stabilityCounter = 0;
             }
             isProcessingCapture = false;
-        } else {
-            isProcessingCapture = false;
         }
-    }
-    
-    // ==================== REDIRECT TO LOGIN AFTER FACE REGISTRATION ====================
-    function redirectToLoginAfterFaceReg() {
-        if(autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
-        sessionStorage.removeItem('user');
-        localStorage.removeItem('rememberedUser');
-        user = null; sessionDescriptor = null; userImage = '';
-        $('mainApp').style.display = 'none';
-        $('loginScreen').classList.remove('hidden');
-        $('registerScreen').classList.add('hidden');
-        setStatus('سجل دخولك الآن للمتابعة');
+        isProcessingCapture = false;
     }
     
     // ==================== API & UI ====================
     async function loadModelsAsync() {
         try {
-            setStatus('جاري تحميل نماذج الكشف السريع...');
-            await Promise.all([
-                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-                faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL)
-            ]);
+            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
+            await faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             lightModels = true;
-            setStatus('جاري تحميل نماذج التعرف المتقدمة...');
-            Promise.all([
-                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-            ]).then(() => {
-                heavyModels = true;
-                setStatus('النظام جاهز');
-            }).catch(e => {
-                console.error('Heavy models loading failed:', e);
-                setStatus('النظام جاهز (نموذج أساسي)');
-            });
-        } catch(e) { 
-            console.error('Light models loading failed:', e); 
-            setStatus('فشل تحميل النماذج');
-        }
+            // إصلاح: إزالة النموذج الثقيل جداً SsdMobilenetv1 لتسريع التحميل بشكل كبير ومنع التوقف
+            await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
+            await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
+            heavyModels = true;
+            setStatus('النظام جاهز');
+        } catch(e) { console.error(e); }
     }
     
     async function fetchUserDataInBackground() {
@@ -708,15 +622,16 @@
         try {
             const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
             const empData = await empRes.json();
+            // إصلاح جوهري: التأكد من أن المصفوفة ليست فاضية لتجنب المطابقة مع لا شئ
             sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
             userImage = (empData.success && empData.userImage) ? empData.userImage : '';
             
+            // إصلاح: فتح الكاميرا تلقائياً لتسجيل البصمة لأي مستخدم (موظف أو أدمن) يفتقد البصمة
             if(!sessionDescriptor && !updateFaceMode) {
                 showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
-                firstTimeFaceReg = true;
                 updateFaceMode = true;
                 const opened = await openCamera();
-                if(!opened) { updateFaceMode=false; firstTimeFaceReg=false; showToast('فشل فتح الكاميرا','error'); }
+                if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا','error'); }
             }
         } catch(e) {}
         setStatus('النظام جاهز');
@@ -749,11 +664,10 @@
                     sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
                     userImage = (empData.success && empData.userImage) ? empData.userImage : '';
                     if(!sessionDescriptor) {
-                        showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'error');
-                        firstTimeFaceReg = true;
+                        showApp(); showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'error');
                         updateFaceMode = true;
                         const opened = await openCamera();
-                        if(!opened) { updateFaceMode=false; firstTimeFaceReg=false; showToast('فشل فتح الكاميرا', 'error'); }
+                        if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا', 'error'); logout(); }
                     } else {
                         showApp();
                         if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000);
@@ -775,17 +689,14 @@
             if(data.success) {
                 $('forcePwModal').classList.remove('active');
                 showToast('تم تحديث كلمة السر بنجاح','success');
+                showApp();
                 const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
                 const empData = await empRes.json();
                 sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
                 if(!sessionDescriptor) {
-                    showToast('يرجى تسجيل بصمة وجهك الآن', 'error');
-                    firstTimeFaceReg = true;
                     updateFaceMode = true;
                     const opened = await openCamera();
-                    if(!opened) { updateFaceMode=false; firstTimeFaceReg=false; showToast('فشل فتح الكاميرا','error'); }
-                } else {
-                    showApp();
+                    if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا','error'); logout(); }
                 }
             } else { playSound('login-error'); showToast(data.error,'error'); }
         } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال','error'); }
@@ -863,10 +774,9 @@
     async function adminDirectAtt(type, code, name) {
         if(!sessionDescriptor) {
             showToast('لم تقم بتسجيل بصمة وجهك بعد، جاري فتح الكاميرا...','error');
-            firstTimeFaceReg = true;
             updateFaceMode = true;
             const opened = await openCamera();
-            if(!opened) { updateFaceMode=false; firstTimeFaceReg=false; showToast('فشل فتح الكاميرا','error'); }
+            if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا','error'); }
             return;
         }
         adminVerifyMode = true; targetEmpForAdmin = { type, code, name };
