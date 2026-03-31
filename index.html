@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Axentro System | إدارة الحضور والانصراف</title>
-    
-    <!-- تم التغيير إلى RemixIcon لحل مشكلة الأيقونات المكسورة نهائياً -->
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     
-    <!-- الأصوات (تأكد من وجود الملفات أو سيستخدم النظام الاهتزاز كبديل) -->
     <audio id="login-success" src="login-success.mp3" preload="auto"></audio>
     <audio id="login-error" src="login-error.mp3" preload="auto"></audio>
     <audio id="logout-success" src="logout-success.mp3" preload="auto"></audio>
@@ -67,7 +65,6 @@
         
         .btn-fingerprint { background: rgba(30, 41, 59, 0.8); border: 1.5px solid #334155; color: #94a3b8; margin-bottom: 12px; }
         .btn-fingerprint:active { background: rgba(51, 65, 85, 0.8); border-color: var(--primary); color: white; }
-        /* استخدام أيقونات Remix بدلاً من FontAwesome */
         .btn-fingerprint i { font-size: 20px; }
 
         .action-group { display: flex; gap: 12px; margin-top: 15px; }
@@ -126,7 +123,7 @@
         .remember-me { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; cursor: pointer; user-select: none; }
         .remember-me input[type="checkbox"] { display: none; }
         .checkmark { width: 24px; height: 24px; border-radius: 8px; border: 2px solid #475569; background: rgba(0,0,0,0.3); position: relative; flex-shrink: 0; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; }
-        .checkmark::after { content: '\ea5e'; font-family: 'remixicon'; font-weight: 900; font-size: 14px; color: white; opacity: 0; transform: scale(0); transition: all 0.2s ease; }
+        .checkmark::after { content: '\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 14px; color: white; opacity: 0; transform: scale(0); transition: all 0.2s ease; }
         .remember-me input:checked ~ .checkmark { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); }
         .remember-me input:checked ~ .checkmark::after { opacity: 1; transform: scale(1); }
         .remember-me label { color: #94a3b8; font-size: 14px; cursor: pointer; transition: 0.2s; }
@@ -155,29 +152,29 @@
 <body>
 
 <div id="cameraOverlay" class="camera-overlay">
-    <button class="close-cam" onclick="closeCamera()"><i class="ri-close-line"></i></button>
+    <button class="close-cam" onclick="closeCamera()"><i class="fas fa-times"></i></button>
     <div class="camera-container" id="camContainer">
         <video id="video" autoplay muted playsinline></video>
         <canvas id="canvas" class="face-canvas"></canvas>
     </div>
-    <p id="camStatus"><i class="ri-loader-4-line ri-spin"></i> جاري البحث عن الوجه...</p>
+    <p id="camStatus"><i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...</p>
 </div>
 
-<div id="changePwModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeChangePwModal()"><i class="ri-close-line"></i></button><h2 style="text-align:center; margin-bottom:20px;" id="changePwTitle">تغيير كلمة السر</h2><div style="text-align: center;" id="changePwBody"></div></div></div>
-<div id="forgotPwModal" class="modal"><div class="modal-content" style="text-align: center;"><button class="modal-close" onclick="closeForgotPw()"><i class="ri-close-line"></i></button><h2 style="margin-bottom: 20px;"><i class="ri-key-2-line"></i> استعادة كلمة المرور</h2><input type="text" id="forgotCode" placeholder="أدخل كود الموظف"><button class="btn btn-login" onclick="submitForgotPw()" style="margin-top:10px;"><i class="ri-send-plane-fill"></i> إرسال كلمة السر</button></div></div>
-<div id="reportModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeReportModal()"><i class="ri-close-line"></i></button><h2 style="text-align:center; margin-bottom:20px;" id="reportTitle">التقارير</h2><div id="reportBody"></div></div></div>
-<div id="forcePwModal" class="modal"><div class="modal-content" style="text-align: center;"><h2 style="margin-bottom: 10px; color: var(--warning);"><i class="ri-alert-fill"></i> تحديث أمني مطلوب</h2><p style="color: #94a3b8; margin-bottom: 25px;">يجب عليك تغيير كلمة المرور المؤقتة قبل المتابعة.</p><div class="password-wrapper" style="margin-bottom:15px;"><input type="password" id="firstNewPw" placeholder="أدخل كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('firstNewPw')"><i class="ri-eye-line"></i></button></div><button class="btn btn-login" onclick="submitFirstPwChange()"><i class="ri-save-3-line"></i> حفظ وتسجيل الوجه</button></div></div>
+<div id="changePwModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeChangePwModal()"><i class="fas fa-times"></i></button><h2 style="text-align:center; margin-bottom:20px;" id="changePwTitle">تغيير كلمة السر</h2><div style="text-align: center;" id="changePwBody"></div></div></div>
+<div id="forgotPwModal" class="modal"><div class="modal-content" style="text-align: center;"><button class="modal-close" onclick="closeForgotPw()"><i class="fas fa-times"></i></button><h2 style="margin-bottom: 20px;"><i class="fas fa-key"></i> استعادة كلمة المرور</h2><input type="text" id="forgotCode" placeholder="أدخل كود الموظف"><button class="btn btn-login" onclick="submitForgotPw()" style="margin-top:10px;"><i class="fas fa-paper-plane"></i> إرسال كلمة السر</button></div></div>
+<div id="reportModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeReportModal()"><i class="fas fa-times"></i></button><h2 style="text-align:center; margin-bottom:20px;" id="reportTitle">التقارير</h2><div id="reportBody"></div></div></div>
+<div id="forcePwModal" class="modal"><div class="modal-content" style="text-align: center;"><h2 style="margin-bottom: 10px; color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> تحديث أمني مطلوب</h2><p style="color: #94a3b8; margin-bottom: 25px;">يجب عليك تغيير كلمة المرور المؤقتة قبل المتابعة.</p><div class="password-wrapper" style="margin-bottom:15px;"><input type="password" id="firstNewPw" placeholder="أدخل كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('firstNewPw')"><i class="fas fa-eye"></i></button></div><button class="btn btn-login" onclick="submitFirstPwChange()"><i class="fas fa-save"></i> حفظ وتسجيل الوجه</button></div></div>
 
 <div id="loginScreen" class="overlay">
     <div class="card" style="max-width: 420px; width: 100%; margin-bottom: 20px; animation: fadeInUp 0.8s ease-out;">
         <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="margin-bottom: 5px; font-size: 32px;"><i class="ri-fingerprint-fill"></i> Axentro System</h1>
+            <h1 style="margin-bottom: 5px; font-size: 32px;"><i class="fas fa-fingerprint"></i> Axentro System</h1>
             <p style="color: #64748b; font-size: 14px; font-weight: 600;">نظام إدارة الحضور والانصراف المتقدم</p>
         </div>
         <input type="text" id="loginCode" placeholder="اسم المستخدم أو الكود">
         <div class="password-wrapper">
             <input type="password" id="loginPass" placeholder="كلمة السر">
-            <button class="toggle-password" onclick="togglePassword('loginPass')"><i class="ri-eye-line"></i></button>
+            <button class="toggle-password" onclick="togglePassword('loginPass')"><i class="fas fa-eye"></i></button>
         </div>
         
         <div class="remember-me">
@@ -186,13 +183,13 @@
             <label for="rememberMe">تذكرني (حفظ جلسة الدخول)</label>
         </div>
 
-        <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;"><i class="ri-login-circle-line"></i> تسجيل الدخول</button>
+        <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;"><i class="fas fa-arrow-right-to-bracket"></i> تسجيل الدخول</button>
         
         <button id="fingerprintLoginBtn" class="btn btn-fingerprint" onclick="loginWithFingerprint()" style="display: none;">
-            <i class="ri-fingerprint-fill"></i> تسجيل الدخول ببصمة الإصبع
+            <i class="fas fa-fingerprint"></i> تسجيل الدخول ببصمة الإصبع
         </button>
 
-        <button class="btn btn-reg" onclick="showRegisterScreen()"><i class="ri-user-add-line"></i> إنشاء حساب جديد</button>
+        <button class="btn btn-reg" onclick="showRegisterScreen()"><i class="fas fa-user-plus"></i> إنشاء حساب جديد</button>
         <p style="text-align: center; margin-top: 20px;"><a href="#" onclick="showForgotPw()" style="color: #64748b; text-decoration: none; font-size: 13px; transition: 0.2px;">نسيت كلمة المرور؟</a></p>
     </div>
     
@@ -200,7 +197,7 @@
         <div class="footer-brand">Axentro</div>
         <p class="footer-copy">© 2024 Axentro – All Rights Reserved<br>By Axentro Team</p>
         <div class="footer-qr-container">
-            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" class="footer-qr-link"><i class="ri-qr-code-line"></i></a>
+            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" class="footer-qr-link"><i class="fas fa-qrcode"></i></a>
             <div class="footer-qr-text">Scan Me > Click On Me</div>
         </div>
     </div>
@@ -208,11 +205,11 @@
 
 <div id="registerScreen" class="overlay hidden">
     <div class="card" style="max-width: 420px; width: 100%; animation: fadeInUp 0.6s ease-out;">
-        <h3 style="margin-bottom: 25px; text-align:center;"><i class="ri-id-card-fill" style="color: var(--primary);"></i> تسجيل موظف جديد</h3>
+        <h3 style="margin-bottom: 25px; text-align:center;"><i class="fas fa-id-card" style="color: var(--primary);"></i> تسجيل موظف جديد</h3>
         <input type="text" id="regName" placeholder="اسم الموظف الثلاثي">
         <input type="email" id="regEmail" placeholder="البريد الإلكتروني">
-        <button class="btn btn-reg" onclick="startRegistration()" style="margin-top: 10px;"><i class="ri-camera-line"></i> التقاط الوجه والتسجيل</button>
-        <button class="btn" onclick="showLoginScreen()" style="background: #334155; margin-top: 12px;"><i class="ri-arrow-right-line"></i> رجوع لتسجيل الدخول</button>
+        <button class="btn btn-reg" onclick="startRegistration()" style="margin-top: 10px;"><i class="fas fa-camera"></i> التقاط الوجه والتسجيل</button>
+        <button class="btn" onclick="showLoginScreen()" style="background: #334155; margin-top: 12px;"><i class="fas fa-arrow-right"></i> رجوع لتسجيل الدخول</button>
     </div>
 </div>
 
@@ -221,21 +218,21 @@
     <div class="status-bar" id="statusBar">
         <span class="status-dot online" id="connDot"></span>
         <span id="connText">النظام جاهز</span>
-        <button class="btn btn-action btn-login" onclick="refreshData()" title="تحديث" id="refreshBtn"><i class="ri-refresh-line"></i></button>
-        <button class="btn btn-action btn-leave" onclick="logout()" title="خروج"><i class="ri-logout-box-r-line"></i></button>
+        <button class="btn btn-action btn-login" onclick="refreshData()" title="تحديث" id="refreshBtn"><i class="fas fa-sync-alt"></i></button>
+        <button class="btn btn-action btn-leave" onclick="logout()" title="خروج"><i class="fas fa-sign-out-alt"></i></button>
     </div>
-    <div class="status-bar" id="locBar" style="font-size: 12px;"><i class="ri-map-pin-line"></i> <span>جاري تحديد الموقع...</span></div>
+    <div class="status-bar" id="locBar" style="font-size: 12px;"><i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span></div>
 
     <div id="adminPanel" style="display: none;">
         <div class="stat-card"><h2 id="empCount">0</h2><p>إجمالي الموظفين المسجلين</p></div>
         <div class="admin-tools">
-            <button class="btn btn-change-pw" onclick="openChangePwModal('own')"><i class="ri-user-shield-line"></i> كلمة سرى</button>
-            <button class="btn btn-change-pw" onclick="openChangePwModal('employee')" style="background: linear-gradient(135deg, #4f46e5, #4338ca);"><i class="ri-key-2-line"></i> سر موظف</button>
+            <button class="btn btn-change-pw" onclick="openChangePwModal('own')"><i class="fas fa-user-shield"></i> كلمة سرى</button>
+            <button class="btn btn-change-pw" onclick="openChangePwModal('employee')" style="background: linear-gradient(135deg, #4f46e5, #4338ca);"><i class="fas fa-key"></i> سر موظف</button>
         </div>
         <div class="card" style="padding: 15px;">
             <div style="position: relative;">
                 <input type="text" id="searchInput" placeholder="ابحث بالاسم أو الكود..." style="margin-bottom: 15px; padding-right: 45px;">
-                <i class="ri-search-line" style="position: absolute; right: 15px; top: 50%; transform: translateY(-70%); color: #64748b;"></i>
+                <i class="fas fa-search" style="position: absolute; right: 15px; top: 50%; transform: translateY(-70%); color: #64748b;"></i>
             </div>
             <div id="searchResults" class="emp-list-container"></div>
         </div>
@@ -243,7 +240,7 @@
 
     <div id="employeePanel" style="display: none;">
         <div class="card" style="padding: 15px 20px;">
-            <p style="margin-bottom: 15px; color: #94a3b8; font-size: 14px; font-weight: 600;"><i class="ri-time-line"></i> اختر وردية العمل الخاصة بك</p>
+            <p style="margin-bottom: 15px; color: #94a3b8; font-size: 14px; font-weight: 600;"><i class="fas fa-clock"></i> اختر وردية العمل الخاصة بك</p>
             <div class="shift-container" id="shiftContainer">
                 <label class="shift-card" onclick="selectShift(this)"><input type="radio" name="shift" value="EARLY SHIFT (صباحي)"><div class="shift-radio"></div><div class="shift-details"><h4>EARLY SHIFT (صباحي)</h4><span>9:00 ص - 5:00 م</span></div></label>
                 <label class="shift-card" onclick="selectShift(this)"><input type="radio" name="shift" value="BETWEEN SHIFT (بعد الظهر)"><div class="shift-radio"></div><div class="shift-details"><h4>BETWEEN SHIFT (بعد الظهر)</h4><span>2:00 م - 10:00 م</span></div></label>
@@ -251,18 +248,18 @@
             </div>
         </div>
         <div class="action-group">
-            <button class="btn btn-att" onclick="handleAttendance('حضور')"><i class="ri-arrow-right-up-line"></i> حضور</button>
-            <button class="btn btn-leave" onclick="handleAttendance('انصراف')"><i class="ri-arrow-right-down-line"></i> انصراف</button>
+            <button class="btn btn-att" onclick="handleAttendance('حضور')"><i class="fas fa-sign-in-alt"></i> حضور</button>
+            <button class="btn btn-leave" onclick="handleAttendance('انصراف')"><i class="fas fa-sign-out-alt"></i> انصراف</button>
         </div>
-        <button class="btn btn-report" onclick="loadMyReport()" style="margin-top: 15px;"><i class="ri-bar-chart-box-line"></i> سجل تقاريري</button>
-        <button class="btn btn-change-pw" onclick="openChangePwModal('own')" style="margin-top: 10px;"><i class="ri-lock-line"></i> تغيير كلمة المرور</button>
+        <button class="btn btn-report" onclick="loadMyReport()" style="margin-top: 15px;"><i class="fas fa-chart-bar"></i> سجل تقاريري</button>
+        <button class="btn btn-change-pw" onclick="openChangePwModal('own')" style="margin-top: 10px;"><i class="fas fa-lock"></i> تغيير كلمة المرور</button>
     </div>
 
     <div class="unified-footer" style="margin-top: 40px;">
         <div class="footer-brand">Axentro</div>
         <p class="footer-copy">© 2024 Axentro – All Rights Reserved<br>By Axentro Team</p>
         <div class="footer-qr-container">
-            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" class="footer-qr-link"><i class="ri-qr-code-line"></i></a>
+            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" class="footer-qr-link"><i class="fas fa-qrcode"></i></a>
             <div class="footer-qr-text">Scan Me > Click On Me</div>
         </div>
     </div>
@@ -342,14 +339,14 @@
         if (!livenessActive) return true;
         if (livenessStartYaw === null) {
             livenessStartYaw = yaw;
-            setCamStatus('<i class="ri-move-line"></i> حرك رأسك قليلاً لليمين أو اليسار...');
+            setCamStatus('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...');
             return false;
         }
         const movement = Math.abs(yaw - livenessStartYaw);
         if (movement > 0.08) {
             livenessMoved = true;
             livenessActive = false;
-            setCamStatus('<i class="ri-checkbox-circle-line"></i> تم التحقق من الحركة، يرجى الثبات...');
+            setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، يرجى الثبات...');
             return true;
         }
         return false;
@@ -358,19 +355,12 @@
     // ==================== CAMERA & FACE DETECTION ====================
     async function openCamera() {
         try {
-            // تحسين إعدادات الكاميرا للسرعة والدقة
-            stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'user', 
-                    width: { ideal: 640 }, // تقليل الدقة قليلاً لزيادة السرعة
-                    height: { ideal: 480 } 
-                } 
-            });
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } });
             video.srcObject = stream;
             await video.play();
             $('cameraOverlay').classList.add('active');
             lastCamStatusText = '';
-            setCamStatus('<i class="ri-loader-4-line ri-spin"></i> جاري البحث عن الوجه...');
+            setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             stabilityCounter = 0;
@@ -378,15 +368,15 @@
             isProcessingCapture = false;
             startDetectionLoop();
             return true;
-        } catch(e) { console.error(e); showToast('فشل فتح الكاميرا','error'); return false; }
+        } catch(e) { console.error(e); return false; }
     }
     
     function closeCamera() {
         if(stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; }
         video.srcObject = null;
         $('cameraOverlay').classList.remove('active');
-        // ملاحظة: لا نقوم بإلغاء الأوضاع هنا إلا عند الإغلاق اليدوي أو الفشل
-        // regMode = false; ... الخ يتم إدارتها داخل performCapture
+        regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false;
+        attType = ''; targetEmpForAdmin = null;
         isProcessingCapture = false;
         if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
         stabilityCounter = 0;
@@ -404,7 +394,7 @@
     
     async function drawFaceBox() {
         if(!video.srcObject || video.videoWidth===0) return;
-        if(!lightModels) { setCamStatus('<i class="ri-loader-4-line ri-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...'); return; }
+        if(!lightModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...'); return; }
         
         try {
             const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })).withFaceLandmarks(true);
@@ -422,10 +412,10 @@
                 if (regMode || updateFaceMode) {
                     stabilityCounter++;
                     if (stabilityCounter >= STABLE_FRAMES_REQUIRED) {
-                        setCamStatus('<i class="ri-camera-fill" style="color:var(--success);"></i> ثبت وجهك، جاري الالتقاط...');
+                        setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> ثبت وجهك، جاري الالتقاط...');
                         if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 300);
                     } else {
-                        setCamStatus(`<i class="ri-loader-4-line ri-spin"></i> ثبت وجهك (${stabilityCounter}/${STABLE_FRAMES_REQUIRED})...`);
+                        setCamStatus(`<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك (${stabilityCounter}/${STABLE_FRAMES_REQUIRED})...`);
                     }
                     return;
                 }
@@ -440,17 +430,17 @@
                     } else {
                         stabilityCounter++;
                         if (stabilityCounter >= STABLE_FRAMES_REQUIRED) {
-                            setCamStatus('<i class="ri-checkbox-circle-fill" style="color:var(--success);"></i> تم اكتشاف الوجه، جاري الالتقاط...');
+                            setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم اكتشاف الوجه، جاري الالتقاط...');
                             if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 300);
                         } else {
-                            setCamStatus(`<i class="ri-loader-4-line ri-spin"></i> ثبت وجهك (${stabilityCounter}/${STABLE_FRAMES_REQUIRED})...`);
+                            setCamStatus(`<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك (${stabilityCounter}/${STABLE_FRAMES_REQUIRED})...`);
                         }
                         return;
                     }
                 }
-                setCamStatus('<i class="ri-checkbox-circle-fill" style="color:var(--success);"></i> تم اكتشاف الوجه');
+                setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم اكتشاف الوجه');
             } else {
-                setCamStatus('<i class="ri-loader-4-line ri-spin"></i> جاري البحث عن الوجه...');
+                setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');
                 if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
                 stabilityCounter = 0;
                 if (attMode || adminVerifyMode) resetLiveness();
@@ -466,21 +456,22 @@
         if(!heavyModels) {
             playSound('faceid-error');
             showToast('نماذج الذكاء الاصطناعي لم تحمل بعد، انتظر قليلاً وحاول مرة أخرى', 'error');
-            setCamStatus('<i class="ri-error-warning-fill" style="color:var(--warning);"></i> جاري تحميل النماذج، أعد المحاولة بعد ثوانٍ...');
+            setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> جاري تحميل النماذج، أعد المحاولة بعد ثوانٍ...');
             isProcessingCapture = false;
             stabilityCounter = 0;
             return;
         }
         
-        setCamStatus('<i class="ri-brain-fill"></i> جاري التحليل الدقيق واستخراج البصمة...');
+        setCamStatus('<i class="fas fa-brain"></i> جاري التحليل الدقيق واستخراج البصمة...');
         
         let detection;
         try {
+            // إصلاح: استخدام النموذج الخفيف بدلاً من الثقيل لمنع توقف الكاميرا ورسالة الإضاءة الخاطئة
             detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 })).withFaceLandmarks();
         } catch(err) {
             console.error(err);
             playSound('faceid-error'); showToast('خطأ في التحليل، حاول مرة أخرى', 'error');
-            setCamStatus('<i class="ri-error-warning-fill" style="color:var(--danger);"></i> خطأ في التحليل');
+            setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i> خطأ في التحليل');
             isProcessingCapture = false;
             stabilityCounter = 0;
             return;
@@ -488,7 +479,7 @@
         
         if(!detection) {
             playSound('faceid-error'); if(navigator.vibrate) navigator.vibrate([100,50,100]);
-            setCamStatus('<i class="ri-close-circle-fill" style="color:red;"></i> حركة مفاجئة، أعد المحاولة');
+            setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> حركة مفاجئة، أعد المحاولة');
             isProcessingCapture = false;
             stabilityCounter = 0;
             return;
@@ -502,7 +493,7 @@
             newDescriptor = Array.from(await faceapi.computeFaceDescriptor(detection));
         } catch(err) {
             playSound('faceid-error'); showToast('فشل استخراج بصمة الوجه، تأكد من إضاءة وجهك', 'error');
-            setCamStatus('<i class="ri-error-warning-fill" style="color:var(--danger);"></i> فشل استخراج البصمة');
+            setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i> فشل استخراج البصمة');
             isProcessingCapture = false;
             stabilityCounter = 0;
             return;
@@ -510,7 +501,7 @@
         
         // ========== HANDLE DIFFERENT MODES ==========
         if(regMode) {
-            setCamStatus('<i class="ri-upload-cloud-2-line"></i> جاري حفظ بيانات الموظف الجديد...');
+            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بيانات الموظف الجديد...');
             const payload = { action:'register', name:regData.name, email:regData.email, descriptor:newDescriptor, imageData:imgData };
             try {
                 const response = await fetch(URL, { method:'POST', body:JSON.stringify(payload) });
@@ -526,7 +517,7 @@
             } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال بالشيت', 'error'); closeCamera(); }
         }
         else if(updateFaceMode) {
-            setCamStatus('<i class="ri-upload-cloud-2-line"></i> جاري حفظ بصمة الوجه...');
+            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بصمة الوجه...');
             const payload = { action:'updateFace', code:user.code, descriptor:newDescriptor, imageData:imgData };
             try {
                 const response = await fetch(URL, { method:'POST', body:JSON.stringify(payload) });
@@ -534,9 +525,7 @@
                 if(result.success) {
                     playSound('faceid-success'); sessionDescriptor = newDescriptor;
                     showToast('تم تسجيل بصمة وجهك بنجاح!', 'success');
-                    closeCamera(); 
-                    // التأكد من الدخول للتطبيق بعد نجاح التسجيل
-                    if(!$('mainApp').style.display === 'block') showApp();
+                    closeCamera(); showApp();
                 } else {
                     playSound('faceid-error'); showToast('فشل التحديث', 'error');
                     closeCamera();
@@ -547,7 +536,7 @@
             if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات وجهك كأدمن غير متوفرة!', 'error'); closeCamera(); return; }
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
             if(distance < MATCH_THRESHOLD) {
-                setCamStatus('<i class="ri-checkbox-circle-fill" style="color:var(--success);"></i> تم التحقق من هويتك كأدمن! جاري تسجيل الموظف...');
+                setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق من هويتك كأدمن! جاري تسجيل الموظف...');
                 const now = new Date();
                 const timeStr = now.toLocaleString('ar-EG', { hour12:true, hour:'2-digit', minute:'2-digit', second:'2-digit' });
                 const dateStr = now.toLocaleDateString('ar-EG');
@@ -560,13 +549,13 @@
                         closeCamera(); if(user.isAdmin) loadEmployees();
                     } else {
                         playSound('faceid-error'); showToast('فشل التسجيل: '+ (data.error||''), 'error');
-                        setCamStatus('<i class="ri-error-warning-fill"></i> فشل إرسال البيانات');
+                        setCamStatus('<i class="fas fa-exclamation-triangle"></i> فشل إرسال البيانات');
                         stabilityCounter = 0;
                     }
                 } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال بالشيت!', 'error'); stabilityCounter = 0; }
             } else {
                 playSound('faceid-error'); showToast('وجه الأدمن غير مطابق! تم رفض العملية للأمان.', 'error');
-                setCamStatus('<i class="ri-forbid-line" style="color:var(--danger);"></i> انتحال هوية مرفوض!');
+                setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> انتحال هوية مرفوض!');
                 stabilityCounter = 0;
             }
             isProcessingCapture = false;
@@ -576,14 +565,14 @@
                 const distanceMeters = getDistanceFromLatLonInKm(currentLat, currentLon, OFFICE_LAT, OFFICE_LON);
                 if(distanceMeters > MAX_DISTANCE_METERS) {
                     playSound('faceid-error'); showToast(`أنت بعيد جداً عن مقر العمل (${Math.round(distanceMeters)} متر)`, 'error');
-                    setCamStatus('<i class="ri-map-pin-user-line" style="color:var(--danger);"></i> مرفوض: خارج نطاق المقر');
+                    setCamStatus('<i class="fas fa-map-marker-alt" style="color:var(--danger);"></i> مرفوض: خارج نطاق المقر');
                     isProcessingCapture = false; stabilityCounter = 0; return;
                 }
             }
             if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة، تواصل مع الأدمن.', 'error'); closeCamera(); return; }
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
             if(distance < MATCH_THRESHOLD) {
-                setCamStatus('<i class="ri-checkbox-circle-fill" style="color:var(--success);"></i> تم التحقق بنجاح! جاري التسجيل...');
+                setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق بنجاح! جاري التسجيل...');
                 const now = new Date();
                 const timeStr = now.toLocaleString('ar-EG', { hour12:true, hour:'2-digit', minute:'2-digit', second:'2-digit' });
                 const dateStr = now.toLocaleDateString('ar-EG');
@@ -600,13 +589,13 @@
                         closeCamera(); if(!user.isAdmin) calculateMonthlyHours();
                     } else {
                         playSound('faceid-error'); showToast('فشل التسجيل: '+ (data.error||''), 'error');
-                        setCamStatus('<i class="ri-error-warning-fill"></i> فشل إرسال البيانات');
+                        setCamStatus('<i class="fas fa-exclamation-triangle"></i> فشل إرسال البيانات');
                         stabilityCounter = 0;
                     }
                 } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال بالشيت!', 'error'); stabilityCounter = 0; }
             } else {
                 playSound('faceid-error'); showToast('الوجه غير مطابق! تم رفض التسجيل.', 'error');
-                setCamStatus('<i class="ri-forbid-line" style="color:var(--danger);"></i> الوجه غير مطابق!');
+                setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> الوجه غير مطابق!');
                 stabilityCounter = 0;
             }
             isProcessingCapture = false;
@@ -620,6 +609,7 @@
             await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             lightModels = true;
+            // إصلاح: إزالة النموذج الثقيل جداً SsdMobilenetv1 لتسريع التحميل بشكل كبير ومنع التوقف
             await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/');
             heavyModels = true;
@@ -632,12 +622,13 @@
         try {
             const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
             const empData = await empRes.json();
+            // إصلاح جوهري: التأكد من أن المصفوفة ليست فاضية لتجنب المطابقة مع لا شئ
             sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
             userImage = (empData.success && empData.userImage) ? empData.userImage : '';
             
-            // المنطق الجديد: إذا لم توجد بصمة، افتح الكاميرا للتسجيل فوراً
+            // إصلاح: فتح الكاميرا تلقائياً لتسجيل البصمة لأي مستخدم (موظف أو أدمن) يفتقد البصمة
             if(!sessionDescriptor && !updateFaceMode) {
-                showToast('يرجى تسجيل بصمة وجهك أولاً', 'warning');
+                showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
                 updateFaceMode = true;
                 const opened = await openCamera();
                 if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا','error'); }
@@ -663,24 +654,26 @@
                     localStorage.removeItem('axentro_saved_login');
                     localStorage.removeItem('axentro_fp_id');
                 }
-                
-                // التحقق من وجود البصمة قبل الدخول
-                setStatus('جاري التحقق من بيانات الوجه...');
-                const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(data.code)}`);
-                const empData = await empRes.json();
-                sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
-                userImage = (empData.success && empData.userImage) ? empData.userImage : '';
-
-                if(!sessionDescriptor) {
-                    // الحالة الأولى: لا توجد بصمة مسجلة
-                    showApp(); // نظهر التطبيق أولاً
-                    showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'warning');
-                    updateFaceMode = true;
-                    const opened = await openCamera();
-                    if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا', 'error'); logout(); }
+                if(!data.isAdmin && data.isFirstLogin) {
+                    $('forcePwModal').classList.add('active');
+                    setStatus('النظام جاهز');
+                } else if(data.isAdmin) {
+                    setStatus('جاري التحقق من بيانات الوجه...');
+                    const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(data.code)}`);
+                    const empData = await empRes.json();
+                    sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
+                    userImage = (empData.success && empData.userImage) ? empData.userImage : '';
+                    if(!sessionDescriptor) {
+                        showApp(); showToast('لا يوجد وجه مسجل لك، يرجى تسجيل وجهك الآن', 'error');
+                        updateFaceMode = true;
+                        const opened = await openCamera();
+                        if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا', 'error'); logout(); }
+                    } else {
+                        showApp();
+                        if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000);
+                    }
                 } else {
-                    // الحالة الثانية: البصمة موجودة، دخول ناجح
-                    showApp();
+                    showApp(); fetchUserDataInBackground();
                     if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000);
                 }
             } else { playSound('login-error'); showToast(data.error||'بيانات خاطئة','error'); setStatus('النظام جاهز'); }
@@ -698,10 +691,8 @@
                 showToast('تم تحديث كلمة السر بنجاح','success');
                 showApp();
                 const empRes = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`);
-                const empData = await res.json(); // تصحيح: يجب استخدام res الجديد أو إعادة الطلب
-                // إعادة طلب البيانات للتأكد
-                const empData2 = await (await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`)).json();
-                sessionDescriptor = (empData2.success && empData2.descriptor && Array.isArray(empData2.descriptor) && empData2.descriptor.length > 0) ? empData2.descriptor : null;
+                const empData = await empRes.json();
+                sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor : null;
                 if(!sessionDescriptor) {
                     updateFaceMode = true;
                     const opened = await openCamera();
@@ -739,7 +730,7 @@
             $('mainAppTitle').textContent='لوحة الموظف'; $('adminPanel').style.display='none'; $('employeePanel').style.display='block';
             playSound('login-success');
             const existingProfile = document.getElementById('empMicroInteractions'); if(existingProfile) existingProfile.remove();
-            const profileHTML = `<div id="empMicroInteractions"><div class="emp-profile-card"><img src="${userImage || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+'}" class="emp-profile-img" alt="Profile"><div><h3 style="margin:0; color:white; font-size:18px;">مرحباً يا ${user.name}</h3><p style="margin:0; color:#64748b; font-size:12px;">${user.code}</p></div></div><div id="monthlyHoursCard" class="emp-month-hours"><p style="color:#c4b5fd; font-size:13px; margin-bottom:5px;"><i class="ri-hourglass-line"></i> إجمالي ساعات العمل هذا الشهر</p><h2 id="monthHoursValue" style="color:white; font-size:28px; margin:0;">...</h2></div></div>`;
+            const profileHTML = `<div id="empMicroInteractions"><div class="emp-profile-card"><img src="${userImage || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+'}" class="emp-profile-img" alt="Profile"><div><h3 style="margin:0; color:white; font-size:18px;">مرحباً يا ${user.name}</h3><p style="margin:0; color:#64748b; font-size:12px;">${user.code}</p></div></div><div id="monthlyHoursCard" class="emp-month-hours"><p style="color:#c4b5fd; font-size:13px; margin-bottom:5px;"><i class="fas fa-hourglass-half"></i> إجمالي ساعات العمل هذا الشهر</p><h2 id="monthHoursValue" style="color:white; font-size:28px; margin:0;">...</h2></div></div>`;
             $('employeePanel').insertAdjacentHTML('afterbegin', profileHTML);
             calculateMonthlyHours();
         }
@@ -775,14 +766,14 @@
     
     function renderEmployeeList(list) {
         if(list.length===0) { $('searchResults').innerHTML='<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين مسجلين</p>'; return; }
-        $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="ri-check-line"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="ri-close-line"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="ri-bar-chart-box-line"></i></button></div></div>`).join('');
+        $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button></div></div>`).join('');
     }
     
     $('searchInput')?.addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); if(!q) renderEmployeeList(employees); else renderEmployeeList(employees.filter(emp=>emp.name.toLowerCase().includes(q)||emp.code.toLowerCase().includes(q))); });
     
     async function adminDirectAtt(type, code, name) {
         if(!sessionDescriptor) {
-            showToast('لم تقم بتسجيل بصمة وجهك بعد، جاري فتح الكاميرا...','warning');
+            showToast('لم تقم بتسجيل بصمة وجهك بعد، جاري فتح الكاميرا...','error');
             updateFaceMode = true;
             const opened = await openCamera();
             if(!opened) { updateFaceMode=false; showToast('فشل فتح الكاميرا','error'); }
@@ -819,8 +810,8 @@
     
     // ==================== MODALS & REPORTS ====================
     function closeReportModal() { $('reportModal').classList.remove('active'); }
-    async function loadMyReport() { $('reportTitle').textContent=`تقرير ${user.name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="ri-loader-4-line ri-spin"></i> جاري التحميل...</center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(user.code); }
-    async function loadEmpReport(code,name) { $('reportTitle').textContent=`تقرير ${name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="ri-loader-4-line ri-spin"></i> جاري التحميل...</center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(code); }
+    async function loadMyReport() { $('reportTitle').textContent=`تقرير ${user.name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(user.code); }
+    async function loadEmpReport(code,name) { $('reportTitle').textContent=`تقرير ${name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(code); }
     async function fetchAndRenderReport(code) {
         try {
             const res = await fetch(`${URL}?action=getEmployeeReport&code=${encodeURIComponent(code)}`);
@@ -837,10 +828,10 @@
         pwChangeMode=mode; const body=$('changePwBody'); const title=$('changePwTitle');
         if(mode==='own') {
             title.textContent='تغيير كلمة السر الخاصة بي';
-            body.innerHTML=`<div class="password-wrapper"><input type="password" id="oldPassword" placeholder="كلمة السر الحالية"><button class="toggle-password" onclick="togglePassword('oldPassword')"><i class="ri-eye-line"></i></button></div><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="ri-eye-line"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تحديث</button>`;
+            body.innerHTML=`<div class="password-wrapper"><input type="password" id="oldPassword" placeholder="كلمة السر الحالية"><button class="toggle-password" onclick="togglePassword('oldPassword')"><i class="fas fa-eye"></i></button></div><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تحديث</button>`;
         } else {
             title.textContent='تغيير كلمة سر موظف';
-            body.innerHTML=`<input type="text" id="targetEmpCode" placeholder="كود الموظف"><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="ri-eye-line"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>`;
+            body.innerHTML=`<input type="text" id="targetEmpCode" placeholder="كود الموظف"><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>`;
         }
         $('changePwModal').classList.add('active');
     }
@@ -942,9 +933,9 @@
             navigator.geolocation.getCurrentPosition(pos => {
                 currentLat = pos.coords.latitude; currentLon = pos.coords.longitude;
                 currentLoc = `https://maps.google.com/?q=${currentLat},${currentLon}`;
-                $('locBar').innerHTML = `<i class="ri-map-pin-line" style="color:var(--success);"></i> <a href="${currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">الموقع محدد (اضغط للعرض)</a>`;
+                $('locBar').innerHTML = `<i class="fas fa-map-marker-alt" style="color:var(--success);"></i> <a href="${currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">الموقع محدد (اضغط للعرض)</a>`;
             }, () => {
-                $('locBar').innerHTML = `<i class="ri-error-warning-fill" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`;
+                $('locBar').innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`;
                 currentLoc='غير متوفر'; currentLat=null; currentLon=null;
             });
         }
