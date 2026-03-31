@@ -273,7 +273,7 @@
     const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 100;
     const MATCH_THRESHOLD = 0.55;
     const AUTO_REFRESH_INTERVAL = 30000;
-    const STABLE_FRAMES_REQUIRED = 8; 
+    const STABLE_FRAMES_REQUIRED = 4; 
     
     // ==================== GLOBAL STATE ====================
     let user = null;
@@ -355,7 +355,7 @@
     // ==================== CAMERA & FACE DETECTION ====================
     async function openCamera() {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } });
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } });
             video.srcObject = stream;
             await video.play();
             $('cameraOverlay').classList.add('active');
@@ -397,7 +397,7 @@
         if(!lightModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...'); return; }
         
         try {
-            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })).withFaceLandmarks(true);
+            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })).withFaceLandmarks(true).withFaceDescriptor();
             ctx.clearRect(0,0,canvas.width,canvas.height);
             
             if(detection) {
@@ -490,7 +490,7 @@
         
         let newDescriptor;
         try {
-            newDescriptor = Array.from(await faceapi.computeFaceDescriptor(detection));
+            newDescriptor = Array.from(await faceapi.detection.descriptor);
         } catch(err) {
             playSound('faceid-error'); showToast('فشل استخراج بصمة الوجه، تأكد من إضاءة وجهك', 'error');
             setCamStatus('<i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i> فشل استخراج البصمة');
