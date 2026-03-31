@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     
-    <!-- Audio elements with original mp3 sources (files must exist on server) -->
     <audio id="login-success" src="login-success.mp3" preload="auto"></audio>
     <audio id="login-error" src="login-error.mp3" preload="auto"></audio>
     <audio id="logout-success" src="logout-success.mp3" preload="auto"></audio>
@@ -272,8 +271,9 @@
     // ==================== CONFIGURATION ====================
     const URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
     const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 100;
-    const MATCH_THRESHOLD = 0.55; // stricter for better security
-    const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
+    const MATCH_THRESHOLD = 0.55;
+    const AUTO_REFRESH_INTERVAL = 30000;
+    const STABLE_FRAMES_REQUIRED = 8; // frames of stable face before capture
     
     // ==================== GLOBAL STATE ====================
     let user = null;
@@ -284,10 +284,12 @@
     let isProcessingCapture = false;
     let currentLat = null, currentLon = null, userImage = '', lastCamStatusText = '';
     let autoRefreshTimer = null;
-    let livenessRequired = false;
-    let initialYaw = null, headMoved = false;
-    let faceStableCounter = 0;
-    const FACE_STABLE_FRAMES = 5; // frames needed for stability
+    
+    // Liveness state for verification modes
+    let livenessActive = false;
+    let livenessStartYaw = null;
+    let livenessMoved = false;
+    let stabilityCounter = 0;
     
     // ==================== DOM HELPERS ====================
     const $ = id => document.getElementById(id);
@@ -318,7 +320,7 @@
     function selectShift(element) { document.querySelectorAll('.shift-card').forEach(c=>c.classList.remove('selected')); element.classList.add('selected'); element.querySelector('input').checked=true; }
     const setCamStatus = (html) => { if(html!==lastCamStatusText) { $('camStatus').innerHTML=html; lastCamStatusText=html; } };
     
-    // ==================== LIVENESS DETECTION ====================
+    // ==================== HEAD POSE & LIVENESS ====================
     function getHeadYaw(landmarks) {
         const nose = landmarks.getNose()[3];
         const leftEye = landmarks.getLeftEye()[0];
@@ -328,23 +330,25 @@
     }
     
     function resetLiveness() {
-        initialYaw = null;
-        headMoved = false;
-        livenessRequired = true;
+        livenessActive = true;
+        livenessStartYaw = null;
+        livenessMoved = false;
+        stabilityCounter = 0;
     }
     
+    // returns true if liveness passed (head moved enough)
     function updateLiveness(yaw) {
-        if (!livenessRequired) return true;
-        if (initialYaw === null) {
-            initialYaw = yaw;
+        if (!livenessActive) return true;
+        if (livenessStartYaw === null) {
+            livenessStartYaw = yaw;
             setCamStatus('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...');
             return false;
         }
-        const movement = Math.abs(yaw - initialYaw);
+        const movement = Math.abs(yaw - livenessStartYaw);
         if (movement > 0.08) {
-            headMoved = true;
-            livenessRequired = false;
-            setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة');
+            livenessMoved = true;
+            livenessActive = false;
+            setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، يرجى الثبات...');
             return true;
         }
         return false;
@@ -361,8 +365,8 @@
             setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            faceStableCounter = 0;
-            resetLiveness();
+            stabilityCounter = 0;
+            if (attMode || adminVerifyMode) resetLiveness();
             isProcessingCapture = false;
             startDetectionLoop();
             return true;
@@ -377,6 +381,8 @@
         attType = ''; targetEmpForAdmin = null;
         isProcessingCapture = false;
         if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
+        stabilityCounter = 0;
+        livenessActive = false;
     }
     
     function startDetectionLoop() {
@@ -405,45 +411,48 @@
                 ctx.beginPath(); ctx.moveTo(box.x,box.y+box.height-cLen); ctx.lineTo(box.x,box.y+box.height); ctx.lineTo(box.x+cLen,box.y+box.height); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen,box.y+box.height); ctx.lineTo(box.x+box.width,box.y+box.height); ctx.lineTo(box.x+box.width,box.y+box.height-cLen); ctx.stroke();
                 
-                // Face stability for enrollment (regMode/updateFaceMode)
-                if(regMode || updateFaceMode) {
-                    faceStableCounter++;
-                    if(faceStableCounter >= FACE_STABLE_FRAMES) {
+                // ===== ENROLLMENT MODES (first time) =====
+                if (regMode || updateFaceMode) {
+                    // No liveness, just face stability
+                    stabilityCounter++;
+                    if (stabilityCounter >= STABLE_FRAMES_REQUIRED) {
                         setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> ثبت وجهك، جاري الالتقاط...');
                         if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 300);
                     } else {
-                        setCamStatus(`<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك (${faceStableCounter}/${FACE_STABLE_FRAMES})...`);
+                        setCamStatus(`<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك (${stabilityCounter}/${STABLE_FRAMES_REQUIRED})...`);
                     }
                     return;
                 }
                 
-                // Liveness check for attendance / admin verification
-                if(attMode || adminVerifyMode) {
+                // ===== VERIFICATION MODES (attendance / admin action) =====
+                if (attMode || adminVerifyMode) {
                     const yaw = getHeadYaw(detection.landmarks);
-                    const livenessPassed = updateLiveness(yaw);
-                    if(!livenessPassed) {
+                    const livenessOk = updateLiveness(yaw);
+                    if (!livenessOk) {
+                        // Still waiting for head movement
                         if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
+                        stabilityCounter = 0;
                         return;
                     } else {
-                        // Liveness passed, now check stability briefly
-                        faceStableCounter++;
-                        if(faceStableCounter >= FACE_STABLE_FRAMES) {
+                        // Liveness passed, now require face stability
+                        stabilityCounter++;
+                        if (stabilityCounter >= STABLE_FRAMES_REQUIRED) {
                             setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم اكتشاف الوجه، جاري الالتقاط...');
                             if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 300);
                         } else {
-                            setCamStatus(`<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك (${faceStableCounter}/${FACE_STABLE_FRAMES})...`);
+                            setCamStatus(`<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك (${stabilityCounter}/${STABLE_FRAMES_REQUIRED})...`);
                         }
                         return;
                     }
                 }
                 
-                // No mode active? shouldn't happen, but if so just draw box
+                // No active mode (should not happen)
                 setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم اكتشاف الوجه');
             } else {
                 setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');
                 if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
-                faceStableCounter = 0;
-                if(attMode || adminVerifyMode) resetLiveness();
+                stabilityCounter = 0;
+                if (attMode || adminVerifyMode) resetLiveness();
             }
         } catch(e) {}
     }
@@ -800,7 +809,7 @@
             const res = await fetch(`${URL}?action=getEmployeeReport&code=${encodeURIComponent(code)}`);
             const data = await res.json();
             if(data.success && data.records.length>0) {
-                let tableRows = data.records.map(r => `<tr><td style="font-size:12px;">${r.date}</td><td><span class="att-badge ${r.type==='حضور'?'att-in':'att-out'}">${r.type}</span></td><td style="font-size:11px;">${r.shift}</td><td style="font-weight:bold; color:${r.hours?'#38bdf8':'#64748b'}">${r.hours||'-'}</td></tr>`).join('');
+                let tableRows = data.records.map(r => `<tr><td style="font-size:12px;">${r.date}脉<td><span class="att-badge ${r.type==='حضور'?'att-in':'att-out'}">${r.type}</span>脉<td style="font-size:11px;">${r.shift}脉<td style="font-weight:bold; color:${r.hours?'#38bdf8':'#64748b'}">${r.hours||'-'}脉</tr>`).join('');
                 $('reportBody').innerHTML = `<table class="report-table"><thead><tr><th>التاريخ</th><th>الحالة</th><th>الشفت</th><th>الساعات</th></tr></thead><tbody>${tableRows}</tbody></table>`;
             } else $('reportBody').innerHTML='<center style="color:#64748b; padding:30px;">لا توجد سجلات حتى الآن.</center>';
         } catch(e) { $('reportBody').innerHTML='<center style="color:#ef4444; padding:20px;">فشل تحميل التقرير</center>'; }
