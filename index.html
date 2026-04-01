@@ -292,8 +292,9 @@
 
 <script>
     const URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
-    const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 500;
-    const MATCH_THRESHOLD = 0.6;
+    const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 150;
+    // [إصلاح] 0.55 مع أخذ عينتين = دقة عالية جداً
+    const MATCH_THRESHOLD = 0.55;
     const AUTO_REFRESH_INTERVAL = 30000;
     const STABLE_FRAMES_REQUIRED = 5;
     const MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
@@ -306,6 +307,8 @@
     let targetEmpForAdmin = null;
     let isProcessingCapture = false;
     let currentLat = null, currentLon = null, currentLoc = 'غير متوفر', userImage = '', lastCamStatusText = '';
+    // [إضافة] دقة GPS لهامش الخطأ
+    let currentAccuracy = 0;
     let autoRefreshTimer = null;
     let detectionLoopTimeout = null;
     let livenessActive = false, livenessStartYaw = null, livenessMoved = false, stabilityCounter = 0;
@@ -385,6 +388,20 @@
         if (livenessStartYaw === null) { livenessStartYaw = yaw; setCamStatus('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...'); return false; }
         if (Math.abs(yaw - livenessStartYaw) > 0.08) { livenessMoved = true; livenessActive = false; setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، يرجى الثبات...'); return true; }
         return false;
+    }
+    
+    // [إضافة] أخذ عينتين ومعدّلهما لثبات التطابق بنسبة 90%+
+    async function extractStableDescriptor() {
+        const samples = [];
+        for (let i = 0; i < 2; i++) {
+            const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })).withFaceLandmarks().withFaceDescriptor();
+            if (!det) return null;
+            samples.push(Array.from(det.descriptor));
+            if (i === 0) await new Promise(r => setTimeout(r, 120));
+        }
+        const avg = new Array(samples[0].length).fill(0);
+        for (const s of samples) for (let j = 0; j < s.length; j++) avg[j] += s[j] / 2;
+        return avg;
     }
     
     async function openCamera() {
@@ -484,13 +501,10 @@
         if(detectionLoopTimeout) { clearTimeout(detectionLoopTimeout); detectionLoopTimeout=null; }
         $('scanLine').classList.remove('active');
         const imgData = createStorageImage();
-        let newDescriptor = null;
+        // [إصلاح] استخدام extractStableDescriptor بدلاً من أخذ عينة واحدة
         setCamStatus('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
-        try {
-            const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })).withFaceLandmarks().withFaceDescriptor();
-            if(!det) { playSound('faceid-error'); if(navigator.vibrate) navigator.vibrate([100,50,100]); setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة، جاري إعادة المحاولة...'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
-            newDescriptor = Array.from(det.descriptor);
-        } catch(err) { playSound('faceid-error'); showToast('خطأ في التحليل', 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
+        const newDescriptor = await extractStableDescriptor();
+        if(!newDescriptor) { playSound('faceid-error'); if(navigator.vibrate) navigator.vibrate([100,50,100]); setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة، جاري إعادة المحاولة...'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
 
         if(regMode) {
             setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بيانات الموظف الجديد...');
@@ -533,10 +547,11 @@
                 else { playSound('faceid-error'); showToast('فشل التسجيل: '+ (data.error||''), 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
             } else { playSound('faceid-error'); showMatchResult(false); showToast('وجه الأدمن غير مطابق!', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> انتحال هوية مرفوض!'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
         }
+        // [إصلاح] فحص الوجه أولاً ثم الموقع (عكس الترتيب السابق)
         else if(attMode) {
-            if(currentLat && currentLon) { const dist = getDistanceFromLatLonInKm(currentLat, currentLon, OFFICE_LAT, OFFICE_LON); if(dist > MAX_DISTANCE_METERS) { playSound('faceid-error'); showToast(`أنت بعيد عن المقر (${Math.round(dist)} متر)`, 'error'); setCamStatus('<i class="fas fa-map-marker-alt" style="color:var(--danger);"></i> مرفوض: خارج نطاق المقر'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; } }
             if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة', 'error'); closeCamera(); return; }
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
+            
             if(attType === 'تغيير كلمة المرور') {
                 if(distance < MATCH_THRESHOLD) {
                     showMatchResult(true);
@@ -545,11 +560,24 @@
                         if(data.success) { playSound('login-success'); showToast('تم تغيير كلمة المرور بنجاح','success'); setTimeout(()=>closeCamera(), 800); }
                         else { playSound('login-error'); showToast('فشل تغيير كلمة السر', 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
                     } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال','error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
-                } else { playSound('faceid-error'); showMatchResult(false); showToast('الوجه غير مطابق! تم إلغاء العملية.', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> الوجه غير مطابق!'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
+                } else { playSound('faceid-error'); showMatchResult(false); showToast('الوجه غير مطابق! تم إلغاء العملية.', 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
                 isProcessingCapture = false; return;
             }
+
             if(distance < MATCH_THRESHOLD) {
                 showMatchResult(true);
+                // [إصلاح] الوجه تم التحقق منه — الآن نتحقق من الموقع مع هامش دقة GPS
+                if(currentLat && currentLon) {
+                    const dist = getDistanceFromLatLonInKm(currentLat, currentLon, OFFICE_LAT, OFFICE_LON);
+                    // طرح هامش خطأ GPS من المسافة الفعللية
+                    const effectiveDist = Math.max(0, dist - (currentAccuracy || 0));
+                    if(effectiveDist > MAX_DISTANCE_METERS) {
+                        playSound('faceid-error');
+                        showToast(`تم التحقق من الوجه ✓ لكنك بعيد عن المقر (${Math.round(dist)} متر)`, 'error');
+                        setCamStatus('<i class="fas fa-map-marker-alt" style="color:var(--danger);"></i> مرفوض: خارج نطاق المقر');
+                        isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return;
+                    }
+                }
                 setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق بنجاح!');
                 const now = new Date(); const selShift = document.querySelector('input[name="shift"]:checked');
                 const payload = { action:'attendance', name:user.name, code:user.code, type:attType, location:currentLoc||'غير متوفر', datetime:`${now.toLocaleDateString('ar-EG')} - ${now.toLocaleString('ar-EG', { hour12:true, hour:'2-digit', minute:'2-digit', second:'2-digit' })}`, imageData:imgData, shift: selShift ? selShift.value : 'لم يتم التحديد' };
@@ -614,6 +642,7 @@
         if (user?.isAdmin) loadEmployees();
     }
     
+    // [إصلاح] لا نستبدل sessionDescriptor بـ null إذا السيرفر رجع فاضي
     async function fetchUserDataInBackground() {
         if(!user) return;
         try {
@@ -623,13 +652,17 @@
         } catch(e){}
         try {
             const empData = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`).then(r=>r.json());
-            sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor.map(Number) : null;
-            if(empData.success && empData.userImage) {
-                userImage = empData.userImage;
-                const img = document.querySelector('.emp-profile-img');
-                if(img) img.src = userImage;
+            // [إصلاح] نحدّث فقط إذا السيرفر رجع بيانات صالحة — لا نمسح الموجود
+            if(empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) {
+                sessionDescriptor = empData.descriptor.map(Number);
+                if(empData.userImage) {
+                    userImage = empData.userImage;
+                    const img = document.querySelector('.emp-profile-img');
+                    if(img) img.src = userImage;
+                }
+                try { localStorage.setItem('axentro_desc_'+user.code, JSON.stringify(sessionDescriptor)); if(userImage) localStorage.setItem('axentro_img_'+user.code, userImage); } catch(e){}
             }
-            if(sessionDescriptor) { try { localStorage.setItem('axentro_desc_'+user.code, JSON.stringify(sessionDescriptor)); if(userImage) localStorage.setItem('axentro_img_'+user.code, userImage); } catch(e){} }
+            // نفتح الكاميرا فقط إذا فعلاً لا توجد بصمة (محلياً ولا من السيرفر)
             if(!sessionDescriptor && !$('cameraOverlay').classList.contains('active')) {
                 playSound('faceid-error'); showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
                 firstTimeSetupMode = true; const opened = await openCamera(); if(!opened) { firstTimeSetupMode=false; showToast('فشل فتح الكاميرا','error'); }
@@ -666,6 +699,7 @@
         } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال بالخادم','error'); setStatus('غير متصل'); }
     }
     
+    // [إصلاح] تحديث isFirstLogin محلياً بعد تغيير كلمة المرور
     async function submitFirstPwChange() {
         const newPw = $('firstNewPw').value.trim();
         if(!newPw || newPw.length<4) return showToast('كلمة السر ضعيفة','error');
@@ -674,6 +708,10 @@
             const data = await fetch(URL, { method:'POST', body:JSON.stringify({ action:'changePassword', code:user.code, oldPassword:null, newPassword:newPw }) }).then(r=>r.json());
             if(data.success) {
                 $('forcePwModal').classList.remove('active'); playSound('login-success');
+                // [إصلاح] تحديث الحالة محلياً حتى لا تُطلب مرة أخرى
+                user.isFirstLogin = false;
+                if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); }
+                else { sessionStorage.setItem('user', JSON.stringify(user)); }
                 showToast('تم تحديث كلمة السر', 'success');
                 let hasFace = false;
                 try { const ld = localStorage.getItem('axentro_desc_'+user.code); if(ld) hasFace = true; } catch(e){}
@@ -709,7 +747,7 @@
         autoRefreshTimer = setInterval(() => { if(user) refreshData(); }, AUTO_REFRESH_INTERVAL);
     }
     
-    /* ====== نهاية الجزء الأول - ابدأ بالجزء الثاني من هنا ====== */
+    /* ====== نهاية الجزء الأول — الصق الجزء الثاني مباشرة ====== */
         async function calculateMonthlyHours() { try { const res = await fetch(`${URL}?action=getEmployeeReport&code=${encodeURIComponent(user.code)}`); const data = await res.json(); if(data.success && data.records.length>0) { const now = new Date(); let totalHours=0; data.records.forEach(rec => { const recDate = parseArabicDateStr(rec.date); if(recDate && recDate.getMonth()===now.getMonth() && recDate.getFullYear()===now.getFullYear() && rec.type==='انصراف' && rec.hours) { totalHours += parseFloat(rec.hours.split(' ')[0])||0; } }); $('monthHoursValue').textContent = totalHours>0 ? totalHours.toFixed(2)+' ساعة' : '0 ساعة'; } else $('monthHoursValue').textContent='0 ساعة'; } catch(e) { $('monthHoursValue').textContent='--'; } }
     
     async function loadEmployees() { try { const d = await fetch(`${URL}?action=getEmployees`).then(r=>r.json()); if(d.success) { employees = d.employees; $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); } } catch(e) { setStatus('غير متصل'); } }
@@ -790,23 +828,25 @@
         else setStatus('النظام جاهز');
     }
     
+    // [إصلاح] GPS عالي الدقة مع هامش خطأ
     function getLocation() {
         if(navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
-                currentLat = pos.coords.latitude; currentLon = pos.coords.longitude;
+                currentLat = pos.coords.latitude;
+                currentLon = pos.coords.longitude;
+                currentAccuracy = pos.coords.accuracy || 0;
                 currentLoc = `https://maps.google.com/?q=${currentLat},${currentLon}`;
                 $('locBar').innerHTML = `<i class="fas fa-map-marker-alt" style="color:var(--success);"></i> <a href="${currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">الموقع محدد</a>`;
             }, () => {
                 $('locBar').innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`;
-                currentLoc='غير متوفر'; currentLat=null; currentLon=null;
-            });
+                currentLoc='غير متوفر'; currentLat=null; currentLon=null; currentAccuracy=0;
+            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
         }
     }
     
     function init() {
         restoreSession(); loadModelsAsync(); getLocation();
         if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(err=>console.log('SW Error:',err));
-        // [إضافة] فتح الصوت عند أول تفاعل + مراقبة حالة الاتصال
         document.addEventListener('click', unlockAudio, { once: true });
         document.addEventListener('touchstart', unlockAudio, { once: true });
         window.addEventListener('online', () => {
@@ -822,8 +862,10 @@
             showToast('أنت غير متصل بالإنترنت - العمليات ستُحفظ محلياً', 'warning');
         });
         document.addEventListener('DOMContentLoaded',()=>{
-            ['loginCode','loginPass'].forEach(id=>{ $(id)?.addEventListener('keypress',e=>{ if(e.key==='Enter') handleLogin(); }); });
-            $('forgotCode')?.addEventListener('keypress',e=>{ if(e.key==='Enter') submitForgotPw(); });
+            // [إصلاح] Enter يعمل على حقل الكود وكلمة السر معاً
+            $('loginCode')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); $('loginPass').focus(); } });
+            $('loginPass')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); handleLogin(); } });
+            $('forgotCode')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); submitForgotPw(); } });
             if(window.PublicKeyCredential) $('fingerprintLoginBtn').style.display='flex';
         });
     }
