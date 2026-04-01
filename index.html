@@ -117,7 +117,7 @@
         .footer-qr-container { margin-top: 20px; display: inline-block; }
         .footer-qr-link { display: block; width: 80px; height: 80px; margin: 0 auto 10px; border-radius: 12px; overflow: hidden; border: 3px solid #334155; animation: qrPulse 2.5s infinite; transition: 0.3px; }
         .footer-qr-link:active { transform: scale(0.95); }
-        .footer-qr-link i { font-size: 48px; color: #38bdf8; line-height: 80px; }
+        .footer-qr-link img { width: 100%; height: 100%; object-fit: cover; border-radius: 9px; }
         .footer-qr-text { font-size: 12px; color: #38bdf8; font-weight: 700; letter-spacing: 1px; }
 
         .remember-me { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; cursor: pointer; user-select: none; }
@@ -197,7 +197,9 @@
         <div class="footer-brand">Axentro</div>
         <p class="footer-copy">© 2024 Axentro – All Rights Reserved<br>By Axentro Team</p>
         <div class="footer-qr-container">
-            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" class="footer-qr-link"><i class="fas fa-qrcode"></i></a>
+            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" class="footer-qr-link">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=https%3A%2F%2Faxentro-official.github.io%2Faxentro-website%2Flinks.html" alt="QR Code">
+            </a>
             <div class="footer-qr-text">Scan Me > Click On Me</div>
         </div>
     </div>
@@ -259,7 +261,9 @@
         <div class="footer-brand">Axentro</div>
         <p class="footer-copy">© 2024 Axentro – All Rights Reserved<br>By Axentro Team</p>
         <div class="footer-qr-container">
-            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" class="footer-qr-link"><i class="fas fa-qrcode"></i></a>
+            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" class="footer-qr-link">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=https%3A%2F%2Faxentro-official.github.io%2Faxentro-website%2Flinks.html" alt="QR Code">
+            </a>
             <div class="footer-qr-text">Scan Me > Click On Me</div>
         </div>
     </div>
@@ -280,7 +284,8 @@
     let regMode = false, attMode = false, updateFaceMode = false, adminVerifyMode = false, firstTimeSetupMode = false, attType = '', regData = {}, autoCaptureTimeout = null;
     let targetEmpForAdmin = null;
     let isProcessingCapture = false;
-    let currentLat = null, currentLon = null, userImage = '', lastCamStatusText = '';
+    // [إصلاح #4] إضافة تصريح المتغير currentLoc الذي كان مفقوداً
+    let currentLat = null, currentLon = null, currentLoc = 'غير متوفر', userImage = '', lastCamStatusText = '';
     let autoRefreshTimer = null;
     let detectionLoopTimeout = null;
     let livenessActive = false, livenessStartYaw = null, livenessMoved = false, stabilityCounter = 0;
@@ -299,6 +304,15 @@
     function base64ToBuffer(base64) { const binary=atob(base64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes.buffer; }
     function selectShift(element) { document.querySelectorAll('.shift-card').forEach(c=>c.classList.remove('selected')); element.classList.add('selected'); element.querySelector('input').checked=true; }
     const setCamStatus = (html) => { if(html!==lastCamStatusText) { $('camStatus').innerHTML=html; lastCamStatusText=html; } };
+    
+    // [إصلاح #6] دالة مساعدة لتحليل التواريخ العربية (٠١/٠٤/٢٠٢٦) بشكل صحيح
+    function parseArabicDateStr(dateStr) {
+        const easternMap = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
+        const normalized = dateStr.replace(/[٠-٩]/g, d => easternMap[d]);
+        const m = normalized.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (m) return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+        return null;
+    }
     
     function getHeadYaw(landmarks) { const nose = landmarks.getNose()[3]; const leftEye = landmarks.getLeftEye()[0]; const rightEye = landmarks.getRightEye()[3]; return nose.x - ((leftEye.x + rightEye.x)/2); }
     function resetLiveness() { livenessActive = true; livenessStartYaw = null; livenessMoved = false; stabilityCounter = 0; }
@@ -484,12 +498,11 @@
         if(!user) return;
         try {
             const empData = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`).then(r=>r.json());
-            // سر إصلاح فشل الحضور والانصراف (تحويل المصفوفة لأرقام حقيقية)
             sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor.map(Number) : null;
             if(empData.success && empData.userImage) {
                 userImage = empData.userImage;
                 const img = document.querySelector('.emp-profile-img');
-                if(img) img.src = userImage; // تحديث الصورة فوراً
+                if(img) img.src = userImage;
             }
             if(!sessionDescriptor && !$('cameraOverlay').classList.contains('active')) {
                 playSound('faceid-error'); showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
@@ -511,7 +524,7 @@
                 
                 if(!data.isAdmin && data.isFirstLogin) { $('forcePwModal').classList.add('active'); setStatus('النظام جاهز'); }
                 else {
-                    setStatus('جاري التحقق من وجود بصمة الوجه...'); // لا تفتح الصفحة قبل التأكد من البصمة
+                    setStatus('جاري التحقق من وجود بصمة الوجه...');
                     try {
                         const empData = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`).then(r=>r.json());
                         sessionDescriptor = (empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) ? empData.descriptor.map(Number) : null;
@@ -535,7 +548,6 @@
             if(data.success) {
                 $('forcePwModal').classList.remove('active'); playSound('login-success');
                 showToast('تم تحديث كلمة السر، سجل بصمة وجهك الآن','success');
-                // إلغاء showApp() لتجنب الدخول بدون بصمة
                 firstTimeSetupMode = true; const opened = await openCamera(); if(!opened) { firstTimeSetupMode=false; logout(); }
             } else { playSound('login-error'); showToast(data.error,'error'); }
         } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال','error'); }
@@ -551,7 +563,6 @@
         if(user.isAdmin) {
             $('mainAppTitle').textContent='لوحة تحكم المدير'; $('adminPanel').style.display='block'; $('employeePanel').style.display='none';
             playSound('login-success'); showToast(`مرحباً بك في لوحة التحكم`,'success');
-            // إضافة صورة الأدمن
             const existing = document.getElementById('adminMicroInteractions'); if(existing) existing.remove();
             $('adminPanel').insertAdjacentHTML('afterbegin', `<div id="adminMicroInteractions"><div class="emp-profile-card"><img src="${userImage || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+'}" class="emp-profile-img" alt="Admin"><div><h3 style="margin:0; color:white; font-size:18px;">مرحباً بك يا ${user.name}</h3><p style="margin:0; color:#64748b; font-size:12px;">مدير النظام</p></div></div></div>`);
             loadEmployees();
@@ -565,7 +576,8 @@
         autoRefreshTimer = setInterval(() => { if(user) refreshData(); }, AUTO_REFRESH_INTERVAL);
     }
     
-    async function calculateMonthlyHours() { /* نفس الكود بدون تغيير */ try { const res = await fetch(`${URL}?action=getEmployeeReport&code=${encodeURIComponent(user.code)}`); const data = await res.json(); if(data.success && data.records.length>0) { const now = new Date(); let totalHours=0; data.records.forEach(rec => { const recDate = new Date(rec.date); if(recDate.getMonth()===now.getMonth() && recDate.getFullYear()===now.getFullYear() && rec.type==='انصراف' && rec.hours) { totalHours += parseFloat(rec.hours.split(' ')[0])||0; } }); $('monthHoursValue').textContent = totalHours>0 ? totalHours.toFixed(2)+' ساعة' : '0 ساعة'; } else $('monthHoursValue').textContent='0 ساعة'; } catch(e) { $('monthHoursValue').textContent='--'; } }
+    // [إصلاح #6] استخدام parseArabicDateStr لتحليل التواريخ العربية بشكل صحيح
+    async function calculateMonthlyHours() { try { const res = await fetch(`${URL}?action=getEmployeeReport&code=${encodeURIComponent(user.code)}`); const data = await res.json(); if(data.success && data.records.length>0) { const now = new Date(); let totalHours=0; data.records.forEach(rec => { const recDate = parseArabicDateStr(rec.date); if(recDate && recDate.getMonth()===now.getMonth() && recDate.getFullYear()===now.getFullYear() && rec.type==='انصراف' && rec.hours) { totalHours += parseFloat(rec.hours.split(' ')[0])||0; } }); $('monthHoursValue').textContent = totalHours>0 ? totalHours.toFixed(2)+' ساعة' : '0 ساعة'; } else $('monthHoursValue').textContent='0 ساعة'; } catch(e) { $('monthHoursValue').textContent='--'; } }
     
     async function loadEmployees() { try { const d = await fetch(`${URL}?action=getEmployees`).then(r=>r.json()); if(d.success) { employees = d.employees; $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); } } catch(e) { setStatus('غير متصل'); } }
     function renderEmployeeList(list) { if(!list.length) { $('searchResults').innerHTML='<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين</p>'; return; } $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button></div></div>`).join(''); }
@@ -640,7 +652,8 @@
         let savedUser = null;
         if(savedLogin) { try { const ld = JSON.parse(savedLogin); $('loginCode').value = ld.code||''; $('loginPass').value = ld.pass||''; $('rememberMe').checked = true; } catch(e){} }
         if(savedSessionStr) { try { const s = JSON.parse(savedSessionStr); if(Date.now()-s.timestamp < 10*60*60*1000) { savedUser = s.data; $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block'; } else { localStorage.removeItem('rememberedUser'); localStorage.removeItem('axentro_fp_id'); } } catch(e) { localStorage.removeItem('rememberedUser'); } }
-        else if(savedTempStr) { savedUser = JSON.parse(savedTempStr); $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block'; }
+        // [إصلاح #5] إضافة try-catch لحماية JSON.parse من sessionStorage التالف
+        else if(savedTempStr) { try { savedUser = JSON.parse(savedTempStr); $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block'; } catch(e) { sessionStorage.removeItem('user'); } }
         if(savedUser) { user = savedUser; showApp(); fetchUserDataInBackground(); }
         else setStatus('النظام جاهز');
     }
