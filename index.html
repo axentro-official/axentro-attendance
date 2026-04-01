@@ -120,7 +120,6 @@
         .emp-item:active { transform: scale(0.98); background: rgba(30, 41, 59, 0.8); }
         .emp-info h4 { margin-bottom: 4px; font-size: 15px; }
         .emp-info p { color: #64748b; font-size: 12px; font-family: monospace; }
-        /* [تحسين] دعم الأزرار الإضافية بدون تشوه على الشاشات الصغيرة */
         .emp-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 23, 0.98); backdrop-filter: blur(20px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; overflow-y: auto; }
@@ -298,7 +297,9 @@
     const AUTO_REFRESH_INTERVAL = 30000;
     const STABLE_FRAMES_REQUIRED = 5;
     const MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
-    const STORE_IMG_MAX = 400;
+    
+    // [تحسين] تقليل الحجم الأقصى للصورة لمنع قطعها في Google Sheets (الحد الأقصى للخلية 50,000 حرف)
+    const STORE_IMG_MAX = 300;
     
     let user = null;
     let lightModels = false, heavyModels = false, stream = null, employees = [];
@@ -345,7 +346,6 @@
         return null;
     }
     
-    // [تحسين] معالجة دقيقة للأبعاد لتجنب تشوه الصور العمودية
     function createStorageImage() {
         const c = document.createElement('canvas');
         let w = video.videoWidth, h = video.videoHeight;
@@ -353,7 +353,8 @@
         if(ratio < 1) { w = Math.round(w * ratio); h = Math.round(h * ratio); }
         c.width = w; c.height = h;
         c.getContext('2d').drawImage(video, 0, 0, w, h);
-        return c.toDataURL('jpeg', 0.4);
+        // [تحسين] تقليل الجودة لضمان عدم تجاوز 50,000 حرف في الخلية ومنع التشوه
+        return c.toDataURL('image/jpeg', 0.3);
     }
     
     function updateStabilityRing(current, max) {
@@ -394,7 +395,8 @@
     async function extractStableDescriptor() {
         const samples = [];
         for (let i = 0; i < 2; i++) {
-            const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })).withFaceLandmarks().withFaceDescriptor();
+            // [تحسين] تخفيض نسبة الصرامة لدعم النظارات والإضاءة الضعيفة
+            const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 })).withFaceLandmarks().withFaceDescriptor();
             if (!det) return null;
             samples.push(Array.from(det.descriptor));
             if (i === 0) await new Promise(r => setTimeout(r, 120));
@@ -452,7 +454,8 @@
         if(!video.srcObject || video.videoWidth===0) return;
         if(!lightModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل النماذج الأساسية...'); updateModelProgress(modelsLoadProgress); return; }
         try {
-            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 })).withFaceLandmarks(true);
+            // [تحسين] تخفيض نسبة الصرامة لدعم النظارات والإضاءة الضعيفة
+            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.2 })).withFaceLandmarks(true);
             ctx.clearRect(0,0,canvas.width,canvas.height);
             if(detection) {
                 const box = detection.detection.box;
@@ -535,7 +538,6 @@
                 else { playSound('faceid-error'); showMatchResult(false); showToast('فشل التحديث', 'error'); closeCamera(); }
             } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال', 'error'); closeCamera(); }
         }
-        // [ميزة مضافة] معالجة إعادة تسجيل بصمة موظف بواسطة الأدمن
         else if(adminResetFaceMode) {
             setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البصمة الجديدة للموظف...');
             try {
@@ -757,7 +759,6 @@
     
     async function loadEmployees() { try { const d = await fetch(`${URL}?action=getEmployees`).then(r=>r.json()); if(d.success) { employees = d.employees; $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); } } catch(e) { setStatus('غير متصل'); } }
     
-    // [تحسين] إضافة زر إعادة تسجيل البصمة البرتقالي في قائمة الموظفين
     function renderEmployeeList(list) { if(!list.length) { $('searchResults').innerHTML='<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين</p>'; return; } $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button><button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}', '${e.name}')" title="إعادة تسجيل بصمة"><i class="fas fa-sync-alt"></i></button></div></div>`).join(''); }
     $('searchInput')?.addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); renderEmployeeList(q ? employees.filter(emp=>emp.name.toLowerCase().includes(q)||emp.code.toLowerCase().includes(q)) : employees); });
     
@@ -850,7 +851,6 @@
         }
     }
 
-    // [ميزة مضافة] دالة إعادة تسجيل البصمة للموظفين من قبل الأدمن
     async function adminResetFace(code, name) {
         if(!code) return showToast('كود الموظف مطلوب','error');
         targetEmpForAdmin = { code, name };
