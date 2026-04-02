@@ -9,7 +9,6 @@
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-    <!-- ✅ إضافة مكتبة Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     
     <audio id="login-success" src="login-success.mp3" preload="auto"></audio>
@@ -37,7 +36,6 @@
         @keyframes scanLine { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
         @keyframes matchPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
         
-        /* ✅ إصلاح Responsive Design - دعم اللاب توب */
         .app-container { flex: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: 15px; position: relative; z-index: 1; animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
         h1 { font-size: 26px; text-align: center; background: linear-gradient(135deg, #fff, #93c5fd); -webkit-background-clip: text; color: transparent; margin-bottom: 20px; font-weight: 800; letter-spacing: -0.5px; }
 
@@ -75,10 +73,27 @@
         .toggle-password { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #64748b; cursor: pointer; font-size: 18px; transition: 0.2s; }
         .toggle-password:active { color: white; }
         
-        .btn { width: 100%; padding: 15px; border-radius: 16px; border: none; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); color: white; position: relative; overflow: hidden; }
+        .btn { 
+            width: 100%; 
+            padding: 15px; 
+            border-radius: 16px; 
+            border: none; 
+            font-size: 15px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); 
+            color: white; 
+            position: relative; 
+            overflow: hidden;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+        }
         .btn:active { transform: scale(0.97); }
         .btn-login { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); box-shadow: 0 10px 25px -5px rgba(59,130,246,0.4); }
-        .btn-login:hover { box-shadow: 0 15px 30px -5px rgba(59,130,246,0.6); }
         .btn-reg { background: linear-gradient(135deg, var(--warning), #d97706); box-shadow: 0 10px 25px -5px rgba(245,158,11,0.4); }
         .btn-att { background: linear-gradient(135deg, var(--success), #059669); box-shadow: 0 10px 25px -5px rgba(16,185,129,0.4); animation: pulseGreen 2s infinite; }
         .btn-leave { background: linear-gradient(135deg, var(--danger), #dc2626); box-shadow: 0 10px 25px -5px rgba(239,68,68,0.4); animation: pulseRed 2s infinite; }
@@ -88,30 +103,30 @@
         .btn-sm { padding: 10px 14px; font-size: 13px; width: auto; border-radius: 12px; }
         .btn-danger { background: linear-gradient(135deg, #dc2626, #991b1b); box-shadow: 0 10px 20px -5px rgba(220,38,38,0.4); }
         
-        /* ✅ تفعيل زر بصمة الإصبع */
+        /* ✅ زر بصمة الإصبع */
         .btn-fingerprint { 
-            background: linear-gradient(135deg, #8b5cf6, #6d28d9); 
-            border: 1.5px solid rgba(139, 92, 246, 0.5); 
-            color: white; 
-            margin-bottom: 12px; 
-            box-shadow: 0 10px 25px -5px rgba(139,92,246,0.4);
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9) !important; 
+            border: 1.5px solid rgba(139, 92, 246, 0.5) !important; 
+            color: white !important; 
+            margin-bottom: 12px !important; 
+            box-shadow: 0 10px 25px -5px rgba(139,92,246,0.4) !important;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            display: flex !important;
         }
         .btn-fingerprint:hover { 
-            background: linear-gradient(135deg, #7c3aed, #5b21b6); 
-            box-shadow: 0 15px 30px -5px rgba(139,92,246,0.6); 
+            background: linear-gradient(135deg, #7c3aed, #5b21b6) !important; 
+            box-shadow: 0 15px 30px -5px rgba(139,92,246,0.6) !important; 
         }
         .btn-fingerprint:active { 
-            transform: scale(0.97); 
+            transform: scale(0.97) !important; 
         }
         .btn-fingerprint i { font-size: 20px; }
 
-        /* ✅ زر تصدير Excel جديد */
+        /* ✅ زر تصدير Excel */
         .btn-excel {
             background: linear-gradient(135deg, #059669, #047857);
             box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.4);
-        }
-        .btn-excel:hover {
-            box-shadow: 0 15px 30px -5px rgba(5, 150, 105, 0.6);
         }
 
         .action-group { display: flex; gap: 12px; margin-top: 15px; }
@@ -137,7 +152,6 @@
         .stat-card p { color: #93c5fd; font-size: 14px; font-weight: 600; }
 
         .emp-profile-card { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; background: var(--card-bg); backdrop-filter: blur(20px); padding: 15px 20px; border-radius: 20px; border: 1px solid var(--glass); }
-        /* ✅ إصلاح: صورة الموظف مع placeholder واضح */
         .emp-profile-img { 
             width: 60px; 
             height: 60px; 
@@ -145,7 +159,6 @@
             border: 2px solid var(--primary); 
             object-fit: cover; 
             background: linear-gradient(135deg, #1e293b, #334155);
-            /* ✅ إضافة تأثير loading */
             animation: pulseGreen 2s infinite;
         }
         .emp-profile-img.loaded {
@@ -153,7 +166,6 @@
         }
         .emp-month-hours { background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(30, 41, 59, 0.8)); padding: 15px; border-radius: 16px; text-align: center; border: 1px solid rgba(139,92,246,0.3); margin-bottom: 20px; }
 
-        /* ✅ بطاقة الأوفر تايم الجديدة */
         .overtime-card {
             background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(30, 41, 59, 0.8));
             padding: 15px;
@@ -206,7 +218,6 @@
         .toast.error { background: linear-gradient(135deg, #dc2626, #ef4444); border: none; }
         .toast.warning { background: linear-gradient(135deg, #d97706, #f59e0b); border: none; }
 
-        /* ✅ تحسين التقارير */
         .report-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
         .report-table th { background: rgba(59,130,246,0.2); padding: 12px; color: #38bdf8; border-bottom: 2px solid rgba(59,130,246,0.3); }
         .report-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1; }
@@ -214,7 +225,6 @@
         .att-in { background: rgba(16, 185, 129, 0.2); color: #10b981; }
         .att-out { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
         
-        /* ✅ شارة الأوفر تايم */
         .overtime-badge {
             background: rgba(245, 158, 11, 0.2);
             color: #f59e0b;
@@ -224,7 +234,6 @@
             font-weight: bold;
         }
 
-        /* ✅ ملخص التقارير */
         .report-summary {
             background: rgba(15, 23, 42, 0.6);
             border-radius: 16px;
@@ -258,7 +267,6 @@
             .emp-actions { width: 100%; justify-content: center; }
         }
 
-        /* ✅ تحسينات للشاشات الكبيرة (لاب توب) */
         @media (min-width: 1024px) {
             .app-container {
                 padding: 30px;
@@ -313,10 +321,12 @@
             <label for="rememberMe">تذكرني (حفظ جلسة الدخول)</label>
         </div>
         <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;"><i class="fas fa-arrow-right-to-bracket"></i> تسجيل الدخول</button>
-        <!-- ✅ تفعيل زر بصمة الإصبح - يظهر دائماً إذا كان WebAuthn مدعوم -->
+        
+        <!-- ✅✅✅ زر الدخول بالبصمة - موجود هنا ✅✅✅ -->
         <button id="fingerprintLoginBtn" class="btn btn-fingerprint" onclick="loginWithFingerprint()" style="display: none;">
             <i class="fas fa-fingerprint"></i> تسجيل الدخول ببصمة الإصبع
         </button>
+        
         <button class="btn btn-reg" onclick="showRegisterScreen()"><i class="fas fa-user-plus"></i> إنشاء حساب جديد</button>
         <p style="text-align: center; margin-top: 20px;"><a href="#" onclick="showForgotPw()" style="color: #64748b; text-decoration: none; font-size: 13px;">نسيت كلمة المرور؟</a></p>
     </div>
@@ -352,7 +362,7 @@
     </div>
     <div class="status-bar" id="locBar" style="font-size: 12px;"><i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span></div>
     
-    <!-- ✅ لوحة تحكم المدير -->
+    <!-- لوحة تحكم المدير -->
     <div id="adminPanel" style="display: none;">
         <div class="stat-card"><h2 id="empCount">0</h2><p>إجمالي الموظفين المسجلين</p></div>
         <div class="admin-tools">
@@ -368,7 +378,7 @@
         </div>
     </div>
     
-    <!-- ✅ لوحة الموظف المحسنة -->
+    <!-- لوحة الموظف -->
     <div id="employeePanel" style="display: none;">
         <div class="card" style="padding: 15px 20px;">
             <p style="margin-bottom: 15px; color: #94a3b8; font-size: 14px; font-weight: 600;"><i class="fas fa-clock"></i> اختر وردية العمل الخاصة بك</p>
@@ -423,20 +433,21 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+    // تهيئة Supabase
     const SUPABASE_URL = 'https://qgbokzzynieoedhloxqt.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc';
     const { createClient } = window.supabase; 
     const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY); 
     const EMAIL_API_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
-    // ✅ ثوابت محسنة
+    // ثوابت النظام
     const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 500;
     const MATCH_THRESHOLD = 0.55, AUTO_REFRESH_INTERVAL = 30000, STABLE_FRAMES_REQUIRED = 5;
     const MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
     const STORE_IMG_MAX = 400;
-    // ✅ ثابت حساب الأوفر تايم (9 ساعات = الشيفت العادي)
     const NORMAL_SHIFT_HOURS = 9;
     
+    // متغيرات النظام
     let user = null, lightModels = false, heavyModels = false, stream = null, employees = [];
     let sessionDescriptor = null;
     let regMode = false, attMode = false, updateFaceMode = false, adminVerifyMode = false, firstTimeSetupMode = false, adminResetFaceMode = false, attType = '', regData = {}, autoCaptureTimeout = null;
@@ -449,9 +460,7 @@
     const $ = id => document.getElementById(id);
     const video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
 
-    // ==========================================
-    // ✅ إصلاح الأصوات (بدون تكرار أو قطع)
-    // ==========================================
+    // دوال الأصوات
     function unlockAudio() {
         if (audioUnlocked) return;
         try { 
@@ -474,39 +483,92 @@
         } catch(e) {}
     }
 
-    // ==========================================
-    // ✅ دوال المساعدات المحسنة
-    // ==========================================
-    function showToast(msg, type='') { const t = $('toast'); t.textContent = msg; t.className = `toast show ${type}`; setTimeout(() => t.classList.remove('show'), 4500); }
-    function setStatus(txt) { $('connText').textContent = txt; }
-    function togglePassword(id) { const i = $(id); i.type = i.type === 'password' ? 'text' : 'password'; }
+    // دوال المساعدة
+    function showToast(msg, type='') { 
+        const t = $('toast'); 
+        t.textContent = msg; 
+        t.className = `toast show ${type}`; 
+        setTimeout(() => t.classList.remove('show'), 4500); 
+    }
+    
+    function setStatus(txt) { 
+        $('connText').textContent = txt; 
+    }
+    
+    function togglePassword(id) { 
+        const i = $(id); 
+        i.type = i.type === 'password' ? 'text' : 'password'; 
+    }
+    
     function deg2rad(deg) { return deg * (Math.PI/180); }
-    function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) { const R = 6371; const dLat = deg2rad(lat2-lat1); const dLon = deg2rad(lon2-lon1); const a = Math.sin(dLat/2)**2 + Math.cos(deg2rad(lat1))*Math.cos(deg2rad(lat2))*Math.sin(dLon/2)**2; const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c * 1000; }
-    function euclideanDistance(desc1, desc2) { let sum=0; for(let i=0;i<desc1.length;i++) sum+=(desc1[i]-desc2[i])**2; return Math.sqrt(sum); }
-    function bufferToBase64(buffer) { let binary=''; const bytes=new Uint8Array(buffer); for(let i=0;i<bytes.byteLength;i++) binary+=String.fromCharCode(bytes[i]); return btoa(binary); }
-    function base64ToBuffer(base64) { const binary=atob(base64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes.buffer; }
-    function selectShift(element) { document.querySelectorAll('.shift-card').forEach(c=>c.classList.remove('selected')); element.classList.add('selected'); element.querySelector('input').checked=true; }
-    const setCamStatus = (html) => { if(html!==lastCamStatusText) { $('camStatus').innerHTML=html; lastCamStatusText=html; } };
+    
+    function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) { 
+        const R = 6371; 
+        const dLat = deg2rad(lat2-lat1); 
+        const dLon = deg2rad(lon2-lon1); 
+        const a = Math.sin(dLat/2)**2 + Math.cos(deg2rad(lat1))*Math.cos(deg2rad(lat2))*Math.sin(dLon/2)**2; 
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+        return R * c * 1000; 
+    }
+    
+    function euclideanDistance(desc1, desc2) { 
+        let sum=0; 
+        for(let i=0;i<desc1.length;i++) sum+=(desc1[i]-desc2[i])**2; 
+        return Math.sqrt(sum); 
+    }
+    
+    function bufferToBase64(buffer) { 
+        let binary=''; 
+        const bytes=new Uint8Array(buffer); 
+        for(let i=0;i<bytes.byteLength;i++) binary+=String.fromCharCode(bytes[i]); 
+        return btoa(binary); 
+    }
+    
+    function base64ToBuffer(base64) { 
+        const binary=atob(base64); 
+        const bytes=new Uint8Array(binary.length); 
+        for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); 
+        return bytes.buffer; 
+    }
+    
+    function selectShift(element) { 
+        document.querySelectorAll('.shift-card').forEach(c=>c.classList.remove('selected')); 
+        element.classList.add('selected'); 
+        element.querySelector('input').checked=true; 
+    }
+    
+    const setCamStatus = (html) => { 
+        if(html!==lastCamStatusText) { 
+            $('camStatus').innerHTML=html; 
+            lastCamStatusText=html; 
+        } 
+    };
     
     function updateStabilityRing(current, max) {
         const circle = $('stabilityCircle'), text = $('stabilityText'), ring = $('stabilityRing');
         if (!circle || !text || !ring) return;
         const circumference = 2 * Math.PI * 20;
         const offset = circumference - (current / max) * circumference;
-        circle.style.strokeDashoffset = offset; text.textContent = current;
+        circle.style.strokeDashoffset = offset; 
+        text.textContent = current;
         if (current > 0) ring.classList.add('active'); else ring.classList.remove('active');
     }
+    
     function showMatchResult(success) {
-        const el = $('matchResult'); if (!el) return;
+        const el = $('matchResult'); 
+        if (!el) return;
         el.className = `match-result ${success ? 'success' : 'fail'}`;
         el.innerHTML = success ? '<i class="fas fa-check" style="color:white;"></i>' : '<i class="fas fa-times" style="color:white;"></i>';
         setTimeout(() => { el.className = 'match-result'; }, 1500);
     }
+    
     function updateModelProgress(percent) {
-        const bar = $('modelProgressBar'), container = $('modelProgress'); if (!bar || !container) return;
+        const bar = $('modelProgressBar'), container = $('modelProgress'); 
+        if (!bar || !container) return;
         bar.style.width = percent + '%';
         if (percent > 0 && percent < 100) container.classList.add('active'); else container.classList.remove('active');
     }
+    
     function createStorageImageBlob() {
         const c = document.createElement('canvas');
         let w = video.videoWidth, h = video.videoHeight;
@@ -515,7 +577,7 @@
         c.width = w; c.height = h; c.getContext('2d').drawImage(video, 0, 0, w, h);
         return new Promise(resolve => c.toBlob(resolve, 'image/jpeg', 0.8));
     }
-    // ✅ دالة جديدة: التقاط الصورة كـ Base64 للإيميل
+    
     async function captureImageAsBase64() {
         const c = document.createElement('canvas');
         let w = video.videoWidth, h = video.videoHeight;
@@ -524,16 +586,38 @@
         c.width = w; c.height = h; c.getContext('2d').drawImage(video, 0, 0, w, h);
         return c.toDataURL('image/jpeg', 0.85);
     }
-    function getHeadYaw(landmarks) { const nose = landmarks.getNose()[3]; const leftEye = landmarks.getLeftEye()[0]; const rightEye = landmarks.getRightEye()[3]; return nose.x - ((leftEye.x + rightEye.x)/2); }
-    function resetLiveness() { livenessActive = true; livenessStartYaw = null; livenessMoved = false; stabilityCounter = 0; }
+    
+    function getHeadYaw(landmarks) { 
+        const nose = landmarks.getNose()[3]; 
+        const leftEye = landmarks.getLeftEye()[0]; 
+        const rightEye = landmarks.getRightEye()[3]; 
+        return nose.x - ((leftEye.x + rightEye.x)/2); 
+    }
+    
+    function resetLiveness() { 
+        livenessActive = true; 
+        livenessStartYaw = null; 
+        livenessMoved = false; 
+        stabilityCounter = 0; 
+    }
+    
     function updateLiveness(yaw) {
         if (!livenessActive) return true;
-        if (livenessStartYaw === null) { livenessStartYaw = yaw; setCamStatus('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...'); return false; }
-        if (Math.abs(yaw - livenessStartYaw) > 0.08) { livenessMoved = true; livenessActive = false; setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، ثبت وجهك...'); return true; }
+        if (livenessStartYaw === null) { 
+            livenessStartYaw = yaw; 
+            setCamStatus('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...'); 
+            return false; 
+        }
+        if (Math.abs(yaw - livenessStartYaw) > 0.08) { 
+            livenessMoved = true; 
+            livenessActive = false; 
+            setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، ثبت وجهك...'); 
+            return true; 
+        }
         return false;
     }
 
-    // ✅ دالة جديدة: حساب الأوفر تايم
+    // حساب الأوفر تايم
     function calculateOvertime(hoursWorked) {
         if (!hoursWorked || hoursWorked <= NORMAL_SHIFT_HOURS) {
             return { overtime: 0, normalHours: hoursWorked || 0, isOvertime: false };
@@ -547,7 +631,6 @@
         };
     }
 
-    // ✅ دالة جديدة: تنسيق الوقت بنظام 12 ساعة (AM/PM)
     function formatTime12(date) {
         return date.toLocaleString('ar-EG', { 
             hour12: true, 
@@ -557,27 +640,21 @@
         });
     }
 
-    // ✅ دالة جديدة: تنسيق التاريخ والوقت معاً
     function formatDateTime12(date) {
         const d = new Date(date);
         return `${d.toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })} - ${formatTime12(d)}`;
     }
 
-    // ==========================================
-    // ✅ NEW: دوال آمنة للحصول على صورة المستخدم وتحديثها
-    // ==========================================
-    
-    // ✅ Avatar افتراضي (يُستخدم عندما لا توجد صورة)
+    // Avatar افتراضي
     function getDefaultAvatar() {
         return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCA0IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+';
     }
 
-    // ✅ دالة آمنة للحصول على رابط صورة المستخدم الحالي
+    // دالة آمنة للحصول على صورة المستخدم
     async function getCurrentUserImageUrl(userCode) {
         try {
             if (!userCode) return null;
             
-            // ✅ طريقة 1: من حقل profile_image_url في قاعدة البيانات (الأكثر أماناً)
             const { data: emp, error } = await db
                 .from('employees')
                 .select('profile_image_url, code')
@@ -585,11 +662,9 @@
                 .single();
             
             if (emp?.profile_image_url) {
-                // ✅ إضافة timestamp عشوائي لكسر Cache
                 return emp.profile_image_url + '?v=' + Date.now() + '&u=' + Math.random().toString(36).substr(2, 9);
             }
             
-            // ✅ طريقة 2: من Storage (البديل)
             const { data: storageData } = db.storage
                 .from('faces')
                 .getPublicUrl(`${userCode}_face.jpg`);
@@ -598,33 +673,28 @@
                 return storageData.publicUrl + '?v=' + Date.now() + '&u=' + Math.random().toString(36).substr(2, 9);
             }
             
-            return null; // لا توجد صورة
+            return null;
         } catch (error) {
             console.error('Error getting user image:', error);
             return null;
         }
     }
 
-    // ✅ دالة تحديث فوري وآمن للصورة
     async function safeUpdateUserImage() {
         if (!user || !user.code) return;
         
         const imageUrl = await getCurrentUserImageUrl(user.code);
         
         if (imageUrl) {
-            userImage = imageUrl; // ✅ تحديث المتغير العام
-            updateUserImageInUI(imageUrl); // ✅ تحديث UI
+            userImage = imageUrl;
+            updateUserImageInUI(imageUrl);
             console.log('✅ Image updated for:', user.code);
         } else {
-            console.log('⚠️ No image found for:', user.code);
-            // ✅ استخدام avatar افتراضي إذا لم توجد صورة
             updateUserImageInUI(getDefaultAvatar());
         }
     }
 
-    // ==========================================
-    // الذكاء الاصطناعي والكاميرا (متوافق مع iOS)
-    // ==========================================
+    // الذكاء الاصطناعي والكاميرا
     async function extractStableDescriptor() {
         const samples = [];
         for (let i = 0; i < 2; i++) {
@@ -714,9 +784,7 @@
         } catch(e) {}
     }
 
-    // ==========================================
-    // ✅ العمليات الرئيسية المحسنة (Supabase + Emails + Overtime)
-    // ==========================================
+    // العمليات الرئيسية
     async function performCapture() {
         if(isProcessingCapture) return;
         isProcessingCapture = true; autoCaptureTimeout = null;
@@ -724,7 +792,6 @@
         $('scanLine').classList.remove('active');
         setCamStatus('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
         const newDescriptor = await extractStableDescriptor();
-        // ✅ التقاط الصورة للإيميل
         const imgBase64 = await captureImageAsBase64();
         
         if(!newDescriptor) { playSound('faceid-error'); setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة...'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
@@ -740,16 +807,9 @@
                 const { data: imgData } = db.storage.from('faces').getPublicUrl(`${newCode}_face.jpg`);
                 const { error } = await db.from('employees').insert({ code: newCode, name: regData.name, email: regData.email, password: tempPass, face_descriptor: newDescriptor, is_first_login: true });
                 if(!error) {
-                    playSound('faceid-success'); showToast(`تم إنشاء الحساب! (جاري إرسال الإيميلات)`, 'success'); 
+                    playSound('faceid-success'); showToast(`تم إنشاء الحساب!`, 'success'); 
                     closeCamera(); showLoginScreen();
-                    // ✅ إرسال إيميلين: واحد للأدمن وواحد للإدارة العليا
-                    fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ 
-                        action: 'sendNewEmpEmails', 
-                        name: regData.name, 
-                        code: newCode, 
-                        password: tempPass, 
-                        email: regData.email 
-                    }) }).catch(e => console.log("Email Err:", e));
+                    fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ action: 'sendNewEmpEmails', name: regData.name, code: newCode, password: tempPass, email: regData.email }) }).catch(e => {});
                 } else throw error;
             } catch(e) { playSound('faceid-error'); showToast('حدث خطأ', 'error'); closeCamera(); }
         }
@@ -761,16 +821,12 @@
                 const { data: imgData } = db.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
                 const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
                 if(!error) { 
-                    playSound('faceid-success'); 
-                    sessionDescriptor = newDescriptor; 
-                    // ✅ تحديث الصورة فوراً
+                    playSound('faceid-success'); sessionDescriptor = newDescriptor; 
                     userImage = imgData.publicUrl + '?t=' + Date.now() + '&cache=' + Math.random();
                     updateUserImageInUI(userImage);
-                    showMatchResult(true); 
-                    showToast('تم تسجيل البصمة!', 'success'); 
+                    showMatchResult(true); showToast('تم تسجيل البصمة!', 'success'); 
                     setTimeout(()=>{ closeCamera(); showApp(); }, 800); 
-                }
-                else throw error;
+                } else throw error;
             } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل الحفظ', 'error'); restartCamLoop(); }
         }
         else if(updateFaceMode || adminResetFaceMode) {
@@ -789,11 +845,9 @@
             if(euclideanDistance(newDescriptor, sessionDescriptor) < MATCH_THRESHOLD) {
                 showMatchResult(true); setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق...');
                 
-                // حالة حذف موظف
                 if(targetEmpForAdmin.type === 'حذف موظف') {
-                    // ✅ حماية الأدمن من الحذف (مزدوجة)
                     if(targetEmpForAdmin.code === 'ADMIN' || targetEmpForAdmin.isAdmin) {
-                        playSound('faceid-error'); showToast('❌ لا يمكن حساب الأدمن!', 'error');
+                        playSound('faceid-error'); showToast('❌ لا يمكن حذف الأدمن!', 'error');
                         setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> محاولة حذف الأدمن مرفوضة!');
                         isProcessingCapture = false; restartCamLoop(); return;
                     }
@@ -801,14 +855,13 @@
                     const { error: attErr } = await db.from('attendance').delete().eq('employee_code', targetEmpForAdmin.code);
                     const { error: empErr } = await db.from('employees').delete().eq('code', targetEmpForAdmin.code);
                     try { await db.storage.from('faces').remove([`${targetEmpForAdmin.code}_face.jpg`]); } catch(e){}
-                    if(!empErr) { playSound('faceid-success'); showToast(`تم حذف ${targetEmpForAdmin.name} بنجاح`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
+                    if(!empErr) { playSound('faceid-success'); showToast(`تم حذف ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
                     else { playSound('faceid-error'); showToast('فشل الحذف', 'error'); restartCamLoop(); }
                     isProcessingCapture = false; return;
                 }
 
-                // حالة تسجيل حضور/انصراف يدوي
                 const { error } = await db.from('attendance').insert({ employee_code: targetEmpForAdmin.code, employee_name: targetEmpForAdmin.name, type: targetEmpForAdmin.type, location_link: currentLoc, shift: 'تسجيل يدوي بواسطة الأدمن' });
-                if(!error) { playSound('faceid-success'); showToast(`تم تسجيل ${targetEmpForAdmin.type} لـ ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
+                if(!error) { playSound('faceid-success'); showToast(`تم تسجيل ${targetEmpForAdmin.type}`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
                 else { playSound('faceid-error'); showToast('فشل التسجيل', 'error'); restartCamLoop(); }
             } else { playSound('faceid-error'); showMatchResult(false); showToast('وجه الأدمن غير مطابق!', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> انتحال هوية مرفوض!'); restartCamLoop(); }
         }
@@ -830,19 +883,16 @@
                 const selShift = document.querySelector('input[name="shift"]:checked');
                 let hoursWorked = null, overtimeInfo = null;
                 
-                // ✅ حساب الأوفر تايم عند الانصراف
                 if(attType === 'انصراف') {
                     const today = new Date().toISOString().split('T')[0];
                     const { data: lastCheckIn } = await db.from('attendance').select('created_at').eq('employee_code', user.code).eq('type', 'حضور').gte('created_at', today).order('created_at', { ascending: false }).limit(1).single();
                     if(lastCheckIn) { 
                         const diff = (new Date() - new Date(lastCheckIn.created_at)) / (1000 * 60 * 60); 
                         hoursWorked = parseFloat(diff.toFixed(2));
-                        // ✅ حساب الأوفر تايم
                         overtimeInfo = calculateOvertime(hoursWorked);
                     }
                 }
                 
-                // ✅ تنسيق الوقت بنظام 12 ساعة
                 const now = new Date();
                 const datetime = formatDateTime12(now);
                 
@@ -861,7 +911,6 @@
                     playSound('faceid-success'); showToast(msg, 'success'); 
                     setTimeout(()=>closeCamera(), 800); calculateMonthlyHours();
                     
-                    // ✅ إرسال إيميل تنبيه للأدمن مع الصورة
                     fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ 
                         action: 'sendAttAlert', 
                         name: user.name, 
@@ -872,7 +921,7 @@
                         shift: selShift ? selShift.value : '', 
                         hoursWorked: hoursWorked ? `${hoursWorked} ساعة` : '-',
                         overtime: overtimeInfo?.isOvertime ? `${overtimeInfo.overtime} ساعة` : 'لا يوجد',
-                        imgBase64: imgBase64 // ✅ إرسال الصورة
+                        imgBase64: imgBase64 
                     }) }).catch(e => {});
                 } else throw error;
             } else { playSound('faceid-error'); showMatchResult(false); showToast('الوجه غير مطابق!', 'error'); setCamStatus('الوجه غير مطابق!'); restartCamLoop(); }
@@ -896,71 +945,36 @@
         } catch(e) { console.error(e); setStatus('خطأ في تحميل النماذج'); }
     }
 
-    // ==========================================
-    // ✅ دالة محسنة: تحديث صورة الموظف في UI
-    // ==========================================
+    // تحديث صورة الموظف في UI
     function updateUserImageInUI(imageUrl) {
-        if (!imageUrl) {
-            imageUrl = getDefaultAvatar(); // ✅ استخدام avatar افتراضي
-        }
-        
-        userImage = imageUrl; // ✅ تحديث المتغير العام
-        
-        // ✅ البحث عن جميع عناصر الصورة وتحديثها
+        if (!imageUrl) imageUrl = getDefaultAvatar();
+        userImage = imageUrl;
         const profileImages = document.querySelectorAll('.emp-profile-img');
-        
         profileImages.forEach(img => {
             if (img) {
-                // ✅ إضافة timestamp جديد لكل تحديث لضمان عدم استخدام Cache
-                const uniqueUrl = imageUrl.includes('?') 
-                    ? imageUrl + '&refresh=' + Date.now()
-                    : imageUrl + '?refresh=' + Date.now();
-                
+                const uniqueUrl = imageUrl.includes('?') ? imageUrl + '&refresh=' + Date.now() : imageUrl + '?refresh=' + Date.now();
                 img.src = uniqueUrl;
-                
-                // ✅ إزالة تأثير loading عند تحميل الصورة
-                img.onload = () => {
-                    img.classList.add('loaded');
-                };
-                
-                // ✅ في حالة فشل تحميل الصورة - استخدام avatar افتراضي
-                img.onerror = () => {
-                    console.warn('⚠️ Failed to load image, using default avatar');
-                    img.src = getDefaultAvatar();
-                    img.classList.add('loaded');
-                };
+                img.onload = () => { img.classList.add('loaded'); };
+                img.onerror = () => { img.src = getDefaultAvatar(); img.classList.add('loaded'); };
             }
         });
-        
-        console.log('✅ UI updated with image for user:', user?.code || 'unknown');
     }
 
-    // ==========================================
-    // ✅ النظام والتقارير المحسنة (مع Excel + Overtime)
-    // ==========================================
+    // جلب بيانات المستخدم
     async function fetchUserDataInBackground() {
         if(!user) return;
         try {
-            const { data: emp } = await db.from('employees')
-                .select('face_descriptor, is_admin, profile_image_url')
-                .eq('code', user.code)
-                .single();
-            
-            if(emp && emp.face_descriptor) {
-                sessionDescriptor = emp.face_descriptor;
-            }
-            
-            // ✅ إصلاح: استخدام الدالة الآمنة الجديدة بدلاً من الطريقة القديمة
+            const { data: emp } = await db.from('employees').select('face_descriptor, is_admin, profile_image_url').eq('code', user.code).single();
+            if(emp && emp.face_descriptor) sessionDescriptor = emp.face_descriptor;
             await safeUpdateUserImage();
-            
             if(!sessionDescriptor && !$('cameraOverlay').classList.contains('active')) {
                 playSound('faceid-error'); showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
                 firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; }
             }
-        } catch(e) { console.error('Error fetching user data:', e); } setStatus('النظام جاهز');
+        } catch(e) { console.error('Error:', e); } setStatus('النظام جاهز');
     }
 
-    // ✅ إصلاح: handleLogin مع تصفير userImage وتحميل الصورة قبل showApp
+    // تسجيل الدخول
     async function handleLogin() {
         const code = $('loginCode').value.trim(), pass = $('loginPass').value.trim();
         if(!code || !pass) return showToast('يرجى إدخال البيانات', 'error');
@@ -968,17 +982,8 @@
         try {
             const { data: emp, error } = await db.from('employees').select('*').eq('code', code).eq('password', pass).single();
             if(!error && emp) {
-                // ✅ إصلاح حرج: تصفير userImage فوراً عند تسجيل دخول جديد
                 userImage = '';
-                
-                // ✅ التحقق من أن هذا ليس أدمن (لأغراض الأمان الإضافية)
-                user = { 
-                    name: emp.name, 
-                    code: emp.code, 
-                    isAdmin: emp.is_admin, 
-                    isFirstLogin: emp.is_first_login,
-                    email: emp.email || ''
-                };
+                user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login, email: emp.email || '' };
                 
                 if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass })); }
                 else { sessionStorage.setItem('user', JSON.stringify(user)); localStorage.removeItem('axentro_saved_login'); }
@@ -986,18 +991,11 @@
                 if(!emp.is_admin && emp.is_first_login) { $('forcePwModal').classList.add('active'); setStatus('النظام جاهز'); }
                 else {
                     sessionDescriptor = emp.face_descriptor;
-                    if(!sessionDescriptor) { 
-                        firstTimeSetupMode = true; 
-                        if(!await openCamera()) { firstTimeSetupMode=false; logout(); } 
-                    }
+                    if(!sessionDescriptor) { firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
                     else { 
                         playSound('login-success'); 
-                        
-                        // ✅ إصلاح: تحميل الصورة أولاً قبل showApp (انتظار!)
                         await safeUpdateUserImage();
-                        
                         showApp(); 
-                        
                         if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000); 
                     }
                 }
@@ -1023,23 +1021,17 @@
         } catch(e) { playSound('login-error'); showToast('خطأ في التحديث','error'); }
     }
 
-    // ✅ إصلاح: logout مع تصفير شامل
     function logout() { 
         playSound('logout-success'); 
         if(autoRefreshTimer) clearInterval(autoRefreshTimer); 
-        
-        // ✅ إصلاح: تصفير كل بيانات المستخدم بالكامل
         localStorage.removeItem('rememberedUser'); 
         sessionStorage.removeItem('user'); 
         user = null; 
         sessionDescriptor = null; 
-        userImage = ''; // ✅ تصفير الصورة
-        
+        userImage = ''; 
         $('mainApp').style.display='none'; 
         $('loginScreen').classList.remove('hidden'); 
         setStatus('النظام جاهز');
-        
-        console.log('✅ User logged out, all data cleared including image');
     }
     
     async function refreshData(silent = false) { 
@@ -1048,7 +1040,7 @@
         if(!silent) showToast('تم التحديث','success'); 
     }
 
-    // ✅ إصلاح: showApp مع onerror handler وصورة آمنة
+    // عرض التطبيق الرئيسي
     function showApp() {
         if(autoRefreshTimer) clearInterval(autoRefreshTimer);
         $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block';
@@ -1056,68 +1048,39 @@
             $('mainAppTitle').textContent='لوحة تحكم المدير'; $('adminPanel').style.display='block'; $('employeePanel').style.display='none';
             showToast('مرحباً بك في لوحة التحكم','success');
             
-            // ✅ إظهار بطاقة الأدمن مع صورته (آمنة)
             const existing = document.getElementById('adminMicroInteractions'); if(existing) existing.remove();
             $('adminPanel').insertAdjacentHTML('afterbegin', `
                 <div id="adminMicroInteractions">
                     <div class="emp-profile-card">
-                        <img src="${userImage || getDefaultAvatar()}" 
-                             class="emp-profile-img" 
-                             alt="Admin"
-                             onerror="this.src='${getDefaultAvatar()}'; this.classList.add('loaded');">
-                        <div>
-                            <h3 style="margin:0; color:white; font-size:18px;">مرحباً بك يا ${user.name}</h3>
-                            <p style="margin:0; color:#64748b; font-size:12px;">مدير النظام</p>
-                        </div>
+                        <img src="${userImage || getDefaultAvatar()}" class="emp-profile-img" alt="Admin" onerror="this.src='${getDefaultAvatar()}'; this.classList.add('loaded');">
+                        <div><h3 style="margin:0; color:white; font-size:18px;">مرحباً بك يا ${user.name}</h3><p style="margin:0; color:#64748b; font-size:12px;">مدير النظام</p></div>
                     </div>
                 </div>
             `);
             
-            // ✅ تحديث صورة الأدمن إذا كانت متاحة
-            if (userImage) {
-                setTimeout(() => updateUserImageInUI(userImage), 100);
-            }
-            
+            if (userImage) setTimeout(() => updateUserImageInUI(userImage), 100);
             loadEmployees();
         } else {
             $('mainAppTitle').textContent='لوحة الموظف'; $('adminPanel').style.display='none'; $('employeePanel').style.display='block';
             
-            // ✅ إظهار بطاقة الموظف مع صورته (آمنة)
             const existing = document.getElementById('empMicroInteractions'); if(existing) existing.remove();
             $('employeePanel').insertAdjacentHTML('afterbegin', `
                 <div id="empMicroInteractions">
                     <div class="emp-profile-card">
-                        <img src="${userImage || getDefaultAvatar()}" 
-                             class="emp-profile-img" 
-                             alt="Profile"
-                             onerror="this.src='${getDefaultAvatar()}'; this.classList.add('loaded');">
-                        <div>
-                            <h3 style="margin:0; color:white; font-size:18px;">مرحباً يا ${user.name}</h3>
-                            <p style="margin:0; color:#64748b; font-size:12px;">${user.code}</p>
-                        </div>
+                        <img src="${userImage || getDefaultAvatar()}" class="emp-profile-img" alt="Profile" onerror="this.src='${getDefaultAvatar()}'; this.classList.add('loaded');">
+                        <div><h3 style="margin:0; color:white; font-size:18px;">مرحباً يا ${user.name}</h3><p style="margin:0; color:#64748b; font-size:12px;">${user.code}</p></div>
                     </div>
-                    <div id="monthlyHoursCard" class="emp-month-hours">
-                        <p style="color:#c4b5fd; font-size:13px; margin-bottom:5px;"><i class="fas fa-hourglass-half"></i> إجمالي ساعات العمل هذا الشهر</p>
-                        <h2 id="monthHoursValue" style="color:white; font-size:28px; margin:0;">...</h2>
-                    </div>
-                    <div id="overtimeCard" class="overtime-card">
-                        <p style="color:#fbbf24; font-size:13px; margin-bottom:5px;"><i class="fas fa-clock"></i> إجمالي الأوفر تايم هذا الشهر</p>
-                        <h2 id="monthOvertimeValue" style="color:white; font-size:28px; margin:0;">...</h2>
-                    </div>
+                    <div id="monthlyHoursCard" class="emp-month-hours"><p style="color:#c4b5fd; font-size:13px; margin-bottom:5px;"><i class="fas fa-hourglass-half"></i> إجمالي ساعات العمل هذا الشهر</p><h2 id="monthHoursValue" style="color:white; font-size:28px; margin:0;">...</h2></div>
+                    <div id="overtimeCard" class="overtime-card"><p style="color:#fbbf24; font-size:13px; margin-bottom:5px;"><i class="fas fa-clock"></i> إجمالي الأوفر تايم هذا الشهر</p><h2 id="monthOvertimeValue" style="color:white; font-size:28px; margin:0;">...</h2></div>
                 </div>
             `);
             
-            // ✅ تحديث صورة الموظف فوراً
-            if (userImage) {
-                setTimeout(() => updateUserImageInUI(userImage), 100);
-            }
-            
+            if (userImage) setTimeout(() => updateUserImageInUI(userImage), 100);
             calculateMonthlyHours();
         }
         autoRefreshTimer = setInterval(() => { if(user) refreshData(true); }, AUTO_REFRESH_INTERVAL);
     }
 
-    // ✅ تحسين حساب الساعات مع الأوفر تايم
     async function calculateMonthlyHours() { 
         try { 
             const now = new Date(); const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -1128,42 +1091,20 @@
                     if(rec.type === 'انصراف' && rec.hours_worked) {
                         const hours = parseFloat(rec.hours_worked) || 0;
                         totalHours += hours;
-                        // ✅ جمع الأوفر تايم
-                        if(rec.overtime && rec.overtime !== '0 دقيقة') {
-                            const ot = parseFloat(rec.overtime) || 0;
-                            totalOvertime += ot;
-                        }
+                        if(rec.overtime && rec.overtime !== '0 دقيقة') totalOvertime += parseFloat(rec.overtime) || 0;
                     }
                 }); 
                 $('monthHoursValue').textContent = totalHours > 0 ? totalHours.toFixed(2) + ' ساعة' : '0 ساعة';
                 $('monthOvertimeValue').textContent = totalOvertime > 0 ? totalOvertime.toFixed(2) + ' ساعة' : '0 ساعة';
             }
-        } catch(e) { 
-            $('monthHoursValue').textContent = '--'; 
-            if($('monthOvertimeValue')) $('monthOvertimeValue').textContent = '--';
-        } 
+        } catch(e) { $('monthHoursValue').textContent = '--'; if($('monthOvertimeValue')) $('monthOvertimeValue').textContent = '--'; } 
     }
 
-    // ✅ إصلاح: استثناء الأدمن من قائمة الموظفين (مزدوج الحماية)
     async function loadEmployees() { 
         try { 
-            // ✅ فلترة: عدم جلب الأدمن (code != 'ADMIN' AND is_admin != true)
-            const { data: emps } = await db.from('employees')
-                .select('code, name, is_admin')
-                .not('code', 'eq', 'ADMIN')
-                .not('is_admin', 'eq', true)
-                .order('created_at', { ascending: true });
-                
-            if(emps) { 
-                employees = emps.filter(emp => !emp.is_admin); // ✅ فلترة إضافية
-                $('empCount').textContent=employees.length; 
-                renderEmployeeList(employees); 
-                setStatus('متصل'); 
-            }
-        } catch(e) { 
-            console.error('Error loading employees:', e);
-            setStatus('غير متصل'); 
-        } 
+            const { data: emps } = await db.from('employees').select('code, name, is_admin').not('code', 'eq', 'ADMIN').not('is_admin', 'eq', true).order('created_at', { ascending: true });
+            if(emps) { employees = emps.filter(emp => !emp.is_admin); $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); }
+        } catch(e) { console.error('Error:', e); setStatus('غير متصل'); } 
     }
 
     function renderEmployeeList(list) { 
@@ -1173,36 +1114,24 @@
     $('searchInput')?.addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); renderEmployeeList(q ? employees.filter(emp=>emp.name.toLowerCase().includes(q)||emp.code.toLowerCase().includes(q)) : employees); });
 
     async function adminDirectAtt(type, code, name) {
-        if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن، جاري التسجيل...', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
+        if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
         adminVerifyMode = true; targetEmpForAdmin = { type, code, name }; attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
         if(!await openCamera()) { adminVerifyMode=false; showToast('فشل فتح الكاميرا','error'); }
     }
     
     async function adminDeleteEmp(code, name) {
-        // ✅ حماية مزدوجة: منع حذف الأدمن (by code or isAdmin)
-        if(code === 'ADMIN') {
-            showToast('❌ لا يمكن حساب الأدمن!', 'error');
-            return;
-        }
-        
-        // ✅ التحقق إضافي من قاعدة البيانات
+        if(code === 'ADMIN') { showToast('❌ لا يمكن حذف الأدمن!', 'error'); return; }
         try {
             const { data: emp } = await db.from('employees').select('is_admin').eq('code', code).single();
-            if (emp && emp.is_admin) {
-                showToast('❌ لا يمكن حساب أدمن!', 'error');
-                return;
-            }
-        } catch(e) {
-            console.log('Error checking admin status:', e);
-        }
-        
-        if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن، جاري التسجيل...', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
+            if (emp && emp.is_admin) { showToast('❌ لا يمكن حذف أدمن!', 'error'); return; }
+        } catch(e) { console.log('Error:', e); }
+        if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
         adminVerifyMode = true; targetEmpForAdmin = { type: 'حذف موظف', code, name }; attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
         if(!await openCamera()) { adminVerifyMode=false; showToast('فشل فتح الكاميرا','error'); }
     }
 
     async function handleAttendance(type) {
-        if(!sessionDescriptor) return showToast('بيانات الوجه غير مسجلة، تواصل مع الأدمن.','error');
+        if(!sessionDescriptor) return showToast('بيانات الوجه غير مسجلة', 'error');
         attMode=true; attType=type; adminVerifyMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
         if(!await openCamera()) { attMode=false; showToast('فشل فتح الكاميرا','error'); }
         else setStatus('جاري التحقق من الوجه...');
@@ -1235,13 +1164,7 @@
         } else {
             const c=$('targetEmpCode').value.trim(), n=$('newPassword').value.trim();
             if(!c||!n) return showToast('يرجى إدخال البيانات','error');
-            
-            // ✅ عدم السماح بتغيير كلمة سر الأدمن
-            if (c === 'ADMIN') {
-                showToast('❌ لا يمكن تغيير كلمة سر الأدمن من هنا!', 'error');
-                return;
-            }
-            
+            if (c === 'ADMIN') { showToast('❌ لا يمكن تغيير كلمة سر الأدمن من هنا!', 'error'); return; }
             const { error } = await db.from('employees').update({ password: n, is_first_login: false }).eq('code', c);
             if(!error) { playSound('login-success'); showToast('تم التغيير بنجاح','success'); closeChangePwModal(); }
             else { playSound('login-error'); showToast('فشل التغيير (تأكد من الكود)','error'); }
@@ -1250,162 +1173,52 @@
 
     function closeReportModal() { $('reportModal').classList.remove('active'); }
     
-    // ✅ تحسين التقارير مع Excel وملخص
-    async function loadMyReport() { 
-        $('reportTitle').textContent=`تقرير ${user.name}`; 
-        $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>'; 
-        $('reportModal').classList.add('active'); 
-        await fetchAndRenderReport(user.code); 
-    }
-    
-    async function loadEmpReport(code,name) { 
-        $('reportTitle').textContent=`تقرير ${name}`; 
-        $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>'; 
-        $('reportModal').classList.add('active'); 
-        await fetchAndRenderReport(code); 
-    }
+    async function loadMyReport() { $('reportTitle').textContent=`تقرير ${user.name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(user.code); }
+    async function loadEmpReport(code,name) { $('reportTitle').textContent=`تقرير ${name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(code); }
     
     async function fetchAndRenderReport(code) { 
         try { 
             const { data: records } = await db.from('attendance').select('*').eq('employee_code', code).order('created_at', { ascending: false });
             if(records && records.length>0) { 
-                // ✅ حساب الملخص
                 let totalDays = 0, totalHours = 0, totalOvertime = 0;
-                records.forEach(r => {
-                    if(r.type === 'حضور') totalDays++;
-                    if(r.hours_worked) totalHours += parseFloat(r.hours_worked) || 0;
-                    if(r.overtime && r.overtime !== '0 دقيقة') totalOvertime += parseFloat(r.overtime) || 0;
-                });
+                records.forEach(r => { if(r.type === 'حضور') totalDays++; if(r.hours_worked) totalHours += parseFloat(r.hours_worked) || 0; if(r.overtime && r.overtime !== '0 دقيقة') totalOvertime += parseFloat(r.overtime) || 0; });
 
-                // ✅ عرض الملخص
-                const summaryHtml = `
-                    <div class="report-summary">
-                        <div class="summary-item">
-                            <h3>${totalDays}</h3>
-                            <p>أيام الحضور</p>
-                        </div>
-                        <div class="summary-item">
-                            <h3 style="color: #38bdf8;">${totalHours.toFixed(1)}</h3>
-                            <p>إجمالي الساعات</p>
-                        </div>
-                        <div class="summary-item">
-                            <h3 style="color: #f59e0b;">${totalOvertime.toFixed(1)}</h3>
-                            <p>الأوفر تايم (ساعة)</p>
-                        </div>
-                    </div>
-                    <div style="text-align: center; margin-bottom: 15px;">
-                        <button class="btn btn-excel" onclick="exportToExcel('${code}')" style="width: auto; padding: 12px 24px;">
-                            <i class="fas fa-file-excel"></i> تصدير Excel
-                        </button>
-                    </div>
-                `;
+                const summaryHtml = `<div class="report-summary"><div class="summary-item"><h3>${totalDays}</h3><p>أيام الحضور</p></div><div class="summary-item"><h3 style="color: #38bdf8;">${totalHours.toFixed(1)}</h3><p>إجمالي الساعات</p></div><div class="summary-item"><h3 style="color: #f59e0b;">${totalOvertime.toFixed(1)}</h3><p>الأوفر تايم (ساعة)</p></div></div><div style="text-align: center; margin-bottom: 15px;"><button class="btn btn-excel" onclick="exportToExcel('${code}')" style="width: auto; padding: 12px 24px;"><i class="fas fa-file-excel"></i> تصدير Excel</button></div>`;
 
-                // ✅ تحسين جدول التقارير
-                $('reportBody').innerHTML = summaryHtml + `<table class="report-table"><thead><tr><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>الشفت</th><th>الساعات</th><th>الأوفر تايم</th></tr></thead><tbody>${records.map(r => { 
-                    const dateStr = new Date(r.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
-                    const timeStr = formatTime12(new Date(r.created_at));
-                    return `<tr>
-                        <td style="font-size:12px;">${dateStr}</td>
-                        <td style="font-size:11px; color:#94a3b8;">${timeStr}</td>
-                        <td><span class="att-badge ${r.type==='حضور?'att-in':'att-out'}">${r.type}</span></td>
-                        <td style="font-size:11px;">${r.shift || '-'}</td>
-                        <td style="font-weight:bold; color:${r.hours_worked?'#38bdf8':'#64748b'}">${r.hours_worked||'-'}</td>
-                        <td>${r.overtime && r.overtime !== '0 دقيقة' ? `<span class="overtime-badge">${r.overtime}</span>` : '-'}</td>
-                    </tr>` 
-                }).join('')}</tbody></table>`; 
+                $('reportBody').innerHTML = summaryHtml + `<table class="report-table"><thead><tr><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>الشفت</th><th>الساعات</th><th>الأوفر تايم</th></tr></thead><tbody>${records.map(r => { const dateStr = new Date(r.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' }); const timeStr = formatTime12(new Date(r.created_at)); return `<tr><td style="font-size:12px;">${dateStr}</td><td style="font-size:11px; color:#94a3b8;">${timeStr}</td><td><span class="att-badge ${r.type==='حضور?'att-in':'att-out'}">${r.type}</span></td><td style="font-size:11px;">${r.shift || '-'}</td><td style="font-weight:bold; color:${r.hours_worked?'#38bdf8':'#64748b'}">${r.hours_worked||'-'}</td><td>${r.overtime && r.overtime !== '0 دقيقة' ? `<span class="overtime-badge">${r.overtime}</span>` : '-'}</td></tr>` }).join('')}</tbody></table>`; 
             } else $('reportBody').innerHTML='<center style="color:#64748b; padding:30px;">لا توجد سجلات.</center>'; 
-        } catch(e) { 
-            console.error('Error fetching report:', e);
-            $('reportBody').innerHTML='<center style="color:#ef4444; padding:20px;">فشل التحميل</center>'; 
-        } 
+        } catch(e) { $('reportBody').innerHTML='<center style="color:#ef4444; padding:20px;">فشل التحميل</center>'; } 
     }
     
-    // ✅ دالة جديدة: تصدير Excel
     async function exportToExcel(employeeCode) {
         try {
             const { data: records } = await db.from('attendance').select('*').eq('employee_code', employeeCode).order('created_at', { ascending: false });
-            
-            if(!records || records.length === 0) {
-                showToast('لا توجد بيانات للتصدير', 'warning');
-                return;
-            }
-
-            // ✅ تجهيز البيانات للExcel
-            const excelData = records.map((r, idx) => ({
-                '#': idx + 1,
-                'التاريخ': new Date(r.created_at).toLocaleDateString('ar-EG'),
-                'الوقت': formatTime12(new Date(r.created_at)),
-                'الحالة': r.type,
-                'الشفت': r.shift || '-',
-                'الساعات (ساعة)': r.hours_worked ? parseFloat(r.hours_worked).toFixed(2) : '-',
-                'الأوفر تايم (ساعة)': r.overtime && r.overtime !== '0 دقيقة' ? parseFloat(r.overtime).toFixed(2) : '0',
-                'الموقع': r.location_link ? '✓' : '-'
-            }));
-
-            // ✅ إنشاء ملف Excel
+            if(!records || records.length === 0) { showToast('لا توجد بيانات للتصدير', 'warning'); return; }
+            const excelData = records.map((r, idx) => ({ '#': idx + 1, 'التاريخ': new Date(r.created_at).toLocaleDateString('ar-EG'), 'الوقت': formatTime12(new Date(r.created_at)), 'الحالة': r.type, 'الشفت': r.shift || '-', 'الساعات (ساعة)': r.hours_worked ? parseFloat(r.hours_worked).toFixed(2) : '-', 'الأوفر تايم (ساعة)': r.overtime && r.overtime !== '0 دقيقة' ? parseFloat(r.overtime).toFixed(2) : '0', 'الموقع': r.location_link ? '✓' : '-' }));
             const ws = XLSX.utils.json_to_sheet(excelData);
-            
-            // ✅ تعديل عرض الأعمدة
-            ws['!cols'] = [
-                { wch: 5 },   // #
-                { wch: 12 }, // التاريخ
-                { wch: 10 }, // الوقت
-                { wch: 10 }, // الحالة
-                { wch: 25 }, // الشفت
-                { wch: 15 }, // الساعات
-                { wch: 18 }, // الأوفر تايم
-                { wch: 8 },  // الموقع
-            ];
-
+            ws['!cols'] = [{ wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 25 }, { wch: 15 }, { wch: 18 }, { wch: 8 }];
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'تقرير الحضور');
-
-            // ✅ تحميل الملف
             const fileName = `تقرير_${employeeCode}_${new Date().toISOString().split('T')[0]}.xlsx`;
             XLSX.writeFile(wb, fileName);
-
-            showToast('✅ تم تصدير التقرير بنجاح!', 'success');
-        } catch(e) {
-            console.error('Export Error:', e);
-            showToast('فشل تصدير التقرير', 'error');
-        }
+            showToast('✅ تم تصدير التقرير!', 'success');
+        } catch(e) { console.error('Export Error:', e); showToast('فشل التصدير', 'error'); }
     }
     
     function showForgotPw() { $('forgotPwModal').classList.add('active'); $('forgotCode').value=''; }
     function closeForgotPw() { $('forgotPwModal').classList.remove('active'); }
     
-    // ✅ تفعيل جدول password_resets
     async function submitForgotPw() { 
         const code = $('forgotCode').value.trim(); if(!code) return showToast('يرجى إدخال الكود','error'); 
-        
-        // ✅ عدم السماح باستعادة كلمة سر الأدمن
-        if (code === 'ADMIN') {
-            showToast('❌ لا يمكن استعادة كلمة سر الأدمن!', 'error');
-            return;
-        }
-        
+        if (code === 'ADMIN') { showToast('❌ لا يمكن استعادة كلمة سر الأدمن!', 'error'); return; }
         const tempPass = Math.random().toString(36).slice(-8);
         const { data: emp } = await db.from('employees').select('name, email').eq('code', code).single();
         const { error } = await db.from('employees').update({ password: tempPass, is_first_login: true }).eq('code', code);
-        
-        // ✅ تسجيل طلب استعادة كلمة المرور
         if(!error) {
-            try {
-                await db.from('password_resets').insert({
-                    employee_code: code,
-                    reset_token: tempPass,
-                    used: false,
-                    created_at: new Date().toISOString()
-                });
-            } catch(insertError) {
-                console.log('Password reset log insert failed:', insertError);
-                // نستمر حتى لو فشل التسجيل
-            }
-            
+            try { await db.from('password_resets').insert({ employee_code: code, reset_token: tempPass, used: false, created_at: new Date().toISOString() }); } catch(insertError) { console.log('Insert failed:', insertError); }
             playSound('login-success'); showToast('تم إعادة تعيين كلمة السر.', 'success'); closeForgotPw();
             if(emp) fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ action: 'sendForgotPw', name: emp.name, code, password: tempPass, email: emp.email }) }).catch(e=>{});
-        }
-        else { playSound('login-error'); showToast('الكود غير صحيح','error'); }
+        } else { playSound('login-error'); showToast('الكود غير صحيح','error'); }
     }
     
     function showRegisterScreen() { $('loginScreen').classList.add('hidden'); $('registerScreen').classList.remove('hidden'); }
@@ -1413,12 +1226,7 @@
     async function startRegistration() { const name = $('regName').value.trim(), email = $('regEmail').value.trim(); if(!name||!email) return showToast('يرجى إدخال البيانات','error'); regData = { name, email }; regMode = true; if(!await openCamera()) { regMode=false; showToast('فشل فتح الكاميرا','error'); } }
 
     async function adminResetFace(code, name) {
-        // ✅ عدم السماح بإعادة تسجيل بصمة الأدمن
-        if (code === 'ADMIN') {
-            showToast('❌ لا يمكن إعادة تسجيل بصمة الأدمن!', 'error');
-            return;
-        }
-        
+        if (code === 'ADMIN') { showToast('❌ لا يمكن إعادة تسجيل بصمة الأدمن!', 'error'); return; }
         targetEmpForAdmin = { code, name }; adminResetFaceMode = true;
         regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false; firstTimeSetupMode = false;
         showToast(`جاري فتح الكاميرا لبصمة ${name}`, 'warning');
@@ -1430,7 +1238,6 @@
             navigator.geolocation.getCurrentPosition(pos => {
                 currentLat = pos.coords.latitude; currentLon = pos.coords.longitude; currentAccuracy = pos.coords.accuracy || 0;
                 currentLoc = `https://maps.google.com/?q=${currentLat},${currentLon}`;
-                // ✅ تحسين عرض الموقع مع الدقة
                 $('locBar').innerHTML = `<i class="fas fa-map-marker-alt" style="color:var(--success);"></i> <a href="${currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">الموقع محدد (±${Math.round(currentAccuracy)}م)</a>`;
             }, () => { $('locBar').innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`; currentLoc='غير متوفر'; currentLat=null; currentLon=null; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
         }
@@ -1446,30 +1253,23 @@
         else setStatus('النظام جاهز');
     }
 
-    // ==========================================
-    // ✅ بصمة الإصبع (WebAuthn) - محسنة ومفعلة
-    // ==========================================
+    // ✅✅✅ دالة تسجيل بصمة الإصبع ✅✅✅
     async function registerFingerprint() { 
         try { 
-            if(!window.PublicKeyCredential) {
-                console.log('WebAuthn not supported');
-                return;
-            }
+            if(!window.PublicKeyCredential) { console.log('WebAuthn not supported'); return; }
             const challenge = new Uint8Array(32); crypto.getRandomValues(challenge); 
             const credential = await navigator.credentials.create({ 
                 publicKey: { challenge, rp:{ name:"Axentro System" }, user:{ id:new Uint8Array(16), name:user.code, displayName:user.name }, pubKeyCredParams:[{alg:-7,type:"public-key"},{alg:-257,type:"public-key"}], authenticatorSelection:{ authenticatorAttachment:"platform", userVerification:"required" }, timeout:60000 } 
             }); 
             if(credential) { 
                 localStorage.setItem('axentro_fp_id', bufferToBase64(credential.rawId)); 
-                showToast('✅ تم تسجيل بصمة الإصبع بنجاح!','success');
-                // ✅ إظهار زر تسجيل الدخول بالبصمة
+                showToast('✅ تم تسجيل بصمة الإصبع!','success');
                 $('fingerprintLoginBtn').style.display = 'flex';
             }
-        } catch(e) { 
-            console.log('Fingerprint registration error:', e);
-        } 
+        } catch(e) { console.log('Fingerprint registration error:', e); } 
     }
 
+    // ✅✅✅ دالة الدخول ببصمة الإصبع ✅✅✅
     async function loginWithFingerprint() {
         const savedFpId = localStorage.getItem('axentro_fp_id'), savedLogin = localStorage.getItem('axentro_saved_login');
         if(!savedFpId || !savedLogin) { 
@@ -1485,19 +1285,14 @@
                 const loginData = JSON.parse(savedLogin); 
                 const { data: emp, error } = await db.from('employees').select('*').eq('code', loginData.code).eq('password', loginData.pass).single();
                 if(!error && emp) { 
-                    // ✅ إصلاح: تصفير userImage قبل تعيين المستخدم الجديد
                     userImage = '';
-                    
                     user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login }; 
                     localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); 
                     sessionDescriptor = emp.face_descriptor;
                     if(!sessionDescriptor) { firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
                     else { 
                         playSound('login-success'); 
-                        
-                        // ✅ إصلاح: تحميل الصورة أولاً
                         await safeUpdateUserImage();
-                        
                         showApp(); 
                     }
                 } else { playSound('login-error'); showToast('فشل التحقق (بيانات تغيرت)','error'); setStatus('النظام جاهز'); }
@@ -1509,19 +1304,22 @@
         } 
     }
 
+    // ✅✅✅ تهيئة التطبيق - تفعيل زر البصمة ✅✅✅
     function init() {
-        restoreSession(); loadModelsAsync(); getLocation();
+        restoreSession(); 
+        loadModelsAsync(); 
+        getLocation();
+        
         document.addEventListener('click', unlockAudio, { once: true });
         document.addEventListener('touchstart', unlockAudio, { once: true });
+        
         window.addEventListener('online', () => { isOnline = true; $('connDot').classList.remove('offline'); $('connDot').classList.add('online'); setStatus('متصل'); });
         window.addEventListener('offline', () => { isOnline = false; $('connDot').classList.remove('online'); $('connDot').classList.add('offline'); setStatus('غير متصل'); showToast('أنت غير متصل بالإنترنت', 'warning'); });
+        
         document.addEventListener('DOMContentLoaded',()=>{
-            // ✅ تفعيل زر بصمة الإصبع دائماً إذا كان WebAuthn مدعوم
+            // ✅✅✅ تفعيل زر بصمة الإصبع ✅✅✅
             if(window.PublicKeyCredential) {
-                // إظهار الزر دائماً، حتى لو لم يتم التسجيل بعد
                 $('fingerprintLoginBtn').style.display = 'flex';
-                
-                // إذا كان مسجل مسبقاً، نغير النص قليلاً
                 if(localStorage.getItem('axentro_fp_id')) {
                     $('fingerprintLoginBtn').innerHTML = '<i class="fas fa-fingerprint"></i> تسجيل الدخول ببصمة الإصبع ✓';
                 }
@@ -1532,6 +1330,8 @@
             $('forgotCode')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); submitForgotPw(); } });
         });
     }
+    
+    // تشغيل التطبيق
     init();
 </script>
 </body>
