@@ -2,7 +2,9 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Axentro System | إدارة الحضور والانصراف</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -20,7 +22,8 @@
             --warning: #f59e0b; --dark: #0f172a; --card-bg: rgba(30, 41, 59, 0.6); --glass: rgba(255,255,255,0.05);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: linear-gradient(145deg, #020617 0%, #0f172a 50%, #020617 100%); color: #f1f5f9; direction: rtl; min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
+        html { height: 100%; overflow: hidden; }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: linear-gradient(145deg, #020617 0%, #0f172a 50%, #020617 100%); color: #f1f5f9; direction: rtl; min-height: 100%; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
         
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideInRight { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: translateX(0); } }
@@ -35,7 +38,7 @@
         .app-container { flex: 1; width: 100%; max-width: 550px; margin: 0 auto; padding: 15px; position: relative; z-index: 1; animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
         h1 { font-size: 26px; text-align: center; background: linear-gradient(135deg, #fff, #93c5fd); -webkit-background-clip: text; color: transparent; margin-bottom: 20px; font-weight: 800; letter-spacing: -0.5px; }
 
-        .camera-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
+        .camera-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; padding: 20px; padding-top: max(20px, env(safe-area-inset-top)); }
         .camera-overlay.active { display: flex; }
         .camera-container { background: #000; border-radius: 24px; overflow: hidden; position: relative; width: 100%; max-width: 500px; aspect-ratio: 4/3; box-shadow: 0 25px 80px -10px rgba(0,0,0,1); border: 2px solid var(--primary); animation: btnGlow 2s infinite; }
         video { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; transform: scaleX(-1); }
@@ -57,11 +60,11 @@
         .stability-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 800; color: white; }
         
         #camStatus { margin-top: 20px; color: #38bdf8; font-size: 16px; font-weight: bold; z-index: 20; text-align: center; animation: fadeInUp 0.5s; min-height: 24px; }
-        .close-cam { position: absolute; top: 20px; right: 20px; z-index: 30; background: rgba(239, 68, 68, 0.9); border: none; color: white; width: 45px; height: 45px; border-radius: 50%; font-size: 20px; cursor: pointer; transition: 0.2s; }
+        .close-cam { position: absolute; top: max(20px, env(safe-area-inset-top)); right: 20px; z-index: 30; background: rgba(239, 68, 68, 0.9); border: none; color: white; width: 45px; height: 45px; border-radius: 50%; font-size: 20px; cursor: pointer; transition: 0.2s; }
         .close-cam:active { transform: scale(0.9); }
 
         .card { background: var(--card-bg); backdrop-filter: blur(20px); border-radius: 24px; padding: 25px; margin-bottom: 20px; border: 1px solid var(--glass); box-shadow: 0 20px 40px -15px rgba(0,0,0,0.5); }
-        input, select { width: 100%; padding: 15px 20px; border-radius: 16px; background: rgba(0,0,0,0.4); border: 1.5px solid #334155; color: white; font-size: 15px; outline: none; margin-bottom: 14px; transition: all 0.3s ease; appearance: none; }
+        input, select { width: 100%; padding: 15px 20px; border-radius: 16px; background: rgba(0,0,0,0.4); border: 1.5px solid #334155; color: white; font-size: 16px; outline: none; margin-bottom: 14px; transition: all 0.3s ease; appearance: none; }
         input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(59,130,246,0.15); background: rgba(0,0,0,0.6); }
         input::placeholder { color: #64748b; }
         .password-wrapper { position: relative; width: 100%; margin-bottom: 14px; }
@@ -80,6 +83,7 @@
         .btn-change-pw { background: linear-gradient(135deg, #8b5cf6, #6d28d9); box-shadow: 0 10px 20px -5px rgba(139,92,246,0.4); }
         .btn-report { background: linear-gradient(135deg, #14b8a6, #0d9488); box-shadow: 0 10px 20px -5px rgba(20,184,166,0.4); }
         .btn-sm { padding: 10px 14px; font-size: 13px; width: auto; border-radius: 12px; }
+        .btn-danger { background: linear-gradient(135deg, #dc2626, #991b1b); box-shadow: 0 10px 20px -5px rgba(220,38,38,0.4); }
         
         .btn-fingerprint { background: rgba(30, 41, 59, 0.8); border: 1.5px solid #334155; color: #94a3b8; margin-bottom: 12px; }
         .btn-fingerprint:active { background: rgba(51, 65, 85, 0.8); border-color: var(--primary); color: white; }
@@ -113,7 +117,7 @@
 
         .admin-tools { display: flex; gap: 10px; margin-bottom: 15px; }
         .admin-tools .btn { flex: 1; font-size: 13px; padding: 14px; }
-        .emp-list-container { max-height: 60vh; overflow-y: auto; }
+        .emp-list-container { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .emp-list-container::-webkit-scrollbar { width: 4px; }
         .emp-list-container::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         .emp-item { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass); border-radius: 16px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
@@ -122,7 +126,7 @@
         .emp-info p { color: #64748b; font-size: 12px; font-family: monospace; }
         .emp-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
-        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 23, 0.98); backdrop-filter: blur(20px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; overflow-y: auto; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 23, 0.98); backdrop-filter: blur(20px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .overlay.hidden { display: none; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); display: none; align-items: center; justify-content: center; z-index: 1500; padding: 20px; }
         .modal.active { display: flex; }
@@ -130,7 +134,7 @@
         .modal-close { position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.1); width: 36px; height: 36px; border-radius: 50%; border: none; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
         .modal-close:active { background: rgba(255,255,255,0.2); }
 
-        .unified-footer { width: 100%; text-align: center; padding: 30px 20px 20px; margin-top: auto; background: linear-gradient(to top, rgba(15,23,42,1), transparent); }
+        .unified-footer { width: 100%; text-align: center; padding: 30px 20px max(20px, env(safe-area-inset-bottom)); margin-top: auto; background: linear-gradient(to top, rgba(15,23,42,1), transparent); }
         .footer-brand { font-size: 18px; font-weight: 800; color: white; margin-bottom: 8px; letter-spacing: -0.5px; }
         .footer-copy { color: #475569; font-size: 12px; line-height: 1.6; }
         .footer-qr-container { margin-top: 20px; display: inline-block; }
@@ -198,9 +202,9 @@
             <h1 style="margin-bottom: 5px; font-size: 32px;"><i class="fas fa-fingerprint"></i> Axentro System</h1>
             <p style="color: #64748b; font-size: 14px; font-weight: 600;">نظام إدارة الحضور والانصراف المتقدم</p>
         </div>
-        <input type="text" id="loginCode" placeholder="اسم المستخدم أو الكود">
+        <input type="text" id="loginCode" placeholder="اسم المستخدم أو الكود" autocomplete="username">
         <div class="password-wrapper">
-            <input type="password" id="loginPass" placeholder="كلمة السر">
+            <input type="password" id="loginPass" placeholder="كلمة السر" autocomplete="current-password">
             <button class="toggle-password" onclick="togglePassword('loginPass')"><i class="fas fa-eye"></i></button>
         </div>
         <div class="remember-me">
@@ -292,53 +296,65 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-    // ==========================================
-    // 1. إعدادات الاتصال بـ Supabase (تم إصلاح خطأ التعارض)
-    // ==========================================
     const SUPABASE_URL = 'https://qgbokzzynieoedhloxqt.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc';
-    const { createClient } = supabase; 
+    const { createClient } = window.supabase; 
     const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY); 
+    const EMAIL_API_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
-    // ==========================================
-    // 2. المتغيرات العامة
-    // ==========================================
-    const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 250;
-    const MATCH_THRESHOLD = 0.55;
-    const AUTO_REFRESH_INTERVAL = 30000;
-    const STABLE_FRAMES_REQUIRED = 5;
+    const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 500;
+    const MATCH_THRESHOLD = 0.55, AUTO_REFRESH_INTERVAL = 30000, STABLE_FRAMES_REQUIRED = 5;
     const MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
     const STORE_IMG_MAX = 400;
     
-    let user = null;
-    let lightModels = false, heavyModels = false, stream = null, employees = [];
+    let user = null, lightModels = false, heavyModels = false, stream = null, employees = [];
     let sessionDescriptor = null;
     let regMode = false, attMode = false, updateFaceMode = false, adminVerifyMode = false, firstTimeSetupMode = false, adminResetFaceMode = false, attType = '', regData = {}, autoCaptureTimeout = null;
-    let targetEmpForAdmin = null;
-    let isProcessingCapture = false;
+    let targetEmpForAdmin = null, isProcessingCapture = false;
     let currentLat = null, currentLon = null, currentLoc = 'غير متوفر', userImage = '', lastCamStatusText = '';
-    let currentAccuracy = 0;
-    let autoRefreshTimer = null;
-    let detectionLoopTimeout = null;
+    let currentAccuracy = 0, autoRefreshTimer = null, detectionLoopTimeout = null;
     let livenessActive = false, livenessStartYaw = null, livenessMoved = false, stabilityCounter = 0;
-    let isOnline = navigator.onLine;
-    let audioUnlocked = false;
-    let modelsLoadProgress = 0;
+    let isOnline = navigator.onLine, audioUnlocked = false, modelsLoadProgress = 0;
     
     const $ = id => document.getElementById(id);
     const video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
 
     // ==========================================
-    // 3. دوال المساعدات
+    // إصلاح الأصوات (بدون تكرار أو قطع)
     // ==========================================
-    function unlockAudio() { if (audioUnlocked) return; try { const a = $('login-success'); if (a) { a.volume = 0.01; a.play().then(() => { a.volume = 1; audioUnlocked = true; }).catch(() => {}); } } catch(e) {} }
-    function playSound(id) { try { const audio = $(id); if (!audio) return; audio.currentTime = 0; audio.play().catch(() => {}); } catch(e) {} }
-    function showToast(msg, type='') { const t = $('toast'); t.textContent = msg; t.className = `toast show ${type}`; setTimeout(() => t.classList.remove('show'), 4000); }
+    function unlockAudio() {
+        if (audioUnlocked) return;
+        try { 
+            const a = $('login-success'); 
+            if (a) { 
+                a.play().then(() => { 
+                    a.pause(); a.currentTime = 0; audioUnlocked = true; 
+                }).catch(() => {}); 
+            } 
+        } catch(e) {}
+    }
+
+    function playSound(id) {
+        if(!audioUnlocked) { unlockAudio(); return; }
+        try { 
+            const audio = $(id); 
+            if (!audio) return; 
+            audio.currentTime = 0; 
+            audio.play().catch(() => {}); 
+        } catch(e) {}
+    }
+
+    // ==========================================
+    // دوال المساعدات
+    // ==========================================
+    function showToast(msg, type='') { const t = $('toast'); t.textContent = msg; t.className = `toast show ${type}`; setTimeout(() => t.classList.remove('show'), 4500); }
     function setStatus(txt) { $('connText').textContent = txt; }
     function togglePassword(id) { const i = $(id); i.type = i.type === 'password' ? 'text' : 'password'; }
     function deg2rad(deg) { return deg * (Math.PI/180); }
     function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) { const R = 6371; const dLat = deg2rad(lat2-lat1); const dLon = deg2rad(lon2-lon1); const a = Math.sin(dLat/2)**2 + Math.cos(deg2rad(lat1))*Math.cos(deg2rad(lat2))*Math.sin(dLon/2)**2; const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c * 1000; }
     function euclideanDistance(desc1, desc2) { let sum=0; for(let i=0;i<desc1.length;i++) sum+=(desc1[i]-desc2[i])**2; return Math.sqrt(sum); }
+    function bufferToBase64(buffer) { let binary=''; const bytes=new Uint8Array(buffer); for(let i=0;i<bytes.byteLength;i++) binary+=String.fromCharCode(bytes[i]); return btoa(binary); }
+    function base64ToBuffer(base64) { const binary=atob(base64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes.buffer; }
     function selectShift(element) { document.querySelectorAll('.shift-card').forEach(c=>c.classList.remove('selected')); element.classList.add('selected'); element.querySelector('input').checked=true; }
     const setCamStatus = (html) => { if(html!==lastCamStatusText) { $('camStatus').innerHTML=html; lastCamStatusText=html; } };
     
@@ -350,41 +366,36 @@
         circle.style.strokeDashoffset = offset; text.textContent = current;
         if (current > 0) ring.classList.add('active'); else ring.classList.remove('active');
     }
-    
     function showMatchResult(success) {
         const el = $('matchResult'); if (!el) return;
         el.className = `match-result ${success ? 'success' : 'fail'}`;
         el.innerHTML = success ? '<i class="fas fa-check" style="color:white;"></i>' : '<i class="fas fa-times" style="color:white;"></i>';
         setTimeout(() => { el.className = 'match-result'; }, 1500);
     }
-    
     function updateModelProgress(percent) {
         const bar = $('modelProgressBar'), container = $('modelProgress'); if (!bar || !container) return;
         bar.style.width = percent + '%';
         if (percent > 0 && percent < 100) container.classList.add('active'); else container.classList.remove('active');
     }
-
     function createStorageImageBlob() {
         const c = document.createElement('canvas');
         let w = video.videoWidth, h = video.videoHeight;
         const ratio = Math.min(STORE_IMG_MAX / w, STORE_IMG_MAX / h);
         if(ratio < 1) { w = Math.round(w * ratio); h = Math.round(h * ratio); }
-        c.width = w; c.height = h;
-        c.getContext('2d').drawImage(video, 0, 0, w, h);
+        c.width = w; c.height = h; c.getContext('2d').drawImage(video, 0, 0, w, h);
         return new Promise(resolve => c.toBlob(resolve, 'image/jpeg', 0.8));
     }
-
     function getHeadYaw(landmarks) { const nose = landmarks.getNose()[3]; const leftEye = landmarks.getLeftEye()[0]; const rightEye = landmarks.getRightEye()[3]; return nose.x - ((leftEye.x + rightEye.x)/2); }
     function resetLiveness() { livenessActive = true; livenessStartYaw = null; livenessMoved = false; stabilityCounter = 0; }
     function updateLiveness(yaw) {
         if (!livenessActive) return true;
         if (livenessStartYaw === null) { livenessStartYaw = yaw; setCamStatus('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...'); return false; }
-        if (Math.abs(yaw - livenessStartYaw) > 0.08) { livenessMoved = true; livenessActive = false; setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، يرجى الثبات...'); return true; }
+        if (Math.abs(yaw - livenessStartYaw) > 0.08) { livenessMoved = true; livenessActive = false; setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، ثبت وجهك...'); return true; }
         return false;
     }
 
     // ==========================================
-    // 4. دوال الذكاء الاصطناعي والكاميرا
+    // الذكاء الاصطناعي والكاميرا (متوافق مع iOS)
     // ==========================================
     async function extractStableDescriptor() {
         const samples = [];
@@ -401,7 +412,7 @@
     
     async function openCamera() {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } });
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } });
             video.srcObject = stream; await video.play();
             $('cameraOverlay').classList.add('active'); lastCamStatusText = '';
             $('scanLine').classList.add('active');
@@ -438,7 +449,7 @@
     
     async function drawFaceBox() {
         if(!video.srcObject || video.videoWidth===0) return;
-        if(!lightModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل النماذج الأساسية...'); updateModelProgress(modelsLoadProgress); return; }
+        if(!lightModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل النماذج...'); updateModelProgress(modelsLoadProgress); return; }
         try {
             const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.2 })).withFaceLandmarks(true);
             ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -452,14 +463,14 @@
                 ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen,box.y+box.height); ctx.lineTo(box.x+box.width,box.y+box.height); ctx.lineTo(box.x+box.width,box.y+box.height-cLen); ctx.stroke();
                 
                 if (regMode || updateFaceMode || firstTimeSetupMode || adminResetFaceMode) {
-                    if (!heavyModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نموذج التعرف...' + Math.round(modelsLoadProgress) + '%'); updateModelProgress(modelsLoadProgress); return; }
+                    if (!heavyModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف ' + Math.round(modelsLoadProgress) + '%'); updateModelProgress(modelsLoadProgress); return; }
                     stabilityCounter++; updateStabilityRing(stabilityCounter, STABLE_FRAMES_REQUIRED);
                     if (stabilityCounter >= STABLE_FRAMES_REQUIRED) { setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> تم الالتقاط!'); $('stabilityRing').classList.remove('active'); if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 200); }
                     else { setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...'); }
                     return;
                 }
                 if (attMode || adminVerifyMode) {
-                    if (!heavyModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نموذج التعرف...' + Math.round(modelsLoadProgress) + '%'); updateModelProgress(modelsLoadProgress); return; }
+                    if (!heavyModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف ' + Math.round(modelsLoadProgress) + '%'); updateModelProgress(modelsLoadProgress); return; }
                     const livenessOk = updateLiveness(getHeadYaw(detection.landmarks));
                     if (!livenessOk) { if(autoCaptureTimeout) clearTimeout(autoCaptureTimeout); stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); return; }
                     stabilityCounter++; updateStabilityRing(stabilityCounter, STABLE_FRAMES_REQUIRED);
@@ -476,81 +487,72 @@
     }
 
     // ==========================================
-    // 5. منطق العمليات الرئيسي (Supabase)
+    // العمليات الرئيسية (Supabase + Emails)
     // ==========================================
     async function performCapture() {
         if(isProcessingCapture) return;
         isProcessingCapture = true; autoCaptureTimeout = null;
         if(detectionLoopTimeout) { clearTimeout(detectionLoopTimeout); detectionLoopTimeout=null; }
         $('scanLine').classList.remove('active');
-        
         setCamStatus('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
         const newDescriptor = await extractStableDescriptor();
-        if(!newDescriptor) { playSound('faceid-error'); setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة، جاري إعادة المحاولة...'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
+        if(!newDescriptor) { playSound('faceid-error'); setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة...'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
 
         if(regMode) {
-            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بيانات الموظف الجديد...');
+            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البيانات...');
             try {
                 const { count } = await db.from('employees').select('*', { count: 'exact', head: true });
                 const newCode = `EMP${String(count + 1).padStart(3, '0')}`;
                 const tempPass = Math.random().toString(36).slice(-8);
-
                 const imgBlob = await createStorageImageBlob();
-                const imgPath = `${newCode}_face.jpg`;
-                await db.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
-                const { data: imgData } = db.storage.from('faces').getPublicUrl(imgPath);
-                const publicUrl = imgData.publicUrl;
-
-                const { error } = await db.from('employees').insert({ 
-                    code: newCode, name: regData.name, email: regData.email, 
-                    password: tempPass, face_descriptor: newDescriptor, is_first_login: true 
-                });
-
+                await db.storage.from('faces').upload(`${newCode}_face.jpg`, imgBlob, { upsert: true });
+                const { data: imgData } = db.storage.from('faces').getPublicUrl(`${newCode}_face.jpg`);
+                const { error } = await db.from('employees').insert({ code: newCode, name: regData.name, email: regData.email, password: tempPass, face_descriptor: newDescriptor, is_first_login: true });
                 if(!error) {
-                    playSound('faceid-success'); 
-                    showToast(`تم إنشاء الحساب! كود: ${newCode} | باسورد: ${tempPass}`, 'success'); 
+                    playSound('faceid-success'); showToast(`تم إنشاء الحساب! (جاري إرسال الإيميل)`, 'success'); 
                     closeCamera(); showLoginScreen();
+                    fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ action: 'sendNewEmpEmails', name: regData.name, code: newCode, password: tempPass, email: regData.email }) }).catch(e => console.log("Email Err:", e));
                 } else throw error;
-            } catch(e) { playSound('faceid-error'); showToast('حدث خطأ: ' + e.message, 'error'); closeCamera(); }
+            } catch(e) { playSound('faceid-error'); showToast('حدث خطأ', 'error'); closeCamera(); }
         }
         else if(firstTimeSetupMode) {
-            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بصمة الوجه...');
-            try {
-                const imgBlob = await createStorageImageBlob();
-                const imgPath = `${user.code}_face.jpg`;
-                await db.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
-                const { data: imgData } = db.storage.from('faces').getPublicUrl(imgPath);
-                
-                const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
-                if(!error) {
-                    playSound('faceid-success'); sessionDescriptor = newDescriptor; userImage = imgData.publicUrl;
-                    showMatchResult(true); showToast('تم تسجيل البصمة بنجاح!', 'success');
-                    setTimeout(()=>{ closeCamera(); showApp(); }, 800);
-                } else throw error;
-            } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل الحفظ', 'error'); restartCamLoop(); }
-        }
-        else if(updateFaceMode) {
+            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البصمة...');
             try {
                 const imgBlob = await createStorageImageBlob();
                 await db.storage.from('faces').upload(`${user.code}_face.jpg`, imgBlob, { upsert: true });
+                const { data: imgData } = db.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
                 const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
-                if(!error) { playSound('faceid-success'); sessionDescriptor = newDescriptor; showMatchResult(true); showToast('تم تحديث البصمة!', 'success'); setTimeout(()=>closeCamera(), 800); showApp(); }
+                if(!error) { playSound('faceid-success'); sessionDescriptor = newDescriptor; userImage = imgData.publicUrl; showMatchResult(true); showToast('تم تسجيل البصمة!', 'success'); setTimeout(()=>{ closeCamera(); showApp(); }, 800); }
                 else throw error;
-            } catch(e) { playSound('faceid-error'); showToast('فشل التحديث', 'error'); closeCamera(); }
+            } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل الحفظ', 'error'); restartCamLoop(); }
         }
-        else if(adminResetFaceMode) {
+        else if(updateFaceMode || adminResetFaceMode) {
+            const targetCode = updateFaceMode ? user.code : targetEmpForAdmin.code;
+            const targetName = updateFaceMode ? user.name : targetEmpForAdmin.name;
             try {
                 const imgBlob = await createStorageImageBlob();
-                await db.storage.from('faces').upload(`${targetEmpForAdmin.code}_face.jpg`, imgBlob, { upsert: true });
-                const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', targetEmpForAdmin.code);
-                if(!error) { playSound('faceid-success'); showMatchResult(true); showToast(`تم تحديث بصمة ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); }
+                await db.storage.from('faces').upload(`${targetCode}_face.jpg`, imgBlob, { upsert: true });
+                const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', targetCode);
+                if(!error) { playSound('faceid-success'); showMatchResult(true); showToast(`تم تحديث بصمة ${targetName}`, 'success'); setTimeout(()=>closeCamera(), 800); if(updateFaceMode) showApp(); }
                 else throw error;
             } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل التحديث', 'error'); restartCamLoop(); }
         }
         else if(adminVerifyMode) {
-            if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات وجهك كأدمن غير متوفرة!', 'error'); closeCamera(); return; }
+            if(!sessionDescriptor) { playSound('faceid-error'); showToast('لا توجد بصمة أدمن!', 'error'); closeCamera(); return; }
             if(euclideanDistance(newDescriptor, sessionDescriptor) < MATCH_THRESHOLD) {
-                showMatchResult(true); setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق، جاري التسجيل...');
+                showMatchResult(true); setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق...');
+                
+                // حالة حذف موظف
+                if(targetEmpForAdmin.type === 'حذف موظف') {
+                    const { error: attErr } = await db.from('attendance').delete().eq('employee_code', targetEmpForAdmin.code);
+                    const { error: empErr } = await db.from('employees').delete().eq('code', targetEmpForAdmin.code);
+                    try { await db.storage.from('faces').remove([`${targetEmpForAdmin.code}_face.jpg`]); } catch(e){}
+                    if(!empErr) { playSound('faceid-success'); showToast(`تم حذف ${targetEmpForAdmin.name} بنجاح`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
+                    else { playSound('faceid-error'); showToast('فشل الحذف', 'error'); restartCamLoop(); }
+                    isProcessingCapture = false; return;
+                }
+
+                // حالة تسجيل حضور/انصراف يدوي
                 const { error } = await db.from('attendance').insert({ employee_code: targetEmpForAdmin.code, employee_name: targetEmpForAdmin.name, type: targetEmpForAdmin.type, location_link: currentLoc, shift: 'تسجيل يدوي بواسطة الأدمن' });
                 if(!error) { playSound('faceid-success'); showToast(`تم تسجيل ${targetEmpForAdmin.type} لـ ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
                 else { playSound('faceid-error'); showToast('فشل التسجيل', 'error'); restartCamLoop(); }
@@ -559,55 +561,41 @@
         else if(attMode) {
             if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة', 'error'); closeCamera(); return; }
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
-            
             if(distance < MATCH_THRESHOLD) {
                 showMatchResult(true);
-                
                 if(attType === 'تغيير كلمة المرور') {
                     const { error } = await db.from('employees').update({ password: window._pendingPwChange.newPassword }).eq('code', user.code).eq('password', window._pendingPwChange.oldPassword);
                     if(!error) { playSound('login-success'); showToast('تم تغيير كلمة المرور', 'success'); setTimeout(()=>closeCamera(), 800); }
                     else { playSound('login-error'); showToast('كلمة السر الحالية خاطئة', 'error'); restartCamLoop(); }
                     isProcessingCapture = false; return;
                 }
-
                 if(currentLat && currentLon) {
                     const dist = getDistanceFromLatLonInKm(currentLat, currentLon, OFFICE_LAT, OFFICE_LON);
-                    if(dist > MAX_DISTANCE_METERS) {
-                        playSound('faceid-error'); showToast(`تم التحقق من الوجه ✓ لكنك بعيد عن المقر (${Math.round(dist)} متر)`, 'error');
-                        setCamStatus('<i class="fas fa-map-marker-alt" style="color:var(--danger);"></i> مرفوض: خارج نطاق المقر');
-                        restartCamLoop(); return;
-                    }
+                    if(dist > MAX_DISTANCE_METERS) { playSound('faceid-error'); showToast(`بعيد عن المقر (${Math.round(dist)} متر)`, 'error'); setCamStatus('مرفوض: خارج نطاق المقر'); restartCamLoop(); return; }
                 }
-
                 const selShift = document.querySelector('input[name="shift"]:checked');
                 let hoursWorked = null;
-                
                 if(attType === 'انصراف') {
                     const today = new Date().toISOString().split('T')[0];
                     const { data: lastCheckIn } = await db.from('attendance').select('created_at').eq('employee_code', user.code).eq('type', 'حضور').gte('created_at', today).order('created_at', { ascending: false }).limit(1).single();
-                    if(lastCheckIn) {
-                        const diff = (new Date() - new Date(lastCheckIn.created_at)) / (1000 * 60 * 60);
-                        hoursWorked = `${diff.toFixed(2)} ساعة`;
-                    }
+                    if(lastCheckIn) { const diff = (new Date() - new Date(lastCheckIn.created_at)) / (1000 * 60 * 60); hoursWorked = `${diff.toFixed(2)} ساعة`; }
                 }
-
-                const { error } = await db.from('attendance').insert({ 
-                    employee_code: user.code, employee_name: user.name, type: attType, 
-                    location_link: currentLoc, shift: selShift ? selShift.value : 'لم يتم التحديد', hours_worked: hoursWorked 
-                });
-
-                if(!error) { playSound('faceid-success'); showToast(`تم تسجيل ${attType} بنجاح ${hoursWorked ? '('+hoursWorked+')' : ''}`, 'success'); setTimeout(()=>closeCamera(), 800); calculateMonthlyHours(); }
-                else throw error;
-            } else { playSound('faceid-error'); showMatchResult(false); showToast('الوجه غير مطابق! تم رفض التسجيل.', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> الوجه غير مطابق!'); restartCamLoop(); }
+                const now = new Date();
+                const datetime = `${now.toLocaleDateString('ar-EG')} - ${now.toLocaleString('ar-EG', { hour12:true, hour:'2-digit', minute:'2-digit', second:'2-digit' })}`;
+                const { error } = await db.from('attendance').insert({ employee_code: user.code, employee_name: user.name, type: attType, location_link: currentLoc, shift: selShift ? selShift.value : 'لم يتم التحديد', hours_worked: hoursWorked });
+                if(!error) {
+                    playSound('faceid-success'); showToast(`تم تسجيل ${attType} بنجاح ${hoursWorked ? '('+hoursWorked+')' : ''}`, 'success'); 
+                    setTimeout(()=>closeCamera(), 800); calculateMonthlyHours();
+                    // إرسال إيميل تنبيه للأدمن في الخلفية
+                    fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ action: 'sendAttAlert', name: user.name, code: user.code, type: attType, datetime, location: currentLoc, shift: selShift ? selShift.value : '', hoursWorked }) }).catch(e => {});
+                } else throw error;
+            } else { playSound('faceid-error'); showMatchResult(false); showToast('الوجه غير مطابق!', 'error'); setCamStatus('الوجه غير مطابق!'); restartCamLoop(); }
         }
         isProcessingCapture = false;
     }
 
     function restartCamLoop() { isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
 
-    // ==========================================
-    // 6. تحميل نماذج الذكاء الاصطناعي
-    // ==========================================
     async function loadModelsAsync() {
         try {
             setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
@@ -623,13 +611,13 @@
     }
 
     // ==========================================
-    // 7. دوال النظام والتقارير
+    // النظام والتقارير
     // ==========================================
     async function fetchUserDataInBackground() {
         if(!user) return;
         try {
-            const { data: emp, error } = await db.from('employees').select('face_descriptor').eq('code', user.code).single();
-            if(!error && emp && emp.face_descriptor) {
+            const { data: emp } = await db.from('employees').select('face_descriptor').eq('code', user.code).single();
+            if(emp && emp.face_descriptor) {
                 sessionDescriptor = emp.face_descriptor;
                 const { data: imgData } = db.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
                 userImage = imgData.publicUrl + '?t=' + new Date().getTime();
@@ -638,14 +626,14 @@
             }
             if(!sessionDescriptor && !$('cameraOverlay').classList.contains('active')) {
                 playSound('faceid-error'); showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
-                firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; showToast('فشل فتح الكاميرا','error'); }
+                firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; }
             }
         } catch(e) {} setStatus('النظام جاهز');
     }
 
     async function handleLogin() {
         const code = $('loginCode').value.trim(), pass = $('loginPass').value.trim();
-        if(!code || !pass) return showToast('يرجى إدخال الكود وكلمة السر', 'error');
+        if(!code || !pass) return showToast('يرجى إدخال البيانات', 'error');
         setStatus('جاري التحقق...');
         try {
             const { data: emp, error } = await db.from('employees').select('*').eq('code', code).eq('password', pass).single();
@@ -653,89 +641,94 @@
                 user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login };
                 if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass })); }
                 else { sessionStorage.setItem('user', JSON.stringify(user)); localStorage.removeItem('axentro_saved_login'); }
-                
                 if(!emp.is_admin && emp.is_first_login) { $('forcePwModal').classList.add('active'); setStatus('النظام جاهز'); }
                 else {
                     sessionDescriptor = emp.face_descriptor;
                     if(!sessionDescriptor) { firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
-                    else { showApp(); fetchUserDataInBackground(); }
+                    else { playSound('login-success'); showApp(); fetchUserDataInBackground(); if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000); }
                 }
-            } else { playSound('login-error'); showToast('بيانات خاطئة','error'); setStatus('النظام جاهز'); }
-        } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال','error'); setStatus('غير متصل'); }
+            } else { playSound('login-error'); showToast('بيانات خاطئة', 'error'); setStatus('النظام جاهز'); }
+        } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال', 'error'); setStatus('غير متصل'); }
     }
 
     async function submitFirstPwChange() {
         const newPw = $('firstNewPw').value.trim();
         if(!newPw || newPw.length<4) return showToast('كلمة السر ضعيفة','error');
-        setStatus('جاري تغيير كلمة السر...');
+        setStatus('جاري التغيير...');
         try {
             const { error } = await db.from('employees').update({ password: newPw, is_first_login: false }).eq('code', user.code);
             if(!error) {
-                $('forcePwModal').classList.remove('active'); playSound('login-success'); user.isFirstLogin = false;
+                $('forcePwModal').classList.remove('active'); user.isFirstLogin = false;
                 if($('rememberMe').checked) localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() }));
                 else sessionStorage.setItem('user', JSON.stringify(user));
-                
                 showToast('تم تحديث كلمة السر', 'success');
                 const { data: emp } = await db.from('employees').select('face_descriptor').eq('code', user.code).single();
-                if (emp && emp.face_descriptor) { showApp(); fetchUserDataInBackground(); }
+                if (emp && emp.face_descriptor) { playSound('login-success'); showApp(); fetchUserDataInBackground(); }
                 else { showToast('الآن سجل بصمة وجهك', 'success'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
             } else throw error;
         } catch(e) { playSound('login-error'); showToast('خطأ في التحديث','error'); }
     }
 
     function logout() { playSound('logout-success'); if(autoRefreshTimer) clearInterval(autoRefreshTimer); localStorage.removeItem('rememberedUser'); sessionStorage.removeItem('user'); user = null; sessionDescriptor = null; userImage = ''; $('mainApp').style.display='none'; $('loginScreen').classList.remove('hidden'); setStatus('النظام جاهز'); }
-    async function refreshData() { const icon = $('refreshBtn').querySelector('i'); icon.style.animation='spin 0.5s linear'; setTimeout(()=>icon.style.animation='',600); if(user?.isAdmin) await loadEmployees(); else if(user) fetchUserDataInBackground(); showToast('تم التحديث','success'); }
+    
+    // إصلاح مشكلة "تم التحديث" كل شوية
+    async function refreshData(silent = false) { 
+        const icon = $('refreshBtn').querySelector('i'); icon.style.animation='spin 0.5s linear'; setTimeout(()=>icon.style.animation='',600); 
+        if(user?.isAdmin) await loadEmployees(); else if(user) fetchUserDataInBackground(); 
+        if(!silent) showToast('تم التحديث','success'); 
+    }
 
     function showApp() {
         if(autoRefreshTimer) clearInterval(autoRefreshTimer);
         $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block';
         if(user.isAdmin) {
             $('mainAppTitle').textContent='لوحة تحكم المدير'; $('adminPanel').style.display='block'; $('employeePanel').style.display='none';
-            playSound('login-success'); showToast('مرحباً بك في لوحة التحكم','success');
+            showToast('مرحباً بك في لوحة التحكم','success');
             const existing = document.getElementById('adminMicroInteractions'); if(existing) existing.remove();
             $('adminPanel').insertAdjacentHTML('afterbegin', `<div id="adminMicroInteractions"><div class="emp-profile-card"><img src="${userImage || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+'}" class="emp-profile-img" alt="Admin"><div><h3 style="margin:0; color:white; font-size:18px;">مرحباً بك يا ${user.name}</h3><p style="margin:0; color:#64748b; font-size:12px;">مدير النظام</p></div></div></div>`);
             loadEmployees();
         } else {
             $('mainAppTitle').textContent='لوحة الموظف'; $('adminPanel').style.display='none'; $('employeePanel').style.display='block';
-            playSound('login-success');
             const existing = document.getElementById('empMicroInteractions'); if(existing) existing.remove();
             $('employeePanel').insertAdjacentHTML('afterbegin', `<div id="empMicroInteractions"><div class="emp-profile-card"><img src="${userImage || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+'}" class="emp-profile-img" alt="Profile"><div><h3 style="margin:0; color:white; font-size:18px;">مرحباً يا ${user.name}</h3><p style="margin:0; color:#64748b; font-size:12px;">${user.code}</p></div></div><div id="monthlyHoursCard" class="emp-month-hours"><p style="color:#c4b5fd; font-size:13px; margin-bottom:5px;"><i class="fas fa-hourglass-half"></i> إجمالي ساعات العمل هذا الشهر</p><h2 id="monthHoursValue" style="color:white; font-size:28px; margin:0;">...</h2></div></div>`);
             calculateMonthlyHours();
         }
-        autoRefreshTimer = setInterval(() => { if(user) refreshData(); }, AUTO_REFRESH_INTERVAL);
+        autoRefreshTimer = setInterval(() => { if(user) refreshData(true); }, AUTO_REFRESH_INTERVAL);
     }
 
     async function calculateMonthlyHours() { 
         try { 
             const now = new Date(); const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-            const { data, error } = await db.from('attendance').select('created_at, type, hours_worked').eq('employee_code', user.code).gte('created_at', startOfMonth);
-            if(!error && data) {
-                let totalHours = 0;
-                data.forEach(rec => { if(rec.type === 'انصراف' && rec.hours_worked) totalHours += parseFloat(rec.hours_worked) || 0; });
-                $('monthHoursValue').textContent = totalHours > 0 ? totalHours.toFixed(2) + ' ساعة' : '0 ساعة';
-            }
+            const { data } = await db.from('attendance').select('created_at, type, hours_worked').eq('employee_code', user.code).gte('created_at', startOfMonth);
+            if(data) { let totalHours = 0; data.forEach(rec => { if(rec.type === 'انصراف' && rec.hours_worked) totalHours += parseFloat(rec.hours_worked) || 0; }); $('monthHoursValue').textContent = totalHours > 0 ? totalHours.toFixed(2) + ' ساعة' : '0 ساعة'; }
         } catch(e) { $('monthHoursValue').textContent = '--'; } 
     }
 
     async function loadEmployees() { 
         try { 
-            const { data: emps, error } = await db.from('employees').select('code, name, is_admin').order('created_at', { ascending: true });
-            if(!error) { employees = emps || []; $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); }
+            const { data: emps } = await db.from('employees').select('code, name').order('created_at', { ascending: true });
+            if(emps) { employees = emps; $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); }
         } catch(e) { setStatus('غير متصل'); } 
     }
 
     function renderEmployeeList(list) { 
         if(!list.length) { $('searchResults').innerHTML='<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين</p>'; return; } 
-        $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button><button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}', '${e.name}')" title="إعادة تسجيل بصمة"><i class="fas fa-sync-alt"></i></button></div></div>`).join(''); 
+        $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button><button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}', '${e.name}')" title="إعادة تسجيل بصمة"><i class="fas fa-sync-alt"></i></button><button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${e.code}', '${e.name}')" title="حذف الموظف"><i class="fas fa-trash"></i></button></div></div>`).join(''); 
     }
     $('searchInput')?.addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); renderEmployeeList(q ? employees.filter(emp=>emp.name.toLowerCase().includes(q)||emp.code.toLowerCase().includes(q)) : employees); });
 
     async function adminDirectAtt(type, code, name) {
-        if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن، جاري التسجيل...','error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
+        if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن، جاري التسجيل...', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
         adminVerifyMode = true; targetEmpForAdmin = { type, code, name }; attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
         if(!await openCamera()) { adminVerifyMode=false; showToast('فشل فتح الكاميرا','error'); }
     }
     
+    async function adminDeleteEmp(code, name) {
+        if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن، جاري التسجيل...', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
+        adminVerifyMode = true; targetEmpForAdmin = { type: 'حذف موظف', code, name }; attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
+        if(!await openCamera()) { adminVerifyMode=false; showToast('فشل فتح الكاميرا','error'); }
+    }
+
     async function handleAttendance(type) {
         if(!sessionDescriptor) return showToast('بيانات الوجه غير مسجلة، تواصل مع الأدمن.','error');
         attMode=true; attType=type; adminVerifyMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
@@ -777,13 +770,13 @@
     }
 
     function closeReportModal() { $('reportModal').classList.remove('active'); }
-    async function loadMyReport() { $('reportTitle').textContent=`تقرير ${user.name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(user.code); }
-    async function loadEmpReport(code,name) { $('reportTitle').textContent=`تقرير ${name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(code); }
+    async function loadMyReport() { $('reportTitle').textContent=`تقرير ${user.name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(user.code); }
+    async function loadEmpReport(code,name) { $('reportTitle').textContent=`تقرير ${name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(code); }
     
     async function fetchAndRenderReport(code) { 
         try { 
-            const { data: records, error } = await db.from('attendance').select('*').eq('employee_code', code).order('created_at', { ascending: false });
-            if(!error && records.length>0) { 
+            const { data: records } = await db.from('attendance').select('*').eq('employee_code', code).order('created_at', { ascending: false });
+            if(records && records.length>0) { 
                 $('reportBody').innerHTML = `<table class="report-table"><thead><tr><th>التاريخ</th><th>الحالة</th><th>الشفت</th><th>الساعات</th></tr></thead><tbody>${records.map(r => { 
                     const dateStr = new Date(r.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
                     return `<tr><td style="font-size:12px;">${dateStr}</td><td><span class="att-badge ${r.type==='حضور'?'att-in':'att-out'}">${r.type}</span></td><td style="font-size:11px;">${r.shift}</td><td style="font-weight:bold; color:${r.hours_worked?'#38bdf8':'#64748b'}">${r.hours_worked||'-'}</td></tr>` 
@@ -797,20 +790,23 @@
     async function submitForgotPw() { 
         const code = $('forgotCode').value.trim(); if(!code) return showToast('يرجى إدخال الكود','error'); 
         const tempPass = Math.random().toString(36).slice(-8);
+        const { data: emp } = await db.from('employees').select('name, email').eq('code', code).single();
         const { error } = await db.from('employees').update({ password: tempPass, is_first_login: true }).eq('code', code);
-        if(!error) { playSound('login-success'); showToast(`تم إعادة تعيين كلمة السر. الباسورد الجديد: ${tempPass}`, 'success'); closeForgotPw(); }
+        if(!error) { 
+            playSound('login-success'); showToast('تم إعادة تعيين كلمة السر.', 'success'); closeForgotPw();
+            if(emp) fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ action: 'sendForgotPw', name: emp.name, code, password: tempPass, email: emp.email }) }).catch(e=>{});
+        }
         else { playSound('login-error'); showToast('الكود غير صحيح','error'); }
     }
     
     function showRegisterScreen() { $('loginScreen').classList.add('hidden'); $('registerScreen').classList.remove('hidden'); }
     function showLoginScreen() { $('registerScreen').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); }
-    async function startRegistration() { const name = $('regName').value.trim(), email = $('regEmail').value.trim(); if(!name||!email) return showToast('يرجى إدخال الاسم والبريد','error'); regData = { name, email }; regMode = true; if(!await openCamera()) { regMode=false; showToast('فشل فتح الكاميرا','error'); } }
+    async function startRegistration() { const name = $('regName').value.trim(), email = $('regEmail').value.trim(); if(!name||!email) return showToast('يرجى إدخال البيانات','error'); regData = { name, email }; regMode = true; if(!await openCamera()) { regMode=false; showToast('فشل فتح الكاميرا','error'); } }
 
     async function adminResetFace(code, name) {
-        if(!code) return showToast('كود الموظف مطلوب','error');
         targetEmpForAdmin = { code, name }; adminResetFaceMode = true;
         regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false; firstTimeSetupMode = false;
-        showToast(`جاري فتح الكاميرا لتسجيل بصمة جديدة لـ ${name}`, 'warning');
+        showToast(`جاري فتح الكاميرا لبصمة ${name}`, 'warning');
         if(!await openCamera()) { adminResetFaceMode = false; showToast('فشل فتح الكاميرا','error'); }
     }
 
@@ -820,7 +816,7 @@
                 currentLat = pos.coords.latitude; currentLon = pos.coords.longitude; currentAccuracy = pos.coords.accuracy || 0;
                 currentLoc = `https://maps.google.com/?q=${currentLat},${currentLon}`;
                 $('locBar').innerHTML = `<i class="fas fa-map-marker-alt" style="color:var(--success);"></i> <a href="${currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">الموقع محدد</a>`;
-            }, () => { $('locBar').innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`; currentLoc='غير متوفر'; currentLat=null; currentLon=null; currentAccuracy=0; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+            }, () => { $('locBar').innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`; currentLoc='غير متوفر'; currentLat=null; currentLon=null; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
         }
     }
 
@@ -834,20 +830,53 @@
         else setStatus('النظام جاهز');
     }
 
-    // دوال البصمة (معلقة لتجنب الأخطاء)
-    async function registerFingerprint() { console.log("Fingerprint skipped."); }
-    async function loginWithFingerprint() { showToast('هذه الميزة قيد التطوير', 'warning'); }
+    // ==========================================
+    // بصمة الإصبع (WebAuthn)
+    // ==========================================
+    async function registerFingerprint() { 
+        try { 
+            if(!window.PublicKeyCredential) return;
+            const challenge = new Uint8Array(32); crypto.getRandomValues(challenge); 
+            const credential = await navigator.credentials.create({ 
+                publicKey: { challenge, rp:{ name:"Axentro System" }, user:{ id:new Uint8Array(16), name:user.code, displayName:user.name }, pubKeyCredParams:[{alg:-7,type:"public-key"},{alg:-257,type:"public-key"}], authenticatorSelection:{ authenticatorAttachment:"platform", userVerification:"required" }, timeout:60000 } 
+            }); 
+            if(credential) { localStorage.setItem('axentro_fp_id', bufferToBase64(credential.rawId)); showToast('تم تسجيل بصمة الإصبع بنجاح!','success'); }
+        } catch(e) {} 
+    }
 
-    // ==========================================
-    // 8. التهيئة
-    // ==========================================
+    async function loginWithFingerprint() {
+        const savedFpId = localStorage.getItem('axentro_fp_id'), savedLogin = localStorage.getItem('axentro_saved_login');
+        if(!savedFpId || !savedLogin) { showToast('سجل دخولك عادياً وفعّل "تذكرني" أولاً','error'); return; }
+        try { 
+            setStatus('جاري التحقق من البصمة...'); 
+            const challenge = new Uint8Array(32); crypto.getRandomValues(challenge); 
+            const assertion = await navigator.credentials.get({ publicKey: { challenge, allowCredentials:[{ id:base64ToBuffer(savedFpId), type:'public-key' }], userVerification:"required" } }); 
+            if(assertion) { 
+                setStatus('جاري التحقق...'); 
+                const loginData = JSON.parse(savedLogin); 
+                const { data: emp, error } = await db.from('employees').select('*').eq('code', loginData.code).eq('password', loginData.pass).single();
+                if(!error && emp) { 
+                    user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login }; 
+                    localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); 
+                    sessionDescriptor = emp.face_descriptor;
+                    if(!sessionDescriptor) { firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
+                    else { playSound('login-success'); showApp(); fetchUserDataInBackground(); }
+                } else { playSound('login-error'); showToast('فشل التحقق (بيانات تغيرت)','error'); setStatus('النظام جاهز'); }
+            } 
+        } catch(e) { 
+            if(e.name==='NotAllowedError') showToast('تم إلغاء البصمة','error'); else showToast('فشل التحقق','error'); 
+            setStatus('النظام جاهز'); 
+        } 
+    }
+
     function init() {
         restoreSession(); loadModelsAsync(); getLocation();
         document.addEventListener('click', unlockAudio, { once: true });
         document.addEventListener('touchstart', unlockAudio, { once: true });
-        window.addEventListener('online', () => { isOnline = true; $('connDot').classList.remove('offline'); $('connDot').classList.add('online'); setStatus('تم الاتصال بالإنترنت'); });
+        window.addEventListener('online', () => { isOnline = true; $('connDot').classList.remove('offline'); $('connDot').classList.add('online'); setStatus('متصل'); });
         window.addEventListener('offline', () => { isOnline = false; $('connDot').classList.remove('online'); $('connDot').classList.add('offline'); setStatus('غير متصل'); showToast('أنت غير متصل بالإنترنت', 'warning'); });
         document.addEventListener('DOMContentLoaded',()=>{
+            if(window.PublicKeyCredential && localStorage.getItem('axentro_fp_id')) $('fingerprintLoginBtn').style.display='flex';
             $('loginCode')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); $('loginPass').focus(); } });
             $('loginPass')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); handleLogin(); } });
             $('forgotCode')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); submitForgotPw(); } });
