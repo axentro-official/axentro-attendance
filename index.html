@@ -293,22 +293,22 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
     // ==========================================
-    // 1. إعدادات الاتصال بـ Supabase
+    // 1. إعدادات الاتصال بـ Supabase (تم إصلاح خطأ التعارض)
     // ==========================================
     const SUPABASE_URL = 'https://qgbokzzynieoedhloxqt.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc';
-    const { createClient } = supabase; // استخراج دالة الإنشاء من المكتبة
-    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY); // تغيير الاسم لتجنب التعارض
+    const { createClient } = supabase; 
+    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY); 
 
     // ==========================================
-    // 2. المتغيرات العامة (بدون رابط جوجل شيت)
+    // 2. المتغيرات العامة
     // ==========================================
     const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 150;
     const MATCH_THRESHOLD = 0.55;
     const AUTO_REFRESH_INTERVAL = 30000;
     const STABLE_FRAMES_REQUIRED = 5;
     const MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
-    const STORE_IMG_MAX = 400; // تحسين جودة الصورة لأن Storage يتقبل ملفات كبيرة
+    const STORE_IMG_MAX = 400;
     
     let user = null;
     let lightModels = false, heavyModels = false, stream = null, employees = [];
@@ -329,7 +329,7 @@
     const video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
 
     // ==========================================
-    // 3. دوال المساعدات (بدون تغيير كبير)
+    // 3. دوال المساعدات
     // ==========================================
     function unlockAudio() { if (audioUnlocked) return; try { const a = $('login-success'); if (a) { a.volume = 0.01; a.play().then(() => { a.volume = 1; audioUnlocked = true; }).catch(() => {}); } } catch(e) {} }
     function playSound(id) { try { const audio = $(id); if (!audio) return; audio.currentTime = 0; audio.play().catch(() => {}); } catch(e) {} }
@@ -364,7 +364,6 @@
         if (percent > 0 && percent < 100) container.classList.add('active'); else container.classList.remove('active');
     }
 
-    // تحويل الـ Canvas إلى Blob لرفعه لـ Supabase Storage
     function createStorageImageBlob() {
         const c = document.createElement('canvas');
         let w = video.videoWidth, h = video.videoHeight;
@@ -385,7 +384,7 @@
     }
 
     // ==========================================
-    // 4. دوال الذكاء الاصطناعي والكاميرا (محسنة)
+    // 4. دوال الذكاء الاصطناعي والكاميرا
     // ==========================================
     async function extractStableDescriptor() {
         const samples = [];
@@ -477,7 +476,7 @@
     }
 
     // ==========================================
-    // 5. منطق العمليات الرئيسي (MAGIC HAPPENS HERE - Supabase)
+    // 5. منطق العمليات الرئيسي (Supabase)
     // ==========================================
     async function performCapture() {
         if(isProcessingCapture) return;
@@ -489,37 +488,31 @@
         const newDescriptor = await extractStableDescriptor();
         if(!newDescriptor) { playSound('faceid-error'); setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة، جاري إعادة المحاولة...'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
 
-        // حالة 1: تسجيل موظف جديد
         if(regMode) {
             setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بيانات الموظف الجديد...');
             try {
-                // توليد كود موظف جديد
-                const { count } = await supabase.from('employees').select('*', { count: 'exact', head: true });
+                const { count } = await db.from('employees').select('*', { count: 'exact', head: true });
                 const newCode = `EMP${String(count + 1).padStart(3, '0')}`;
                 const tempPass = Math.random().toString(36).slice(-8);
 
-                // رفع الصورة لـ Storage
                 const imgBlob = await createStorageImageBlob();
                 const imgPath = `${newCode}_face.jpg`;
                 await db.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
                 const { data: imgData } = db.storage.from('faces').getPublicUrl(imgPath);
                 const publicUrl = imgData.publicUrl;
 
-                // إدخال البيانات لقاعدة البيانات
-                const { error } = await supabase.from('employees').insert({ 
+                const { error } = await db.from('employees').insert({ 
                     code: newCode, name: regData.name, email: regData.email, 
                     password: tempPass, face_descriptor: newDescriptor, is_first_login: true 
                 });
 
                 if(!error) {
                     playSound('faceid-success'); 
-                    showToast(`تم إنشاء الحساب! كودك: ${newCode} | باسورد مؤقت: ${tempPass} (تم محاكاة الإيميل لعدم وجود Back-end)`, 'success'); 
+                    showToast(`تم إنشاء الحساب! كود: ${newCode} | باسورد: ${tempPass}`, 'success'); 
                     closeCamera(); showLoginScreen();
                 } else throw error;
             } catch(e) { playSound('faceid-error'); showToast('حدث خطأ: ' + e.message, 'error'); closeCamera(); }
         }
-
-        // حالة 2: تسجيل بصمة للمرة الأولى (بعد تغيير الباسورد)
         else if(firstTimeSetupMode) {
             setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بصمة الوجه...');
             try {
@@ -528,7 +521,7 @@
                 await db.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
                 const { data: imgData } = db.storage.from('faces').getPublicUrl(imgPath);
                 
-                const { error } = await supabase.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
+                const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
                 if(!error) {
                     playSound('faceid-success'); sessionDescriptor = newDescriptor; userImage = imgData.publicUrl;
                     showMatchResult(true); showToast('تم تسجيل البصمة بنجاح!', 'success');
@@ -536,41 +529,33 @@
                 } else throw error;
             } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل الحفظ', 'error'); restartCamLoop(); }
         }
-
-        // حالة 3: تحديث بصمة الوجه (إعدادات)
         else if(updateFaceMode) {
             try {
                 const imgBlob = await createStorageImageBlob();
                 await db.storage.from('faces').upload(`${user.code}_face.jpg`, imgBlob, { upsert: true });
-                const { error } = await supabase.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
+                const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
                 if(!error) { playSound('faceid-success'); sessionDescriptor = newDescriptor; showMatchResult(true); showToast('تم تحديث البصمة!', 'success'); setTimeout(()=>closeCamera(), 800); showApp(); }
                 else throw error;
             } catch(e) { playSound('faceid-error'); showToast('فشل التحديث', 'error'); closeCamera(); }
         }
-
-        // حالة 4: الأدمن يعيد تسجيل بصمة لموظف
         else if(adminResetFaceMode) {
             try {
                 const imgBlob = await createStorageImageBlob();
                 await db.storage.from('faces').upload(`${targetEmpForAdmin.code}_face.jpg`, imgBlob, { upsert: true });
-                const { error } = await supabase.from('employees').update({ face_descriptor: newDescriptor }).eq('code', targetEmpForAdmin.code);
+                const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', targetEmpForAdmin.code);
                 if(!error) { playSound('faceid-success'); showMatchResult(true); showToast(`تم تحديث بصمة ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); }
                 else throw error;
             } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل التحديث', 'error'); restartCamLoop(); }
         }
-
-        // حالة 5: الأدمن يتحقق من وجهه لتسجيل حضور/انصراف لموظف
         else if(adminVerifyMode) {
             if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات وجهك كأدمن غير متوفرة!', 'error'); closeCamera(); return; }
             if(euclideanDistance(newDescriptor, sessionDescriptor) < MATCH_THRESHOLD) {
                 showMatchResult(true); setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق، جاري التسجيل...');
-                const { error } = await supabase.from('attendance').insert({ employee_code: targetEmpForAdmin.code, employee_name: targetEmpForAdmin.name, type: targetEmpForAdmin.type, location_link: currentLoc, shift: 'تسجيل يدوي بواسطة الأدمن' });
+                const { error } = await db.from('attendance').insert({ employee_code: targetEmpForAdmin.code, employee_name: targetEmpForAdmin.name, type: targetEmpForAdmin.type, location_link: currentLoc, shift: 'تسجيل يدوي بواسطة الأدمن' });
                 if(!error) { playSound('faceid-success'); showToast(`تم تسجيل ${targetEmpForAdmin.type} لـ ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
                 else { playSound('faceid-error'); showToast('فشل التسجيل', 'error'); restartCamLoop(); }
             } else { playSound('faceid-error'); showMatchResult(false); showToast('وجه الأدمن غير مطابق!', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> انتحال هوية مرفوض!'); restartCamLoop(); }
         }
-
-        // حالة 6: الموظف يسجل حضور/انصراف أو يغير باسورد
         else if(attMode) {
             if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة', 'error'); closeCamera(); return; }
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
@@ -578,15 +563,13 @@
             if(distance < MATCH_THRESHOLD) {
                 showMatchResult(true);
                 
-                // إذا كان الإجراء تغيير كلمة سر
                 if(attType === 'تغيير كلمة المرور') {
-                    const { error } = await supabase.from('employees').update({ password: window._pendingPwChange.newPassword }).eq('code', user.code).eq('password', window._pendingPwChange.oldPassword);
+                    const { error } = await db.from('employees').update({ password: window._pendingPwChange.newPassword }).eq('code', user.code).eq('password', window._pendingPwChange.oldPassword);
                     if(!error) { playSound('login-success'); showToast('تم تغيير كلمة المرور', 'success'); setTimeout(()=>closeCamera(), 800); }
                     else { playSound('login-error'); showToast('كلمة السر الحالية خاطئة', 'error'); restartCamLoop(); }
                     isProcessingCapture = false; return;
                 }
 
-                // التحقق من الموقع الجغرافي
                 if(currentLat && currentLon) {
                     const dist = getDistanceFromLatLonInKm(currentLat, currentLon, OFFICE_LAT, OFFICE_LON);
                     if(dist > MAX_DISTANCE_METERS) {
@@ -596,21 +579,19 @@
                     }
                 }
 
-                // تسجيل الحضور أو الانصراف
                 const selShift = document.querySelector('input[name="shift"]:checked');
                 let hoursWorked = null;
                 
                 if(attType === 'انصراف') {
-                    // حساب ساعات العمل
                     const today = new Date().toISOString().split('T')[0];
-                    const { data: lastCheckIn } = await supabase.from('attendance').select('created_at').eq('employee_code', user.code).eq('type', 'حضور').gte('created_at', today).order('created_at', { ascending: false }).limit(1).single();
+                    const { data: lastCheckIn } = await db.from('attendance').select('created_at').eq('employee_code', user.code).eq('type', 'حضور').gte('created_at', today).order('created_at', { ascending: false }).limit(1).single();
                     if(lastCheckIn) {
                         const diff = (new Date() - new Date(lastCheckIn.created_at)) / (1000 * 60 * 60);
                         hoursWorked = `${diff.toFixed(2)} ساعة`;
                     }
                 }
 
-                const { error } = await supabase.from('attendance').insert({ 
+                const { error } = await db.from('attendance').insert({ 
                     employee_code: user.code, employee_name: user.name, type: attType, 
                     location_link: currentLoc, shift: selShift ? selShift.value : 'لم يتم التحديد', hours_worked: hoursWorked 
                 });
@@ -622,11 +603,10 @@
         isProcessingCapture = false;
     }
 
-    // دالة مساعدة لإعادة تشغيل الكاميرا عند الفشل
     function restartCamLoop() { isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
 
     // ==========================================
-    // 6. دوال الذكاء الاصطناعي (تحميل النماذج)
+    // 6. تحميل نماذج الذكاء الاصطناعي
     // ==========================================
     async function loadModelsAsync() {
         try {
@@ -643,16 +623,16 @@
     }
 
     // ==========================================
-    // 7. دوال النظام (تسجيل دخول، بانيلات، تقارير)
+    // 7. دوال النظام والتقارير
     // ==========================================
     async function fetchUserDataInBackground() {
         if(!user) return;
         try {
-            const { data: emp, error } = await supabase.from('employees').select('face_descriptor').eq('code', user.code).single();
+            const { data: emp, error } = await db.from('employees').select('face_descriptor').eq('code', user.code).single();
             if(!error && emp && emp.face_descriptor) {
                 sessionDescriptor = emp.face_descriptor;
                 const { data: imgData } = db.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
-                userImage = imgData.publicUrl + '?t=' + new Date().getTime(); // Cash Busting
+                userImage = imgData.publicUrl + '?t=' + new Date().getTime();
                 const img = document.querySelector('.emp-profile-img');
                 if(img) img.src = userImage;
             }
@@ -668,7 +648,7 @@
         if(!code || !pass) return showToast('يرجى إدخال الكود وكلمة السر', 'error');
         setStatus('جاري التحقق...');
         try {
-            const { data: emp, error } = await supabase.from('employees').select('*').eq('code', code).eq('password', pass).single();
+            const { data: emp, error } = await db.from('employees').select('*').eq('code', code).eq('password', pass).single();
             if(!error && emp) {
                 user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login };
                 if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass })); }
@@ -689,15 +669,14 @@
         if(!newPw || newPw.length<4) return showToast('كلمة السر ضعيفة','error');
         setStatus('جاري تغيير كلمة السر...');
         try {
-            const { error } = await supabase.from('employees').update({ password: newPw, is_first_login: false }).eq('code', user.code);
+            const { error } = await db.from('employees').update({ password: newPw, is_first_login: false }).eq('code', user.code);
             if(!error) {
                 $('forcePwModal').classList.remove('active'); playSound('login-success'); user.isFirstLogin = false;
                 if($('rememberMe').checked) localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() }));
                 else sessionStorage.setItem('user', JSON.stringify(user));
                 
                 showToast('تم تحديث كلمة السر', 'success');
-                // التحقق مما إذا كان لديه بصمة مسجلة مسبقاً
-                const { data: emp } = await supabase.from('employees').select('face_descriptor').eq('code', user.code).single();
+                const { data: emp } = await db.from('employees').select('face_descriptor').eq('code', user.code).single();
                 if (emp && emp.face_descriptor) { showApp(); fetchUserDataInBackground(); }
                 else { showToast('الآن سجل بصمة وجهك', 'success'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
             } else throw error;
@@ -729,7 +708,7 @@
     async function calculateMonthlyHours() { 
         try { 
             const now = new Date(); const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-            const { data, error } = await supabase.from('attendance').select('created_at, type, hours_worked').eq('employee_code', user.code).gte('created_at', startOfMonth);
+            const { data, error } = await db.from('attendance').select('created_at, type, hours_worked').eq('employee_code', user.code).gte('created_at', startOfMonth);
             if(!error && data) {
                 let totalHours = 0;
                 data.forEach(rec => { if(rec.type === 'انصراف' && rec.hours_worked) totalHours += parseFloat(rec.hours_worked) || 0; });
@@ -740,8 +719,7 @@
 
     async function loadEmployees() { 
         try { 
-            // السر الخفي: نحضر فقط الاسم والكود! بدون صور وبصمات! لهذا سيكون فورياً
-            const { data: emps, error } = await supabase.from('employees').select('code, name, is_admin').order('created_at', { ascending: true });
+            const { data: emps, error } = await db.from('employees').select('code, name, is_admin').order('created_at', { ascending: true });
             if(!error) { employees = emps || []; $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); }
         } catch(e) { setStatus('غير متصل'); } 
     }
@@ -792,7 +770,7 @@
         } else {
             const c=$('targetEmpCode').value.trim(), n=$('newPassword').value.trim();
             if(!c||!n) return showToast('يرجى إدخال البيانات','error');
-            const { error } = await supabase.from('employees').update({ password: n, is_first_login: false }).eq('code', c);
+            const { error } = await db.from('employees').update({ password: n, is_first_login: false }).eq('code', c);
             if(!error) { playSound('login-success'); showToast('تم التغيير بنجاح','success'); closeChangePwModal(); }
             else { playSound('login-error'); showToast('فشل التغيير (تأكد من الكود)','error'); }
         }
@@ -804,7 +782,7 @@
     
     async function fetchAndRenderReport(code) { 
         try { 
-            const { data: records, error } = await supabase.from('attendance').select('*').eq('employee_code', code).order('created_at', { ascending: false });
+            const { data: records, error } = await db.from('attendance').select('*').eq('employee_code', code).order('created_at', { ascending: false });
             if(!error && records.length>0) { 
                 $('reportBody').innerHTML = `<table class="report-table"><thead><tr><th>التاريخ</th><th>الحالة</th><th>الشفت</th><th>الساعات</th></tr></thead><tbody>${records.map(r => { 
                     const dateStr = new Date(r.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -819,8 +797,8 @@
     async function submitForgotPw() { 
         const code = $('forgotCode').value.trim(); if(!code) return showToast('يرجى إدخال الكود','error'); 
         const tempPass = Math.random().toString(36).slice(-8);
-        const { error } = await supabase.from('employees').update({ password: tempPass, is_first_login: true }).eq('code', code);
-        if(!error) { playSound('login-success'); showToast(`تم إعادة تعيين كلمة السر. الباسورد الجديد: ${tempPass} (يُفضل إرساله بالإيميل لاحقاً)`, 'success'); closeForgotPw(); }
+        const { error } = await db.from('employees').update({ password: tempPass, is_first_login: true }).eq('code', code);
+        if(!error) { playSound('login-success'); showToast(`تم إعادة تعيين كلمة السر. الباسورد الجديد: ${tempPass}`, 'success'); closeForgotPw(); }
         else { playSound('login-error'); showToast('الكود غير صحيح','error'); }
     }
     
@@ -855,13 +833,13 @@
         if(savedUser) { user = savedUser; showApp(); fetchUserDataInBackground(); }
         else setStatus('النظام جاهز');
     }
-    
-    // دوال بصمة الإصبع (معلقة مؤقتاً لتجنب أخطاء الـ Console)
-    async function registerFingerprint() { console.log("Fingerprint registration skipped in this version."); }
-    async function loginWithFingerprint() { showToast('هذه الميزة قيد التطوير للإصدار القادم', 'warning'); }
+
+    // دوال البصمة (معلقة لتجنب الأخطاء)
+    async function registerFingerprint() { console.log("Fingerprint skipped."); }
+    async function loginWithFingerprint() { showToast('هذه الميزة قيد التطوير', 'warning'); }
 
     // ==========================================
-    // 8. التهيئة (Initialization)
+    // 8. التهيئة
     // ==========================================
     function init() {
         restoreSession(); loadModelsAsync(); getLocation();
@@ -876,7 +854,6 @@
         });
     }
     init();
-    
 </script>
 </body>
 </html>
