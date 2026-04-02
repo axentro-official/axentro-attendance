@@ -290,16 +290,24 @@
 
 <div id="toast" class="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-    const URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
+    // ==========================================
+    // 1. إعدادات الاتصال بـ Supabase
+    // ==========================================
+    const SUPABASE_URL = 'https://qgbokzzynieoedhloxqt.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ==========================================
+    // 2. المتغيرات العامة (بدون رابط جوجل شيت)
+    // ==========================================
     const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 150;
     const MATCH_THRESHOLD = 0.55;
     const AUTO_REFRESH_INTERVAL = 30000;
     const STABLE_FRAMES_REQUIRED = 5;
     const MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
-    
-    // [تحسين] تقليل الحجم الأقصى للصورة لمنع قطعها في Google Sheets (الحد الأقصى للخلية 50,000 حرف)
-    const STORE_IMG_MAX = 300;
+    const STORE_IMG_MAX = 400; // تحسين جودة الصورة لأن Storage يتقبل ملفات كبيرة
     
     let user = null;
     let lightModels = false, heavyModels = false, stream = null, employees = [];
@@ -313,76 +321,59 @@
     let detectionLoopTimeout = null;
     let livenessActive = false, livenessStartYaw = null, livenessMoved = false, stabilityCounter = 0;
     let isOnline = navigator.onLine;
-    let offlineQueue = JSON.parse(localStorage.getItem('axentro_offline_queue') || '[]');
     let audioUnlocked = false;
     let modelsLoadProgress = 0;
     
     const $ = id => document.getElementById(id);
     const video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
-    
-    function unlockAudio() {
-        if (audioUnlocked) return;
-        try { const a = $('login-success'); if (a) { a.volume = 0.01; a.play().then(() => { a.volume = 1; audioUnlocked = true; }).catch(() => {}); } } catch(e) {}
-    }
-    function playSound(id) {
-        try { const audio = $(id); if (!audio) return; audio.currentTime = 0; audio.play().catch(() => { setTimeout(() => { try { audio.currentTime = 0; audio.play().catch(()=>{}); } catch(e){} }, 150); }); } catch(e) {}
-    }
+
+    // ==========================================
+    // 3. دوال المساعدات (بدون تغيير كبير)
+    // ==========================================
+    function unlockAudio() { if (audioUnlocked) return; try { const a = $('login-success'); if (a) { a.volume = 0.01; a.play().then(() => { a.volume = 1; audioUnlocked = true; }).catch(() => {}); } } catch(e) {} }
+    function playSound(id) { try { const audio = $(id); if (!audio) return; audio.currentTime = 0; audio.play().catch(() => {}); } catch(e) {} }
     function showToast(msg, type='') { const t = $('toast'); t.textContent = msg; t.className = `toast show ${type}`; setTimeout(() => t.classList.remove('show'), 4000); }
     function setStatus(txt) { $('connText').textContent = txt; }
     function togglePassword(id) { const i = $(id); i.type = i.type === 'password' ? 'text' : 'password'; }
     function deg2rad(deg) { return deg * (Math.PI/180); }
     function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) { const R = 6371; const dLat = deg2rad(lat2-lat1); const dLon = deg2rad(lon2-lon1); const a = Math.sin(dLat/2)**2 + Math.cos(deg2rad(lat1))*Math.cos(deg2rad(lat2))*Math.sin(dLon/2)**2; const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c * 1000; }
     function euclideanDistance(desc1, desc2) { let sum=0; for(let i=0;i<desc1.length;i++) sum+=(desc1[i]-desc2[i])**2; return Math.sqrt(sum); }
-    function bufferToBase64(buffer) { let binary=''; const bytes=new Uint8Array(buffer); for(let i=0;i<bytes.byteLength;i++) binary+=String.fromCharCode(bytes[i]); return btoa(binary); }
-    function base64ToBuffer(base64) { const binary=atob(base64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes.buffer; }
     function selectShift(element) { document.querySelectorAll('.shift-card').forEach(c=>c.classList.remove('selected')); element.classList.add('selected'); element.querySelector('input').checked=true; }
     const setCamStatus = (html) => { if(html!==lastCamStatusText) { $('camStatus').innerHTML=html; lastCamStatusText=html; } };
-    
-    function parseArabicDateStr(dateStr) {
-        const easternMap = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
-        const normalized = dateStr.replace(/[٠-٩]/g, d => easternMap[d]);
-        const m = normalized.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-        if (m) return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
-        return null;
-    }
-    
-    function createStorageImage() {
-        const c = document.createElement('canvas');
-        let w = video.videoWidth, h = video.videoHeight;
-        const ratio = Math.min(STORE_IMG_MAX / w, STORE_IMG_MAX / h);
-        if(ratio < 1) { w = Math.round(w * ratio); h = Math.round(h * ratio); }
-        c.width = w; c.height = h;
-        c.getContext('2d').drawImage(video, 0, 0, w, h);
-        // [تحسين] تقليل الجودة لضمان عدم تجاوز 50,000 حرف في الخلية ومنع التشوه
-        return c.toDataURL('image/jpeg', 0.3);
-    }
     
     function updateStabilityRing(current, max) {
         const circle = $('stabilityCircle'), text = $('stabilityText'), ring = $('stabilityRing');
         if (!circle || !text || !ring) return;
         const circumference = 2 * Math.PI * 20;
         const offset = circumference - (current / max) * circumference;
-        circle.style.strokeDashoffset = offset;
-        text.textContent = current;
+        circle.style.strokeDashoffset = offset; text.textContent = current;
         if (current > 0) ring.classList.add('active'); else ring.classList.remove('active');
     }
     
     function showMatchResult(success) {
-        const el = $('matchResult');
-        if (!el) return;
+        const el = $('matchResult'); if (!el) return;
         el.className = `match-result ${success ? 'success' : 'fail'}`;
         el.innerHTML = success ? '<i class="fas fa-check" style="color:white;"></i>' : '<i class="fas fa-times" style="color:white;"></i>';
         setTimeout(() => { el.className = 'match-result'; }, 1500);
     }
     
     function updateModelProgress(percent) {
-        const bar = $('modelProgressBar'), container = $('modelProgress');
-        if (!bar || !container) return;
+        const bar = $('modelProgressBar'), container = $('modelProgress'); if (!bar || !container) return;
         bar.style.width = percent + '%';
-        if (percent > 0 && percent < 100) container.classList.add('active');
-        else container.classList.remove('active');
+        if (percent > 0 && percent < 100) container.classList.add('active'); else container.classList.remove('active');
     }
-    
+
+    // تحويل الـ Canvas إلى Blob لرفعه لـ Supabase Storage
+    function createStorageImageBlob() {
+        const c = document.createElement('canvas');
+        let w = video.videoWidth, h = video.videoHeight;
+        const ratio = Math.min(STORE_IMG_MAX / w, STORE_IMG_MAX / h);
+        if(ratio < 1) { w = Math.round(w * ratio); h = Math.round(h * ratio); }
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(video, 0, 0, w, h);
+        return new Promise(resolve => c.toBlob(resolve, 'image/jpeg', 0.8));
+    }
+
     function getHeadYaw(landmarks) { const nose = landmarks.getNose()[3]; const leftEye = landmarks.getLeftEye()[0]; const rightEye = landmarks.getRightEye()[3]; return nose.x - ((leftEye.x + rightEye.x)/2); }
     function resetLiveness() { livenessActive = true; livenessStartYaw = null; livenessMoved = false; stabilityCounter = 0; }
     function updateLiveness(yaw) {
@@ -391,11 +382,13 @@
         if (Math.abs(yaw - livenessStartYaw) > 0.08) { livenessMoved = true; livenessActive = false; setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، يرجى الثبات...'); return true; }
         return false;
     }
-    
+
+    // ==========================================
+    // 4. دوال الذكاء الاصطناعي والكاميرا (محسنة)
+    // ==========================================
     async function extractStableDescriptor() {
         const samples = [];
         for (let i = 0; i < 2; i++) {
-            // [تحسين] تخفيض نسبة الصرامة لدعم النظارات والإضاءة الضعيفة
             const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 })).withFaceLandmarks().withFaceDescriptor();
             if (!det) return null;
             samples.push(Array.from(det.descriptor));
@@ -412,26 +405,19 @@
             video.srcObject = stream; await video.play();
             $('cameraOverlay').classList.add('active'); lastCamStatusText = '';
             $('scanLine').classList.add('active');
-            if (!lightModels || !heavyModels) {
-                setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...');
-                updateModelProgress(modelsLoadProgress);
-            } else {
-                setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');
-            }
+            setCamStatus(lightModels && heavyModels ? '<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...' : '<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...');
             canvas.width = video.videoWidth; canvas.height = video.videoHeight;
             stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED);
             if (attMode || adminVerifyMode || adminResetFaceMode) resetLiveness();
             isProcessingCapture = false;
             startDetectionLoop(); return true;
-        } catch(e) { console.error(e); return false; }
+        } catch(e) { console.error(e); showToast('فشل الوصول للكاميرا', 'error'); return false; }
     }
     
     function closeCamera() {
         if(stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; }
         video.srcObject = null; $('cameraOverlay').classList.remove('active');
-        $('scanLine').classList.remove('active');
-        $('matchResult').className = 'match-result';
-        $('stabilityRing').classList.remove('active');
+        $('scanLine').classList.remove('active'); $('matchResult').className = 'match-result'; $('stabilityRing').classList.remove('active');
         updateModelProgress(0);
         regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false; firstTimeSetupMode = false; adminResetFaceMode = false;
         attType = ''; targetEmpForAdmin = null; isProcessingCapture = false;
@@ -454,7 +440,6 @@
         if(!video.srcObject || video.videoWidth===0) return;
         if(!lightModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل النماذج الأساسية...'); updateModelProgress(modelsLoadProgress); return; }
         try {
-            // [تحسين] تخفيض نسبة الصرامة لدعم النظارات والإضاءة الضعيفة
             const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.2 })).withFaceLandmarks(true);
             ctx.clearRect(0,0,canvas.width,canvas.height);
             if(detection) {
@@ -468,26 +453,18 @@
                 
                 if (regMode || updateFaceMode || firstTimeSetupMode || adminResetFaceMode) {
                     if (!heavyModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نموذج التعرف...' + Math.round(modelsLoadProgress) + '%'); updateModelProgress(modelsLoadProgress); return; }
-                    stabilityCounter++;
-                    updateStabilityRing(stabilityCounter, STABLE_FRAMES_REQUIRED);
-                    if (stabilityCounter >= STABLE_FRAMES_REQUIRED) {
-                        setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> تم الالتقاط!');
-                        $('stabilityRing').classList.remove('active');
-                        if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 200);
-                    } else { setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...'); }
+                    stabilityCounter++; updateStabilityRing(stabilityCounter, STABLE_FRAMES_REQUIRED);
+                    if (stabilityCounter >= STABLE_FRAMES_REQUIRED) { setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> تم الالتقاط!'); $('stabilityRing').classList.remove('active'); if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 200); }
+                    else { setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...'); }
                     return;
                 }
                 if (attMode || adminVerifyMode) {
                     if (!heavyModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل نموذج التعرف...' + Math.round(modelsLoadProgress) + '%'); updateModelProgress(modelsLoadProgress); return; }
                     const livenessOk = updateLiveness(getHeadYaw(detection.landmarks));
                     if (!livenessOk) { if(autoCaptureTimeout) clearTimeout(autoCaptureTimeout); stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); return; }
-                    stabilityCounter++;
-                    updateStabilityRing(stabilityCounter, STABLE_FRAMES_REQUIRED);
-                    if (stabilityCounter >= STABLE_FRAMES_REQUIRED) {
-                        setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم الالتقاط!');
-                        $('stabilityRing').classList.remove('active');
-                        if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 200);
-                    } else { setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...'); }
+                    stabilityCounter++; updateStabilityRing(stabilityCounter, STABLE_FRAMES_REQUIRED);
+                    if (stabilityCounter >= STABLE_FRAMES_REQUIRED) { setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم الالتقاط!'); $('stabilityRing').classList.remove('active'); if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 200); }
+                    else { setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...'); }
                     return;
                 }
             } else {
@@ -497,245 +474,238 @@
             }
         } catch(e) {}
     }
-    
+
+    // ==========================================
+    // 5. منطق العمليات الرئيسي (MAGIC HAPPENS HERE - Supabase)
+    // ==========================================
     async function performCapture() {
         if(isProcessingCapture) return;
         isProcessingCapture = true; autoCaptureTimeout = null;
         if(detectionLoopTimeout) { clearTimeout(detectionLoopTimeout); detectionLoopTimeout=null; }
         $('scanLine').classList.remove('active');
-        const imgData = createStorageImage();
+        
         setCamStatus('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
         const newDescriptor = await extractStableDescriptor();
-        if(!newDescriptor) { playSound('faceid-error'); if(navigator.vibrate) navigator.vibrate([100,50,100]); setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة، جاري إعادة المحاولة...'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
+        if(!newDescriptor) { playSound('faceid-error'); setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة، جاري إعادة المحاولة...'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
 
+        // حالة 1: تسجيل موظف جديد
         if(regMode) {
             setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بيانات الموظف الجديد...');
             try {
-                const res = await fetch(URL, { method:'POST', body:JSON.stringify({ action:'register', name:regData.name, email:regData.email, descriptor:newDescriptor, imageData:imgData }) }).then(r=>r.json());
-                if(res.success) { playSound('faceid-success'); if(navigator.vibrate) navigator.vibrate(50); showToast('تم إنشاء الحساب بنجاح! سجل دخولك الآن.', 'success'); closeCamera(); showLoginScreen(); }
-                else { playSound('faceid-error'); showToast(res.error || 'حدث خطأ', 'error'); closeCamera(); }
-            } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال', 'error'); closeCamera(); }
+                // توليد كود موظف جديد
+                const { count } = await supabase.from('employees').select('*', { count: 'exact', head: true });
+                const newCode = `EMP${String(count + 1).padStart(3, '0')}`;
+                const tempPass = Math.random().toString(36).slice(-8);
+
+                // رفع الصورة لـ Storage
+                const imgBlob = await createStorageImageBlob();
+                const imgPath = `${newCode}_face.jpg`;
+                await supabase.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
+                const { data: imgData } = supabase.storage.from('faces').getPublicUrl(imgPath);
+                const publicUrl = imgData.publicUrl;
+
+                // إدخال البيانات لقاعدة البيانات
+                const { error } = await supabase.from('employees').insert({ 
+                    code: newCode, name: regData.name, email: regData.email, 
+                    password: tempPass, face_descriptor: newDescriptor, is_first_login: true 
+                });
+
+                if(!error) {
+                    playSound('faceid-success'); 
+                    showToast(`تم إنشاء الحساب! كودك: ${newCode} | باسورد مؤقت: ${tempPass} (تم محاكاة الإيميل لعدم وجود Back-end)`, 'success'); 
+                    closeCamera(); showLoginScreen();
+                } else throw error;
+            } catch(e) { playSound('faceid-error'); showToast('حدث خطأ: ' + e.message, 'error'); closeCamera(); }
         }
+
+        // حالة 2: تسجيل بصمة للمرة الأولى (بعد تغيير الباسورد)
         else if(firstTimeSetupMode) {
             setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بصمة الوجه...');
             try {
-                const res = await fetch(URL, { method:'POST', body:JSON.stringify({ action:'updateFace', code:user.code, descriptor:newDescriptor, imageData:imgData }) }).then(r=>r.json());
-                if(res.success) {
-                    playSound('faceid-success'); sessionDescriptor = newDescriptor; userImage = imgData;
-                    try { localStorage.setItem('axentro_desc_'+user.code, JSON.stringify(newDescriptor)); localStorage.setItem('axentro_img_'+user.code, imgData); } catch(e){}
-                    showMatchResult(true);
-                    showToast('تم تسجيل البصمة بنجاح! جاري الدخول...', 'success');
+                const imgBlob = await createStorageImageBlob();
+                const imgPath = `${user.code}_face.jpg`;
+                await supabase.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
+                const { data: imgData } = supabase.storage.from('faces').getPublicUrl(imgPath);
+                
+                const { error } = await supabase.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
+                if(!error) {
+                    playSound('faceid-success'); sessionDescriptor = newDescriptor; userImage = imgData.publicUrl;
+                    showMatchResult(true); showToast('تم تسجيل البصمة بنجاح!', 'success');
                     setTimeout(()=>{ closeCamera(); showApp(); }, 800);
-                    if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1500);
-                } else { playSound('faceid-error'); showMatchResult(false); showToast('فشل الحفظ', 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
-            } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('خطأ في الاتصال', 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
+                } else throw error;
+            } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل الحفظ', 'error'); restartCamLoop(); }
         }
+
+        // حالة 3: تحديث بصمة الوجه (إعدادات)
         else if(updateFaceMode) {
-            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ بصمة الوجه...');
             try {
-                const res = await fetch(URL, { method:'POST', body:JSON.stringify({ action:'updateFace', code:user.code, descriptor:newDescriptor, imageData:imgData }) }).then(r=>r.json());
-                if(res.success) { playSound('faceid-success'); sessionDescriptor = newDescriptor; userImage = imgData; showMatchResult(true); showToast('تم تحديث البصمة بنجاح!', 'success'); setTimeout(()=>closeCamera(), 800); showApp(); }
-                else { playSound('faceid-error'); showMatchResult(false); showToast('فشل التحديث', 'error'); closeCamera(); }
-            } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال', 'error'); closeCamera(); }
+                const imgBlob = await createStorageImageBlob();
+                await supabase.storage.from('faces').upload(`${user.code}_face.jpg`, imgBlob, { upsert: true });
+                const { error } = await supabase.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
+                if(!error) { playSound('faceid-success'); sessionDescriptor = newDescriptor; showMatchResult(true); showToast('تم تحديث البصمة!', 'success'); setTimeout(()=>closeCamera(), 800); showApp(); }
+                else throw error;
+            } catch(e) { playSound('faceid-error'); showToast('فشل التحديث', 'error'); closeCamera(); }
         }
+
+        // حالة 4: الأدمن يعيد تسجيل بصمة لموظف
         else if(adminResetFaceMode) {
-            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البصمة الجديدة للموظف...');
             try {
-                const res = await fetch(URL, { method:'POST', body:JSON.stringify({ action:'updateFace', code:targetEmpForAdmin.code, descriptor:newDescriptor, imageData:imgData }) }).then(r=>r.json());
-                if(res.success) {
-                    playSound('faceid-success'); showMatchResult(true);
-                    showToast(`تم تحديث بصمة ${targetEmpForAdmin.name} بنجاح!`, 'success');
-                    setTimeout(()=>closeCamera(), 800);
-                } else {
-                    playSound('faceid-error'); showMatchResult(false); showToast('فشل التحديث: '+(res.error||''), 'error');
-                    isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop();
-                }
-            } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال', 'error'); closeCamera(); }
+                const imgBlob = await createStorageImageBlob();
+                await supabase.storage.from('faces').upload(`${targetEmpForAdmin.code}_face.jpg`, imgBlob, { upsert: true });
+                const { error } = await supabase.from('employees').update({ face_descriptor: newDescriptor }).eq('code', targetEmpForAdmin.code);
+                if(!error) { playSound('faceid-success'); showMatchResult(true); showToast(`تم تحديث بصمة ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); }
+                else throw error;
+            } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل التحديث', 'error'); restartCamLoop(); }
         }
+
+        // حالة 5: الأدمن يتحقق من وجهه لتسجيل حضور/انصراف لموظف
         else if(adminVerifyMode) {
             if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات وجهك كأدمن غير متوفرة!', 'error'); closeCamera(); return; }
             if(euclideanDistance(newDescriptor, sessionDescriptor) < MATCH_THRESHOLD) {
-                showMatchResult(true);
-                setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق، جاري التسجيل...');
-                const now = new Date(); const payload = { action:'attendance', name:targetEmpForAdmin.name, code:targetEmpForAdmin.code, type:targetEmpForAdmin.type, location:currentLoc||'غير متوفر', datetime:`${now.toLocaleDateString('ar-EG')} - ${now.toLocaleString('ar-EG', { hour12:true, hour:'2-digit', minute:'2-digit', second:'2-digit' })}`, imageData:imgData, shift:'تسجيل يدوي بواسطة الأدمن (تم التحقق بالوجه)' };
-                const data = await offlineSafePost(URL, payload);
-                if(data.success) { playSound('faceid-success'); showToast(`تم تسجيل ${targetEmpForAdmin.type} لـ ${targetEmpForAdmin.name}${data.offline ? ' (محلياً)' : ''}`, data.offline ? 'warning' : 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
-                else { playSound('faceid-error'); showToast('فشل التسجيل: '+ (data.error||''), 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
-            } else { playSound('faceid-error'); showMatchResult(false); showToast('وجه الأدمن غير مطابق!', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> انتحال هوية مرفوض!'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
+                showMatchResult(true); setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق، جاري التسجيل...');
+                const { error } = await supabase.from('attendance').insert({ employee_code: targetEmpForAdmin.code, employee_name: targetEmpForAdmin.name, type: targetEmpForAdmin.type, location_link: currentLoc, shift: 'تسجيل يدوي بواسطة الأدمن' });
+                if(!error) { playSound('faceid-success'); showToast(`تم تسجيل ${targetEmpForAdmin.type} لـ ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
+                else { playSound('faceid-error'); showToast('فشل التسجيل', 'error'); restartCamLoop(); }
+            } else { playSound('faceid-error'); showMatchResult(false); showToast('وجه الأدمن غير مطابق!', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> انتحال هوية مرفوض!'); restartCamLoop(); }
         }
+
+        // حالة 6: الموظف يسجل حضور/انصراف أو يغير باسورد
         else if(attMode) {
             if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة', 'error'); closeCamera(); return; }
             const distance = euclideanDistance(newDescriptor, sessionDescriptor);
             
-            if(attType === 'تغيير كلمة المرور') {
-                if(distance < MATCH_THRESHOLD) {
-                    showMatchResult(true);
-                    try {
-                        const data = await offlineSafePost(URL, { action:'changePassword', ...window._pendingPwChange });
-                        if(data.success) { playSound('login-success'); showToast('تم تغيير كلمة المرور بنجاح','success'); setTimeout(()=>closeCamera(), 800); }
-                        else { playSound('login-error'); showToast('فشل تغيير كلمة السر', 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
-                    } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال','error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
-                } else { playSound('faceid-error'); showMatchResult(false); showToast('الوجه غير مطابق! تم إلغاء العملية.', 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
-                isProcessingCapture = false; return;
-            }
-
             if(distance < MATCH_THRESHOLD) {
                 showMatchResult(true);
+                
+                // إذا كان الإجراء تغيير كلمة سر
+                if(attType === 'تغيير كلمة المرور') {
+                    const { error } = await supabase.from('employees').update({ password: window._pendingPwChange.newPassword }).eq('code', user.code).eq('password', window._pendingPwChange.oldPassword);
+                    if(!error) { playSound('login-success'); showToast('تم تغيير كلمة المرور', 'success'); setTimeout(()=>closeCamera(), 800); }
+                    else { playSound('login-error'); showToast('كلمة السر الحالية خاطئة', 'error'); restartCamLoop(); }
+                    isProcessingCapture = false; return;
+                }
+
+                // التحقق من الموقع الجغرافي
                 if(currentLat && currentLon) {
                     const dist = getDistanceFromLatLonInKm(currentLat, currentLon, OFFICE_LAT, OFFICE_LON);
-                    const effectiveDist = Math.max(0, dist - (currentAccuracy || 0));
-                    if(effectiveDist > MAX_DISTANCE_METERS) {
-                        playSound('faceid-error');
-                        showToast(`تم التحقق من الوجه ✓ لكنك بعيد عن المقر (${Math.round(dist)} متر)`, 'error');
+                    if(dist > MAX_DISTANCE_METERS) {
+                        playSound('faceid-error'); showToast(`تم التحقق من الوجه ✓ لكنك بعيد عن المقر (${Math.round(dist)} متر)`, 'error');
                         setCamStatus('<i class="fas fa-map-marker-alt" style="color:var(--danger);"></i> مرفوض: خارج نطاق المقر');
-                        isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return;
+                        restartCamLoop(); return;
                     }
                 }
-                setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق بنجاح!');
-                const now = new Date(); const selShift = document.querySelector('input[name="shift"]:checked');
-                const payload = { action:'attendance', name:user.name, code:user.code, type:attType, location:currentLoc||'غير متوفر', datetime:`${now.toLocaleDateString('ar-EG')} - ${now.toLocaleString('ar-EG', { hour12:true, hour:'2-digit', minute:'2-digit', second:'2-digit' })}`, imageData:imgData, shift: selShift ? selShift.value : 'لم يتم التحديد' };
-                try {
-                    const data = await offlineSafePost(URL, payload);
-                    if(data.success) { playSound('faceid-success'); showToast(`تم تسجيل ${attType} بنجاح ${data.hoursWorked ? '('+data.hoursWorked+')' : ''}${data.offline ? ' (محلياً)' : ''}`, data.offline ? 'warning' : 'success'); setTimeout(()=>closeCamera(), 800); calculateMonthlyHours(); }
-                    else { playSound('faceid-error'); showToast('فشل التسجيل: '+ (data.error||''), 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
-                } catch(e) { playSound('faceid-error'); showToast('خطأ في الاتصال', 'error'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
-            } else { playSound('faceid-error'); showMatchResult(false); showToast('الوجه غير مطابق! تم رفض التسجيل.', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> الوجه غير مطابق!'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
+
+                // تسجيل الحضور أو الانصراف
+                const selShift = document.querySelector('input[name="shift"]:checked');
+                let hoursWorked = null;
+                
+                if(attType === 'انصراف') {
+                    // حساب ساعات العمل
+                    const today = new Date().toISOString().split('T')[0];
+                    const { data: lastCheckIn } = await supabase.from('attendance').select('created_at').eq('employee_code', user.code).eq('type', 'حضور').gte('created_at', today).order('created_at', { ascending: false }).limit(1).single();
+                    if(lastCheckIn) {
+                        const diff = (new Date() - new Date(lastCheckIn.created_at)) / (1000 * 60 * 60);
+                        hoursWorked = `${diff.toFixed(2)} ساعة`;
+                    }
+                }
+
+                const { error } = await supabase.from('attendance').insert({ 
+                    employee_code: user.code, employee_name: user.name, type: attType, 
+                    location_link: currentLoc, shift: selShift ? selShift.value : 'لم يتم التحديد', hours_worked: hoursWorked 
+                });
+
+                if(!error) { playSound('faceid-success'); showToast(`تم تسجيل ${attType} بنجاح ${hoursWorked ? '('+hoursWorked+')' : ''}`, 'success'); setTimeout(()=>closeCamera(), 800); calculateMonthlyHours(); }
+                else throw error;
+            } else { playSound('faceid-error'); showMatchResult(false); showToast('الوجه غير مطابق! تم رفض التسجيل.', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> الوجه غير مطابق!'); restartCamLoop(); }
         }
         isProcessingCapture = false;
     }
-    
+
+    // دالة مساعدة لإعادة تشغيل الكاميرا عند الفشل
+    function restartCamLoop() { isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
+
+    // ==========================================
+    // 6. دوال الذكاء الاصطناعي (تحميل النماذج)
+    // ==========================================
     async function loadModelsAsync() {
         try {
             setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
-            modelsLoadProgress = 25;
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL); modelsLoadProgress = 25;
             setStatus('جاري تحميل الذكاء الاصطناعي (2/4)...');
-            await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODELS_URL);
-            modelsLoadProgress = 50;
-            lightModels = true;
+            await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODELS_URL); modelsLoadProgress = 50; lightModels = true;
             setStatus('جاري تحميل الذكاء الاصطناعي (3/4)...');
-            await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL);
-            modelsLoadProgress = 75;
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL); modelsLoadProgress = 75;
             setStatus('جاري تحميل الذكاء الاصطناعي (4/4)...');
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL);
-            modelsLoadProgress = 100;
-            heavyModels = true;
-            updateModelProgress(100);
-            setTimeout(()=>updateModelProgress(0), 600);
-            setStatus('النظام جاهز');
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL); modelsLoadProgress = 100; heavyModels = true;
+            updateModelProgress(100); setTimeout(()=>updateModelProgress(0), 600); setStatus('النظام جاهز');
         } catch(e) { console.error(e); setStatus('خطأ في تحميل النماذج'); }
     }
-    
-    async function offlineSafePost(url, data) {
-        if (isOnline) {
-            try { const res = await fetch(url, { method:'POST', body:JSON.stringify(data) }); return await res.json(); }
-            catch(e) { offlineQueue.push({ url, data, timestamp: Date.now() }); localStorage.setItem('axentro_offline_queue', JSON.stringify(offlineQueue)); return { success: true, offline: true }; }
-        } else {
-            offlineQueue.push({ url, data, timestamp: Date.now() });
-            localStorage.setItem('axentro_offline_queue', JSON.stringify(offlineQueue));
-            return { success: true, offline: true };
-        }
-    }
-    
-    async function flushOfflineQueue() {
-        if (!isOnline || offlineQueue.length === 0) return;
-        showToast(`جاري مزامنة ${offlineQueue.length} عملية محفوظة...`, 'warning');
-        setStatus('جاري المزامنة...');
-        const queue = [...offlineQueue];
-        offlineQueue = [];
-        localStorage.setItem('axentro_offline_queue', '[]');
-        let synced = 0;
-        for (const item of queue) {
-            try { await fetch(item.url, { method:'POST', body:JSON.stringify(item.data) }); synced++; }
-            catch(e) { offlineQueue.push(item); }
-        }
-        localStorage.setItem('axentro_offline_queue', JSON.stringify(offlineQueue));
-        setStatus('النظام جاهز');
-        if (synced > 0) showToast(`تمت مزامنة ${synced} عملية بنجاح`, 'success');
-        if (user?.isAdmin) loadEmployees();
-    }
-    
+
+    // ==========================================
+    // 7. دوال النظام (تسجيل دخول، بانيلات، تقارير)
+    // ==========================================
     async function fetchUserDataInBackground() {
         if(!user) return;
         try {
-            const localDesc = localStorage.getItem('axentro_desc_'+user.code);
-            const localImg = localStorage.getItem('axentro_img_'+user.code);
-            if (localDesc) { sessionDescriptor = JSON.parse(localDesc); if(localImg) userImage = localImg; }
-        } catch(e){}
-        try {
-            const empData = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`).then(r=>r.json());
-            if(empData.success && empData.descriptor && Array.isArray(empData.descriptor) && empData.descriptor.length > 0) {
-                sessionDescriptor = empData.descriptor.map(Number);
-                if(empData.userImage) {
-                    userImage = empData.userImage;
-                    const img = document.querySelector('.emp-profile-img');
-                    if(img) img.src = userImage;
-                }
-                try { localStorage.setItem('axentro_desc_'+user.code, JSON.stringify(sessionDescriptor)); if(userImage) localStorage.setItem('axentro_img_'+user.code, userImage); } catch(e){}
+            const { data: emp, error } = await supabase.from('employees').select('face_descriptor').eq('code', user.code).single();
+            if(!error && emp && emp.face_descriptor) {
+                sessionDescriptor = emp.face_descriptor;
+                const { data: imgData } = supabase.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
+                userImage = imgData.publicUrl + '?t=' + new Date().getTime(); // Cash Busting
+                const img = document.querySelector('.emp-profile-img');
+                if(img) img.src = userImage;
             }
             if(!sessionDescriptor && !$('cameraOverlay').classList.contains('active')) {
                 playSound('faceid-error'); showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
-                firstTimeSetupMode = true; const opened = await openCamera(); if(!opened) { firstTimeSetupMode=false; showToast('فشل فتح الكاميرا','error'); }
+                firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; showToast('فشل فتح الكاميرا','error'); }
             }
         } catch(e) {} setStatus('النظام جاهز');
     }
-    
+
     async function handleLogin() {
         const code = $('loginCode').value.trim(), pass = $('loginPass').value.trim();
         if(!code || !pass) return showToast('يرجى إدخال الكود وكلمة السر', 'error');
         setStatus('جاري التحقق...');
         try {
-            const data = await fetch(`${URL}?action=verifyLogin&code=${encodeURIComponent(code)}&password=${encodeURIComponent(pass)}`).then(r=>r.json());
-            if(data.success) {
-                user = { name: data.name, code: data.code, isAdmin: data.isAdmin, isFirstLogin: data.isFirstLogin };
+            const { data: emp, error } = await supabase.from('employees').select('*').eq('code', code).eq('password', pass).single();
+            if(!error && emp) {
+                user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login };
                 if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass })); }
-                else { sessionStorage.setItem('user', JSON.stringify(user)); localStorage.removeItem('axentro_saved_login'); localStorage.removeItem('axentro_fp_id'); }
-                if(!data.isAdmin && data.isFirstLogin) {
-                    $('forcePwModal').classList.add('active'); setStatus('النظام جاهز');
-                } else {
-                    sessionDescriptor = null; userImage = '';
-                    try { const ld = localStorage.getItem('axentro_desc_'+user.code); if(ld) sessionDescriptor = JSON.parse(ld); } catch(e){}
-                    try { const li = localStorage.getItem('axentro_img_'+user.code); if(li) userImage = li; } catch(e){}
-                    if(!sessionDescriptor) {
-                        playSound('faceid-error'); showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
-                        firstTimeSetupMode = true; const opened = await openCamera(); if(!opened) { firstTimeSetupMode=false; logout(); }
-                    } else {
-                        showApp();
-                        fetchUserDataInBackground();
-                        if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000);
-                    }
+                else { sessionStorage.setItem('user', JSON.stringify(user)); localStorage.removeItem('axentro_saved_login'); }
+                
+                if(!emp.is_admin && emp.is_first_login) { $('forcePwModal').classList.add('active'); setStatus('النظام جاهز'); }
+                else {
+                    sessionDescriptor = emp.face_descriptor;
+                    if(!sessionDescriptor) { firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
+                    else { showApp(); fetchUserDataInBackground(); }
                 }
-            } else { playSound('login-error'); showToast(data.error||'بيانات خاطئة','error'); setStatus('النظام جاهز'); }
-        } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال بالخادم','error'); setStatus('غير متصل'); }
+            } else { playSound('login-error'); showToast('بيانات خاطئة','error'); setStatus('النظام جاهز'); }
+        } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال','error'); setStatus('غير متصل'); }
     }
-    
+
     async function submitFirstPwChange() {
         const newPw = $('firstNewPw').value.trim();
         if(!newPw || newPw.length<4) return showToast('كلمة السر ضعيفة','error');
         setStatus('جاري تغيير كلمة السر...');
         try {
-            const data = await fetch(URL, { method:'POST', body:JSON.stringify({ action:'changePassword', code:user.code, oldPassword:null, newPassword:newPw }) }).then(r=>r.json());
-            if(data.success) {
-                $('forcePwModal').classList.remove('active'); playSound('login-success');
-                user.isFirstLogin = false;
-                if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); }
-                else { sessionStorage.setItem('user', JSON.stringify(user)); }
+            const { error } = await supabase.from('employees').update({ password: newPw, is_first_login: false }).eq('code', user.code);
+            if(!error) {
+                $('forcePwModal').classList.remove('active'); playSound('login-success'); user.isFirstLogin = false;
+                if($('rememberMe').checked) localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() }));
+                else sessionStorage.setItem('user', JSON.stringify(user));
+                
                 showToast('تم تحديث كلمة السر', 'success');
-                let hasFace = false;
-                try { const ld = localStorage.getItem('axentro_desc_'+user.code); if(ld) hasFace = true; } catch(e){}
-                if (!hasFace) {
-                    try { const empData = await fetch(`${URL}?action=getEmployeeData&code=${encodeURIComponent(user.code)}`).then(r=>r.json()); if(empData.success && empData.descriptor && empData.descriptor.length > 0) hasFace = true; } catch(e){}
-                }
-                if (hasFace) { showApp(); fetchUserDataInBackground(); }
-                else { showToast('الآن سجل بصمة وجهك', 'success'); firstTimeSetupMode = true; const opened = await openCamera(); if(!opened) { firstTimeSetupMode=false; logout(); } }
-            } else { playSound('login-error'); showToast(data.error,'error'); }
-        } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال','error'); }
+                // التحقق مما إذا كان لديه بصمة مسجلة مسبقاً
+                const { data: emp } = await supabase.from('employees').select('face_descriptor').eq('code', user.code).single();
+                if (emp && emp.face_descriptor) { showApp(); fetchUserDataInBackground(); }
+                else { showToast('الآن سجل بصمة وجهك', 'success'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
+            } else throw error;
+        } catch(e) { playSound('login-error'); showToast('خطأ في التحديث','error'); }
     }
-    
+
     function logout() { playSound('logout-success'); if(autoRefreshTimer) clearInterval(autoRefreshTimer); localStorage.removeItem('rememberedUser'); sessionStorage.removeItem('user'); user = null; sessionDescriptor = null; userImage = ''; $('mainApp').style.display='none'; $('loginScreen').classList.remove('hidden'); setStatus('النظام جاهز'); }
-    
     async function refreshData() { const icon = $('refreshBtn').querySelector('i'); icon.style.animation='spin 0.5s linear'; setTimeout(()=>icon.style.animation='',600); if(user?.isAdmin) await loadEmployees(); else if(user) fetchUserDataInBackground(); showToast('تم التحديث','success'); }
-    
+
     function showApp() {
         if(autoRefreshTimer) clearInterval(autoRefreshTimer);
         $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block';
@@ -754,14 +724,33 @@
         }
         autoRefreshTimer = setInterval(() => { if(user) refreshData(); }, AUTO_REFRESH_INTERVAL);
     }
-    
-        async function calculateMonthlyHours() { try { const res = await fetch(`${URL}?action=getEmployeeReport&code=${encodeURIComponent(user.code)}`); const data = await res.json(); if(data.success && data.records.length>0) { const now = new Date(); let totalHours=0; data.records.forEach(rec => { const recDate = parseArabicDateStr(rec.date); if(recDate && recDate.getMonth()===now.getMonth() && recDate.getFullYear()===now.getFullYear() && rec.type==='انصراف' && rec.hours) { totalHours += parseFloat(rec.hours.split(' ')[0])||0; } }); $('monthHoursValue').textContent = totalHours>0 ? totalHours.toFixed(2)+' ساعة' : '0 ساعة'; } else $('monthHoursValue').textContent='0 ساعة'; } catch(e) { $('monthHoursValue').textContent='--'; } }
-    
-    async function loadEmployees() { try { const d = await fetch(`${URL}?action=getEmployees`).then(r=>r.json()); if(d.success) { employees = d.employees; $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); } } catch(e) { setStatus('غير متصل'); } }
-    
-    function renderEmployeeList(list) { if(!list.length) { $('searchResults').innerHTML='<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين</p>'; return; } $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button><button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}', '${e.name}')" title="إعادة تسجيل بصمة"><i class="fas fa-sync-alt"></i></button></div></div>`).join(''); }
+
+    async function calculateMonthlyHours() { 
+        try { 
+            const now = new Date(); const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+            const { data, error } = await supabase.from('attendance').select('created_at, type, hours_worked').eq('employee_code', user.code).gte('created_at', startOfMonth);
+            if(!error && data) {
+                let totalHours = 0;
+                data.forEach(rec => { if(rec.type === 'انصراف' && rec.hours_worked) totalHours += parseFloat(rec.hours_worked) || 0; });
+                $('monthHoursValue').textContent = totalHours > 0 ? totalHours.toFixed(2) + ' ساعة' : '0 ساعة';
+            }
+        } catch(e) { $('monthHoursValue').textContent = '--'; } 
+    }
+
+    async function loadEmployees() { 
+        try { 
+            // السر الخفي: نحضر فقط الاسم والكود! بدون صور وبصمات! لهذا سيكون فورياً
+            const { data: emps, error } = await supabase.from('employees').select('code, name, is_admin').order('created_at', { ascending: true });
+            if(!error) { employees = emps || []; $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); }
+        } catch(e) { setStatus('غير متصل'); } 
+    }
+
+    function renderEmployeeList(list) { 
+        if(!list.length) { $('searchResults').innerHTML='<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين</p>'; return; } 
+        $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button><button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}', '${e.name}')" title="إعادة تسجيل بصمة"><i class="fas fa-sync-alt"></i></button></div></div>`).join(''); 
+    }
     $('searchInput')?.addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); renderEmployeeList(q ? employees.filter(emp=>emp.name.toLowerCase().includes(q)||emp.code.toLowerCase().includes(q)) : employees); });
-    
+
     async function adminDirectAtt(type, code, name) {
         if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن، جاري التسجيل...','error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
         adminVerifyMode = true; targetEmpForAdmin = { type, code, name }; attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
@@ -788,6 +777,7 @@
         $('changePwModal').classList.add('active');
     }
     function closeChangePwModal() { $('changePwModal').classList.remove('active'); }
+    
     async function submitChangePassword() {
         if(pwChangeMode==='own') {
             const o=$('oldPassword').value.trim(), n=$('newPassword').value.trim();
@@ -801,87 +791,83 @@
         } else {
             const c=$('targetEmpCode').value.trim(), n=$('newPassword').value.trim();
             if(!c||!n) return showToast('يرجى إدخال البيانات','error');
-            try { const data = await fetch(URL, { method:'POST', body:JSON.stringify({ action:'changePassword', code:c, oldPassword:null, newPassword:n }) }).then(r=>r.json()); if(data.success) { playSound('login-success'); showToast('تم التغيير بنجاح','success'); closeChangePwModal(); } else { playSound('login-error'); showToast(data.error,'error'); } } catch(e) { playSound('login-error'); showToast('خطأ','error'); }
+            const { error } = await supabase.from('employees').update({ password: n, is_first_login: false }).eq('code', c);
+            if(!error) { playSound('login-success'); showToast('تم التغيير بنجاح','success'); closeChangePwModal(); }
+            else { playSound('login-error'); showToast('فشل التغيير (تأكد من الكود)','error'); }
         }
     }
-    
+
     function closeReportModal() { $('reportModal').classList.remove('active'); }
     async function loadMyReport() { $('reportTitle').textContent=`تقرير ${user.name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(user.code); }
     async function loadEmpReport(code,name) { $('reportTitle').textContent=`تقرير ${name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(code); }
-    async function fetchAndRenderReport(code) { try { const data = await fetch(`${URL}?action=getEmployeeReport&code=${encodeURIComponent(code)}`).then(r=>r.json()); if(data.success && data.records.length>0) { $('reportBody').innerHTML = `<table class="report-table"><thead><tr><th>التاريخ</th><th>الحالة</th><th>الشفت</th><th>الساعات</th></tr></thead><tbody>${data.records.map(r => `<tr><td style="font-size:12px;">${r.date}</td><td><span class="att-badge ${r.type==='حضور'?'att-in':'att-out'}">${r.type}</span></td><td style="font-size:11px;">${r.shift}</td><td style="font-weight:bold; color:${r.hours?'#38bdf8':'#64748b'}">${r.hours||'-'}</td></tr>`).join('')}</tbody></table>`; } else $('reportBody').innerHTML='<center style="color:#64748b; padding:30px;">لا توجد سجلات.</center>'; } catch(e) { $('reportBody').innerHTML='<center style="color:#ef4444; padding:20px;">فشل التحميل</center>'; } }
+    
+    async function fetchAndRenderReport(code) { 
+        try { 
+            const { data: records, error } = await supabase.from('attendance').select('*').eq('employee_code', code).order('created_at', { ascending: false });
+            if(!error && records.length>0) { 
+                $('reportBody').innerHTML = `<table class="report-table"><thead><tr><th>التاريخ</th><th>الحالة</th><th>الشفت</th><th>الساعات</th></tr></thead><tbody>${records.map(r => { 
+                    const dateStr = new Date(r.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                    return `<tr><td style="font-size:12px;">${dateStr}</td><td><span class="att-badge ${r.type==='حضور'?'att-in':'att-out'}">${r.type}</span></td><td style="font-size:11px;">${r.shift}</td><td style="font-weight:bold; color:${r.hours_worked?'#38bdf8':'#64748b'}">${r.hours_worked||'-'}</td></tr>` 
+                }).join('')}</tbody></table>`; 
+            } else $('reportBody').innerHTML='<center style="color:#64748b; padding:30px;">لا توجد سجلات.</center>'; 
+        } catch(e) { $('reportBody').innerHTML='<center style="color:#ef4444; padding:20px;">فشل التحميل</center>'; } 
+    }
     
     function showForgotPw() { $('forgotPwModal').classList.add('active'); $('forgotCode').value=''; }
     function closeForgotPw() { $('forgotPwModal').classList.remove('active'); }
-    async function submitForgotPw() { const code = $('forgotCode').value.trim(); if(!code) return showToast('يرجى إدخال الكود','error'); try { const data = await fetch(URL, { method:'POST', body:JSON.stringify({ action:'forgotPassword', code }) }).then(r=>r.json()); if(data.success) { playSound('login-success'); showToast(data.message,'success'); closeForgotPw(); } else { playSound('login-error'); showToast(data.error,'error'); } } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال','error'); } }
+    async function submitForgotPw() { 
+        const code = $('forgotCode').value.trim(); if(!code) return showToast('يرجى إدخال الكود','error'); 
+        const tempPass = Math.random().toString(36).slice(-8);
+        const { error } = await supabase.from('employees').update({ password: tempPass, is_first_login: true }).eq('code', code);
+        if(!error) { playSound('login-success'); showToast(`تم إعادة تعيين كلمة السر. الباسورد الجديد: ${tempPass} (يُفضل إرساله بالإيميل لاحقاً)`, 'success'); closeForgotPw(); }
+        else { playSound('login-error'); showToast('الكود غير صحيح','error'); }
+    }
     
     function showRegisterScreen() { $('loginScreen').classList.add('hidden'); $('registerScreen').classList.remove('hidden'); }
     function showLoginScreen() { $('registerScreen').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); }
     async function startRegistration() { const name = $('regName').value.trim(), email = $('regEmail').value.trim(); if(!name||!email) return showToast('يرجى إدخال الاسم والبريد','error'); regData = { name, email }; regMode = true; if(!await openCamera()) { regMode=false; showToast('فشل فتح الكاميرا','error'); } }
-    
-    async function registerFingerprint() { try { const challenge = new Uint8Array(32); crypto.getRandomValues(challenge); const credential = await navigator.credentials.create({ publicKey: { challenge, rp:{ name:"Axentro Attendance System" }, user:{ id:new Uint8Array(16), name:user.code, displayName:user.name }, pubKeyCredParams:[{alg:-7,type:"public-key"},{alg:-257,type:"public-key"}], authenticatorSelection:{ authenticatorAttachment:"platform", userVerification:"required" }, timeout:60000 } }); if(credential) { localStorage.setItem('axentro_fp_id', bufferToBase64(credential.rawId)); showToast('تم تسجيل بصمة الإصبع بنجاح!','success'); } } catch(e) {} }
-    
-    async function loginWithFingerprint() {
-        const savedFpId = localStorage.getItem('axentro_fp_id'), savedLogin = localStorage.getItem('axentro_saved_login');
-        if(!savedFpId || !savedLogin) { showToast('سجل دخولك عادياً أولاً وفعّل تذكرني','error'); return; }
-        try { setStatus('جاري التحقق من البصمة...'); const challenge = new Uint8Array(32); crypto.getRandomValues(challenge); const assertion = await navigator.credentials.get({ publicKey: { challenge, allowCredentials:[{ id:base64ToBuffer(savedFpId), type:'public-key' }], userVerification:"required" } }); if(assertion) { setStatus('جاري التحقق مع السيرفر...'); const loginData = JSON.parse(savedLogin); const data = await fetch(`${URL}?action=verifyLogin&code=${encodeURIComponent(loginData.code)}&password=${encodeURIComponent(loginData.pass)}`).then(r=>r.json()); if(data.success) { user = { name:data.name, code:data.code, isAdmin:data.isAdmin, isFirstLogin:data.isFirstLogin }; localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); showApp(); fetchUserDataInBackground(); } else { playSound('login-error'); showToast('فشل التحقق','error'); setStatus('النظام جاهز'); } } } catch(e) { if(e.name==='NotAllowedError') showToast('تم إلغاء البصمة','error'); else showToast('فشل التحقق','error'); setStatus('النظام جاهز'); }
-    }
-    
-    function restoreSession() {
-        const savedSessionStr = localStorage.getItem('rememberedUser'), savedTempStr = sessionStorage.getItem('user'), savedLogin = localStorage.getItem('axentro_saved_login');
-        let savedUser = null;
-        if(savedLogin) { try { const ld = JSON.parse(savedLogin); $('loginCode').value = ld.code||''; $('loginPass').value = ld.pass||''; $('rememberMe').checked = true; } catch(e){} }
-        if(savedSessionStr) { try { const s = JSON.parse(savedSessionStr); if(Date.now()-s.timestamp < 10*60*60*1000) { savedUser = s.data; $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block'; } else { localStorage.removeItem('rememberedUser'); localStorage.removeItem('axentro_fp_id'); } } catch(e) { localStorage.removeItem('rememberedUser'); } }
-        else if(savedTempStr) { try { savedUser = JSON.parse(savedTempStr); $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block'; } catch(e) { sessionStorage.removeItem('user'); } }
-        if(savedUser) { user = savedUser; showApp(); fetchUserDataInBackground(); }
-        else setStatus('النظام جاهز');
-    }
-    
-    function getLocation() {
-        if(navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(pos => {
-                currentLat = pos.coords.latitude;
-                currentLon = pos.coords.longitude;
-                currentAccuracy = pos.coords.accuracy || 0;
-                currentLoc = `https://maps.google.com/?q=${currentLat},${currentLon}`;
-                $('locBar').innerHTML = `<i class="fas fa-map-marker-alt" style="color:var(--success);"></i> <a href="${currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">الموقع محدد</a>`;
-            }, () => {
-                $('locBar').innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`;
-                currentLoc='غير متوفر'; currentLat=null; currentLon=null; currentAccuracy=0;
-            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-        }
-    }
 
     async function adminResetFace(code, name) {
         if(!code) return showToast('كود الموظف مطلوب','error');
-        targetEmpForAdmin = { code, name };
-        adminResetFaceMode = true;
+        targetEmpForAdmin = { code, name }; adminResetFaceMode = true;
         regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false; firstTimeSetupMode = false;
         showToast(`جاري فتح الكاميرا لتسجيل بصمة جديدة لـ ${name}`, 'warning');
         if(!await openCamera()) { adminResetFaceMode = false; showToast('فشل فتح الكاميرا','error'); }
     }
-    
+
+    function getLocation() {
+        if(navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                currentLat = pos.coords.latitude; currentLon = pos.coords.longitude; currentAccuracy = pos.coords.accuracy || 0;
+                currentLoc = `https://maps.google.com/?q=${currentLat},${currentLon}`;
+                $('locBar').innerHTML = `<i class="fas fa-map-marker-alt" style="color:var(--success);"></i> <a href="${currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">الموقع محدد</a>`;
+            }, () => { $('locBar').innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`; currentLoc='غير متوفر'; currentLat=null; currentLon=null; currentAccuracy=0; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        }
+    }
+
+    function restoreSession() {
+        const savedSessionStr = localStorage.getItem('rememberedUser'), savedTempStr = sessionStorage.getItem('user'), savedLogin = localStorage.getItem('axentro_saved_login');
+        let savedUser = null;
+        if(savedLogin) { try { const ld = JSON.parse(savedLogin); $('loginCode').value = ld.code||''; $('loginPass').value = ld.pass||''; $('rememberMe').checked = true; } catch(e){} }
+        if(savedSessionStr) { try { const s = JSON.parse(savedSessionStr); if(Date.now()-s.timestamp < 10*60*60*1000) { savedUser = s.data; $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block'; } else { localStorage.removeItem('rememberedUser'); } } catch(e) { localStorage.removeItem('rememberedUser'); } }
+        else if(savedTempStr) { try { savedUser = JSON.parse(savedTempStr); $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block'; } catch(e) { sessionStorage.removeItem('user'); } }
+        if(savedUser) { user = savedUser; showApp(); fetchUserDataInBackground(); }
+        else setStatus('النظام جاهز');
+    }
+
+    // ==========================================
+    // 8. التهيئة (Initialization)
+    // ==========================================
     function init() {
         restoreSession(); loadModelsAsync(); getLocation();
-        if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(err=>console.log('SW Error:',err));
         document.addEventListener('click', unlockAudio, { once: true });
         document.addEventListener('touchstart', unlockAudio, { once: true });
-        window.addEventListener('online', () => {
-            isOnline = true;
-            $('connDot').classList.remove('offline'); $('connDot').classList.add('online');
-            setStatus('تم الاتصال بالإنترنت');
-            flushOfflineQueue();
-        });
-        window.addEventListener('offline', () => {
-            isOnline = false;
-            $('connDot').classList.remove('online'); $('connDot').classList.add('offline');
-            setStatus('غير متصل - البيانات تُحفظ محلياً');
-            showToast('أنت غير متصل بالإنترنت - العمليات ستُحفظ محلياً', 'warning');
-        });
+        window.addEventListener('online', () => { isOnline = true; $('connDot').classList.remove('offline'); $('connDot').classList.add('online'); setStatus('تم الاتصال بالإنترنت'); });
+        window.addEventListener('offline', () => { isOnline = false; $('connDot').classList.remove('online'); $('connDot').classList.add('offline'); setStatus('غير متصل'); showToast('أنت غير متصل بالإنترنت', 'warning'); });
         document.addEventListener('DOMContentLoaded',()=>{
             $('loginCode')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); $('loginPass').focus(); } });
             $('loginPass')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); handleLogin(); } });
             $('forgotCode')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); submitForgotPw(); } });
-            if(window.PublicKeyCredential) $('fingerprintLoginBtn').style.display='flex';
         });
     }
     init();
