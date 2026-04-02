@@ -564,6 +564,65 @@
     }
 
     // ==========================================
+    // ✅ NEW: دوال آمنة للحصول على صورة المستخدم وتحديثها
+    // ==========================================
+    
+    // ✅ Avatar افتراضي (يُستخدم عندما لا توجد صورة)
+    function getDefaultAvatar() {
+        return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCA0IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+';
+    }
+
+    // ✅ دالة آمنة للحصول على رابط صورة المستخدم الحالي
+    async function getCurrentUserImageUrl(userCode) {
+        try {
+            if (!userCode) return null;
+            
+            // ✅ طريقة 1: من حقل profile_image_url في قاعدة البيانات (الأكثر أماناً)
+            const { data: emp, error } = await db
+                .from('employees')
+                .select('profile_image_url, code')
+                .eq('code', userCode)
+                .single();
+            
+            if (emp?.profile_image_url) {
+                // ✅ إضافة timestamp عشوائي لكسر Cache
+                return emp.profile_image_url + '?v=' + Date.now() + '&u=' + Math.random().toString(36).substr(2, 9);
+            }
+            
+            // ✅ طريقة 2: من Storage (البديل)
+            const { data: storageData } = db.storage
+                .from('faces')
+                .getPublicUrl(`${userCode}_face.jpg`);
+            
+            if (storageData?.publicUrl) {
+                return storageData.publicUrl + '?v=' + Date.now() + '&u=' + Math.random().toString(36).substr(2, 9);
+            }
+            
+            return null; // لا توجد صورة
+        } catch (error) {
+            console.error('Error getting user image:', error);
+            return null;
+        }
+    }
+
+    // ✅ دالة تحديث فوري وآمن للصورة
+    async function safeUpdateUserImage() {
+        if (!user || !user.code) return;
+        
+        const imageUrl = await getCurrentUserImageUrl(user.code);
+        
+        if (imageUrl) {
+            userImage = imageUrl; // ✅ تحديث المتغير العام
+            updateUserImageInUI(imageUrl); // ✅ تحديث UI
+            console.log('✅ Image updated for:', user.code);
+        } else {
+            console.log('⚠️ No image found for:', user.code);
+            // ✅ استخدام avatar افتراضي إذا لم توجد صورة
+            updateUserImageInUI(getDefaultAvatar());
+        }
+    }
+
+    // ==========================================
     // الذكاء الاصطناعي والكاميرا (متوافق مع iOS)
     // ==========================================
     async function extractStableDescriptor() {
@@ -838,30 +897,42 @@
     }
 
     // ==========================================
-    // ✅ دالة جديدة: تحديث صورة الموظف في UI
+    // ✅ دالة محسنة: تحديث صورة الموظف في UI
     // ==========================================
     function updateUserImageInUI(imageUrl) {
-        if (!imageUrl) return;
-        userImage = imageUrl;
+        if (!imageUrl) {
+            imageUrl = getDefaultAvatar(); // ✅ استخدام avatar افتراضي
+        }
+        
+        userImage = imageUrl; // ✅ تحديث المتغير العام
+        
         // ✅ البحث عن جميع عناصر الصورة وتحديثها
         const profileImages = document.querySelectorAll('.emp-profile-img');
+        
         profileImages.forEach(img => {
             if (img) {
-                img.src = imageUrl;
+                // ✅ إضافة timestamp جديد لكل تحديث لضمان عدم استخدام Cache
+                const uniqueUrl = imageUrl.includes('?') 
+                    ? imageUrl + '&refresh=' + Date.now()
+                    : imageUrl + '?refresh=' + Date.now();
+                
+                img.src = uniqueUrl;
+                
                 // ✅ إزالة تأثير loading عند تحميل الصورة
                 img.onload = () => {
                     img.classList.add('loaded');
                 };
-                // ✅ في حالة فشل تحميل الصورة
+                
+                // ✅ في حالة فشل تحميل الصورة - استخدام avatar افتراضي
                 img.onerror = () => {
-                    console.log('Failed to load image, retrying...');
-                    // إعادة المحاولة بعد ثانية
-                    setTimeout(() => {
-                        img.src = imageUrl + '&retry=' + Date.now();
-                    }, 1000);
+                    console.warn('⚠️ Failed to load image, using default avatar');
+                    img.src = getDefaultAvatar();
+                    img.classList.add('loaded');
                 };
             }
         });
+        
+        console.log('✅ UI updated with image for user:', user?.code || 'unknown');
     }
 
     // ==========================================
@@ -870,15 +941,18 @@
     async function fetchUserDataInBackground() {
         if(!user) return;
         try {
-            const { data: emp } = await db.from('employees').select('face_descriptor, is_admin').eq('code', user.code).single();
+            const { data: emp } = await db.from('employees')
+                .select('face_descriptor, is_admin, profile_image_url')
+                .eq('code', user.code)
+                .single();
+            
             if(emp && emp.face_descriptor) {
                 sessionDescriptor = emp.face_descriptor;
-                const { data: imgData } = db.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
-                // ✅ إصلاح Cache - إضافة timestamp عشوائي
-                const newImageUrl = imgData.publicUrl + '?t=' + Date.now() + '&cache=' + Math.random();
-                // ✅ تحديث الصورة فوراً في UI
-                updateUserImageInUI(newImageUrl);
             }
+            
+            // ✅ إصلاح: استخدام الدالة الآمنة الجديدة بدلاً من الطريقة القديمة
+            await safeUpdateUserImage();
+            
             if(!sessionDescriptor && !$('cameraOverlay').classList.contains('active')) {
                 playSound('faceid-error'); showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
                 firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; }
@@ -886,6 +960,7 @@
         } catch(e) { console.error('Error fetching user data:', e); } setStatus('النظام جاهز');
     }
 
+    // ✅ إصلاح: handleLogin مع تصفير userImage وتحميل الصورة قبل showApp
     async function handleLogin() {
         const code = $('loginCode').value.trim(), pass = $('loginPass').value.trim();
         if(!code || !pass) return showToast('يرجى إدخال البيانات', 'error');
@@ -893,6 +968,9 @@
         try {
             const { data: emp, error } = await db.from('employees').select('*').eq('code', code).eq('password', pass).single();
             if(!error && emp) {
+                // ✅ إصلاح حرج: تصفير userImage فوراً عند تسجيل دخول جديد
+                userImage = '';
+                
                 // ✅ التحقق من أن هذا ليس أدمن (لأغراض الأمان الإضافية)
                 user = { 
                     name: emp.name, 
@@ -914,11 +992,11 @@
                     }
                     else { 
                         playSound('login-success'); 
+                        
+                        // ✅ إصلاح: تحميل الصورة أولاً قبل showApp (انتظار!)
+                        await safeUpdateUserImage();
+                        
                         showApp(); 
-                        // ✅ تحديث الصورة فوراً بعد showApp
-                        setTimeout(() => {
-                            fetchUserDataInBackground();
-                        }, 500);
                         
                         if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000); 
                     }
@@ -945,7 +1023,24 @@
         } catch(e) { playSound('login-error'); showToast('خطأ في التحديث','error'); }
     }
 
-    function logout() { playSound('logout-success'); if(autoRefreshTimer) clearInterval(autoRefreshTimer); localStorage.removeItem('rememberedUser'); sessionStorage.removeItem('user'); user = null; sessionDescriptor = null; userImage = ''; $('mainApp').style.display='none'; $('loginScreen').classList.remove('hidden'); setStatus('النظام جاهز'); }
+    // ✅ إصلاح: logout مع تصفير شامل
+    function logout() { 
+        playSound('logout-success'); 
+        if(autoRefreshTimer) clearInterval(autoRefreshTimer); 
+        
+        // ✅ إصلاح: تصفير كل بيانات المستخدم بالكامل
+        localStorage.removeItem('rememberedUser'); 
+        sessionStorage.removeItem('user'); 
+        user = null; 
+        sessionDescriptor = null; 
+        userImage = ''; // ✅ تصفير الصورة
+        
+        $('mainApp').style.display='none'; 
+        $('loginScreen').classList.remove('hidden'); 
+        setStatus('النظام جاهز');
+        
+        console.log('✅ User logged out, all data cleared including image');
+    }
     
     async function refreshData(silent = false) { 
         const icon = $('refreshBtn').querySelector('i'); icon.style.animation='spin 0.5s linear'; setTimeout(()=>icon.style.animation='',600); 
@@ -953,6 +1048,7 @@
         if(!silent) showToast('تم التحديث','success'); 
     }
 
+    // ✅ إصلاح: showApp مع onerror handler وصورة آمنة
     function showApp() {
         if(autoRefreshTimer) clearInterval(autoRefreshTimer);
         $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block';
@@ -960,13 +1056,15 @@
             $('mainAppTitle').textContent='لوحة تحكم المدير'; $('adminPanel').style.display='block'; $('employeePanel').style.display='none';
             showToast('مرحباً بك في لوحة التحكم','success');
             
-            // ✅ إظهار بطاقة الأدمن مع صورته
+            // ✅ إظهار بطاقة الأدمن مع صورته (آمنة)
             const existing = document.getElementById('adminMicroInteractions'); if(existing) existing.remove();
             $('adminPanel').insertAdjacentHTML('afterbegin', `
                 <div id="adminMicroInteractions">
                     <div class="emp-profile-card">
-                        <img src="${userImage || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCA0IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+'}" 
-                             class="emp-profile-img" alt="Admin">
+                        <img src="${userImage || getDefaultAvatar()}" 
+                             class="emp-profile-img" 
+                             alt="Admin"
+                             onerror="this.src='${getDefaultAvatar()}'; this.classList.add('loaded');">
                         <div>
                             <h3 style="margin:0; color:white; font-size:18px;">مرحباً بك يا ${user.name}</h3>
                             <p style="margin:0; color:#64748b; font-size:12px;">مدير النظام</p>
@@ -984,12 +1082,15 @@
         } else {
             $('mainAppTitle').textContent='لوحة الموظف'; $('adminPanel').style.display='none'; $('employeePanel').style.display='block';
             
+            // ✅ إظهار بطاقة الموظف مع صورته (آمنة)
             const existing = document.getElementById('empMicroInteractions'); if(existing) existing.remove();
             $('employeePanel').insertAdjacentHTML('afterbegin', `
                 <div id="empMicroInteractions">
                     <div class="emp-profile-card">
-                        <img src="${userImage || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCA0IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+'}" 
-                             class="emp-profile-img" alt="Profile">
+                        <img src="${userImage || getDefaultAvatar()}" 
+                             class="emp-profile-img" 
+                             alt="Profile"
+                             onerror="this.src='${getDefaultAvatar()}'; this.classList.add('loaded');">
                         <div>
                             <h3 style="margin:0; color:white; font-size:18px;">مرحباً يا ${user.name}</h3>
                             <p style="margin:0; color:#64748b; font-size:12px;">${user.code}</p>
@@ -1206,7 +1307,7 @@
                     return `<tr>
                         <td style="font-size:12px;">${dateStr}</td>
                         <td style="font-size:11px; color:#94a3b8;">${timeStr}</td>
-                        <td><span class="att-badge ${r.type==='حضور'?'att-in':'att-out'}">${r.type}</span></td>
+                        <td><span class="att-badge ${r.type==='حضور?'att-in':'att-out'}">${r.type}</span></td>
                         <td style="font-size:11px;">${r.shift || '-'}</td>
                         <td style="font-weight:bold; color:${r.hours_worked?'#38bdf8':'#64748b'}">${r.hours_worked||'-'}</td>
                         <td>${r.overtime && r.overtime !== '0 دقيقة' ? `<span class="overtime-badge">${r.overtime}</span>` : '-'}</td>
@@ -1384,11 +1485,21 @@
                 const loginData = JSON.parse(savedLogin); 
                 const { data: emp, error } = await db.from('employees').select('*').eq('code', loginData.code).eq('password', loginData.pass).single();
                 if(!error && emp) { 
+                    // ✅ إصلاح: تصفير userImage قبل تعيين المستخدم الجديد
+                    userImage = '';
+                    
                     user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login }; 
                     localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); 
                     sessionDescriptor = emp.face_descriptor;
                     if(!sessionDescriptor) { firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
-                    else { playSound('login-success'); showApp(); setTimeout(() => fetchUserDataInBackground(), 500); }
+                    else { 
+                        playSound('login-success'); 
+                        
+                        // ✅ إصلاح: تحميل الصورة أولاً
+                        await safeUpdateUserImage();
+                        
+                        showApp(); 
+                    }
                 } else { playSound('login-error'); showToast('فشل التحقق (بيانات تغيرت)','error'); setStatus('النظام جاهز'); }
             } 
         } catch(e) { 
