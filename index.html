@@ -297,7 +297,8 @@
     // ==========================================
     const SUPABASE_URL = 'https://qgbokzzynieoedhloxqt.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc';
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { createClient } = supabase; // استخراج دالة الإنشاء من المكتبة
+    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY); // تغيير الاسم لتجنب التعارض
 
     // ==========================================
     // 2. المتغيرات العامة (بدون رابط جوجل شيت)
@@ -500,8 +501,8 @@
                 // رفع الصورة لـ Storage
                 const imgBlob = await createStorageImageBlob();
                 const imgPath = `${newCode}_face.jpg`;
-                await supabase.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
-                const { data: imgData } = supabase.storage.from('faces').getPublicUrl(imgPath);
+                await db.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
+                const { data: imgData } = db.storage.from('faces').getPublicUrl(imgPath);
                 const publicUrl = imgData.publicUrl;
 
                 // إدخال البيانات لقاعدة البيانات
@@ -524,8 +525,8 @@
             try {
                 const imgBlob = await createStorageImageBlob();
                 const imgPath = `${user.code}_face.jpg`;
-                await supabase.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
-                const { data: imgData } = supabase.storage.from('faces').getPublicUrl(imgPath);
+                await db.storage.from('faces').upload(imgPath, imgBlob, { upsert: true });
+                const { data: imgData } = db.storage.from('faces').getPublicUrl(imgPath);
                 
                 const { error } = await supabase.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
                 if(!error) {
@@ -540,7 +541,7 @@
         else if(updateFaceMode) {
             try {
                 const imgBlob = await createStorageImageBlob();
-                await supabase.storage.from('faces').upload(`${user.code}_face.jpg`, imgBlob, { upsert: true });
+                await db.storage.from('faces').upload(`${user.code}_face.jpg`, imgBlob, { upsert: true });
                 const { error } = await supabase.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
                 if(!error) { playSound('faceid-success'); sessionDescriptor = newDescriptor; showMatchResult(true); showToast('تم تحديث البصمة!', 'success'); setTimeout(()=>closeCamera(), 800); showApp(); }
                 else throw error;
@@ -551,7 +552,7 @@
         else if(adminResetFaceMode) {
             try {
                 const imgBlob = await createStorageImageBlob();
-                await supabase.storage.from('faces').upload(`${targetEmpForAdmin.code}_face.jpg`, imgBlob, { upsert: true });
+                await db.storage.from('faces').upload(`${targetEmpForAdmin.code}_face.jpg`, imgBlob, { upsert: true });
                 const { error } = await supabase.from('employees').update({ face_descriptor: newDescriptor }).eq('code', targetEmpForAdmin.code);
                 if(!error) { playSound('faceid-success'); showMatchResult(true); showToast(`تم تحديث بصمة ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); }
                 else throw error;
@@ -650,7 +651,7 @@
             const { data: emp, error } = await supabase.from('employees').select('face_descriptor').eq('code', user.code).single();
             if(!error && emp && emp.face_descriptor) {
                 sessionDescriptor = emp.face_descriptor;
-                const { data: imgData } = supabase.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
+                const { data: imgData } = db.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
                 userImage = imgData.publicUrl + '?t=' + new Date().getTime(); // Cash Busting
                 const img = document.querySelector('.emp-profile-img');
                 if(img) img.src = userImage;
@@ -854,6 +855,10 @@
         if(savedUser) { user = savedUser; showApp(); fetchUserDataInBackground(); }
         else setStatus('النظام جاهز');
     }
+    
+    // دوال بصمة الإصبع (معلقة مؤقتاً لتجنب أخطاء الـ Console)
+    async function registerFingerprint() { console.log("Fingerprint registration skipped in this version."); }
+    async function loginWithFingerprint() { showToast('هذه الميزة قيد التطوير للإصدار القادم', 'warning'); }
 
     // ==========================================
     // 8. التهيئة (Initialization)
@@ -871,6 +876,7 @@
         });
     }
     init();
+    
 </script>
 </body>
 </html>
