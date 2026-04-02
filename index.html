@@ -23,6 +23,7 @@
         :root {
             --primary: #3b82f6; --primary-dark: #2563eb; --success: #10b981; --danger: #ef4444;
             --warning: #f59e0b; --dark: #0f172a; --card-bg: rgba(30, 41, 59, 0.6); --glass: rgba(255,255,255,0.05);
+            --fingerprint-color: #8b5cf6;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html { height: 100%; overflow: hidden; }
@@ -46,8 +47,19 @@
         @keyframes pulseRed { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } }
         @keyframes scanLine { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
         @keyframes matchPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+        
+        /* ===== حركة بصمة الإصبع ===== */
+        @keyframes fingerprintPulse {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 5px var(--fingerprint-color)); }
+            50% { transform: scale(1.08); filter: drop-shadow(0 0 20px var(--fingerprint-color)); }
+        }
+        
+        @keyframes fingerprintScan {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 0% 100%; }
+        }
 
-        /* ===== الحاوية الرئيسية - إصلاح Responsive ===== */
+        /* ===== الحاوية الرئيسية ===== */
         .app-container { 
             flex: 1; width: 100%; max-width: 600px; margin: 0 auto; padding: 12px; 
             position: relative; z-index: 1; animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
@@ -105,6 +117,54 @@
         .btn-sm { padding: 9px 12px; font-size: 12px; width: auto; border-radius: 11px; }
         .btn-danger { background: linear-gradient(135deg, #dc2626, #991b1b); box-shadow: 0 8px 18px -5px rgba(220,38,38,0.4); }
         .btn-excel { background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 8px 18px -5px rgba(5,150,105,0.4); }
+        
+        /* ===== زر بصمة الإصبع ===== */
+        .btn-fingerprint {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(109, 40, 217, 0.3));
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            color: #c4b5fd;
+            margin-bottom: 10px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .btn-fingerprint:hover {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(109, 40, 217, 0.4));
+            border-color: var(--fingerprint-color);
+            box-shadow: 0 0 25px rgba(139, 92, 246, 0.4);
+            color: white;
+        }
+        .btn-fingerprint:active {
+            transform: scale(0.97);
+            background: linear-gradient(135deg, var(--fingerprint-color), #6d28d9);
+        }
+        .btn-fingerprint i {
+            font-size: 22px;
+            animation: fingerprintPulse 2s ease-in-out infinite;
+        }
+        .btn-fingerprint.scanning {
+            animation: fingerprintPulse 0.5s ease-in-out infinite;
+            border-color: #10b981;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+        }
+        .btn-fingerprint.scanning i {
+            color: #10b981;
+        }
+        .btn-fingerprint.error {
+            border-color: #ef4444;
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+            animation: shake 0.5s ease-in-out;
+        }
+        .btn-fingerprint.success {
+            border-color: #10b981;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.4));
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
 
         /* ===== اختيار الشيفت ===== */
         .shift-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -173,12 +233,18 @@
         .remember-me label { color: #94a3b8; font-size: 13px; cursor: pointer; transition: 0.2s; }
         .remember-me:hover label { color: #e2e8f0; }
 
+        /* ===== فاصل بصمة الإصبع ===== */
+        .divider { display: flex; align-items: center; margin: 18px 0; gap: 12px; }
+        .divider-line { flex: 1; height: 1px; background: linear-gradient(to left, transparent, #334155, transparent); }
+        .divider-text { color: #64748b; font-size: 12px; white-space: nowrap; }
+
         /* ===== Toast ===== */
         .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(50px); background: #1e293b; color: white; padding: 12px 24px; border-radius: 50px; font-size: 14px; font-weight: 600; z-index: 3000; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); opacity: 0; border: 1px solid var(--glass); text-align: center; max-width: 90%; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5); }
         .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
         .toast.success { background: linear-gradient(135deg, #059669, #10b981); border: none; }
         .toast.error { background: linear-gradient(135deg, #dc2626, #ef4444); border: none; }
         .toast.warning { background: linear-gradient(135deg, #d97706, #f59e0b); border: none; }
+        .toast.info { background: linear-gradient(135deg, #8b5cf6, #6d28d9); border: none; }
 
         /* ===== جدول التقارير المحسن ===== */
         .report-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
@@ -191,6 +257,11 @@
 
         /* ===== تنبيه الموقع ===== */
         .location-warning { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 12px; padding: 12px; margin-bottom: 12px; text-align: center; color: #fca5a5; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; animation: pulseRed 2s infinite; }
+
+        /* ===== حالة بصمة الإصبع ===== */
+        .fp-status { text-align: center; font-size: 12px; color: #c4b5fd; margin-top: 8px; min-height: 18px; }
+        .fp-status.success { color: #10b981; }
+        .fp-status.error { color: #ef4444; }
 
         /* ===== Responsive محسن ===== */
         @media (max-width: 480px) {
@@ -258,10 +329,25 @@
         <div class="remember-me">
             <input type="checkbox" id="rememberMe">
             <div class="checkmark"></div>
-            <label for="rememberMe">تذكرني (حفظ جلسة الدخول)</label>
+            <label for="rememberMe">تذكرني (حفظ جلسة + بصمة)</label>
         </div>
         <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 10px;"><i class="fas fa-arrow-right-to-bracket"></i> تسجيل الدخول</button>
-        <button class="btn btn-reg" onclick="showRegisterScreen()"><i class="fas fa-user-plus"></i> إنشاء حساب جديد</button>
+        
+        <!-- فاصل بصمة الإصبع -->
+        <div class="divider">
+            <div class="divider-line"></div>
+            <span class="divider-text">أو</span>
+            <div class="divider-line"></div>
+        </div>
+        
+        <!-- زر بصمة الإصبع -->
+        <button id="fingerprintLoginBtn" class="btn btn-fingerprint" onclick="loginWithFingerprint()">
+            <i class="fas fa-fingerprint"></i>
+            <span>تسجيل الدخول ببصمة الإصبع</span>
+        </button>
+        <p id="fingerprintStatus" class="fp-status"></p>
+        
+        <button class="btn btn-reg" onclick="showRegisterScreen()" style="margin-top: 10px;"><i class="fas fa-user-plus"></i> إنشاء حساب جديد</button>
         <p style="text-align: center; margin-top: 16px;"><a href="#" onclick="showForgotPw()" style="color: #64748b; text-decoration: none; font-size: 12px;">نسيت كلمة المرور؟</a></p>
     </div>
     <div class="unified-footer">
@@ -395,7 +481,7 @@ const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 50
 const MATCH_THRESHOLD = 0.55, AUTO_REFRESH_INTERVAL = 30000, STABLE_FRAMES_REQUIRED = 5;
 const MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
 const STORE_IMG_MAX = 400;
-const SHIFT_HOURS = 9; // عدد ساعات الشيفت
+const SHIFT_HOURS = 9;
 
 // المتغيرات العامة
 let user = null, lightModels = false, heavyModels = false, stream = null, employees = [];
@@ -406,7 +492,7 @@ let currentLat = null, currentLon = null, currentLoc = 'غير متوفر', user
 let currentAccuracy = 0, autoRefreshTimer = null, detectionLoopTimeout = null;
 let livenessActive = false, livenessStartYaw = null, livenessMoved = false, stabilityCounter = 0;
 let isOnline = navigator.onLine, audioUnlocked = false, modelsLoadProgress = 0;
-let locationPermissionGranted = false; // جديد: حالة إذن الموقع
+let locationPermissionGranted = false;
 
 // العناصر
 const $ = id => document.getElementById(id);
@@ -467,23 +553,17 @@ function base64ToBuffer(base64) {
 // تنسيق الوقت بنظام 12 ساعة AM/PM
 function formatTime12(date) {
     return date.toLocaleString('ar-EG', { 
-        hour: 'numeric', 
-        minute: '2-digit', 
-        second: '2-digit',
-        hour12: true 
+        hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true 
     });
 }
 
-// تنسيق التاريخ والوقت الكامل
 function formatDateTimeFull(date) {
-    const dateStr = date.toLocaleDateString('ar-EG', { 
-        year: 'numeric', month: '2-digit', day: '2-digit' 
-    });
+    const dateStr = date.toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
     const timeStr = formatTime12(date);
     return `${dateStr} - ${timeStr}`;
 }
 
-// حساب الأوفر تايم (فوق 9 ساعات)
+// حساب الأوفر تايم
 function calculateOvertime(checkInTime, checkOutTime) {
     const diffMs = checkOutTime - checkInTime;
     const diffHours = diffMs / (1000 * 60 * 60);
@@ -497,11 +577,7 @@ function calculateOvertime(checkInTime, checkOutTime) {
             overtimeDisplay: `+${otMinutes} دقيقة أوفر تايم`
         };
     }
-    return {
-        hoursWorked: diffHours.toFixed(2) + ' ساعة',
-        overtime: '0 دقيقة',
-        overtimeDisplay: ''
-    };
+    return { hoursWorked: diffHours.toFixed(2) + ' ساعة', overtime: '0 دقيقة', overtimeDisplay: '' };
 }
 
 function selectShift(element) { 
@@ -545,7 +621,6 @@ function createStorageImageBlob() {
     return new Promise(resolve => c.toBlob(resolve, 'image/jpeg', 0.85));
 }
 
-// التقاط صورة للإيميل (جودة أعلى)
 function captureImageForEmail() {
     const c = document.createElement('canvas');
     let w = video.videoWidth, h = video.videoHeight;
@@ -582,6 +657,287 @@ function updateLiveness(yaw) {
 }
 
 // ==========================================
+// 👆 بصمة الإصبع (WebAuthn)
+// ==========================================
+
+/**
+ * التحقق من دعم بصمة الإصبع
+ */
+function isFingerprintSupported() {
+    return !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+}
+
+/**
+ * تحديث حالة زر بصمة الإصبع
+ */
+function updateFingerprintButtonVisibility() {
+    const btn = $('fingerprintLoginBtn');
+    const status = $('fingerprintStatus');
+    
+    if (!btn || !status) return;
+    
+    // التحقق من وجود بيانات محفوظة
+    const hasSavedCredentials = localStorage.getItem('axentro_fp_id') && localStorage.getItem('axentro_saved_login');
+    
+    if (!isFingerprintSupported()) {
+        btn.style.display = 'none';
+        status.textContent = '🔒 المتصفح لا يدعم بصمة الإصبع';
+        status.className = 'fp-status';
+        return;
+    }
+    
+    if (!hasSavedCredentials) {
+        btn.style.display = 'flex';
+        btn.style.opacity = '0.5';
+        btn.style.pointerEvents = 'none';
+        status.textContent = '💡 سجل دخولك عادياً وفعّل "تذكرني" أولاً';
+        status.className = 'fp-status';
+        return;
+    }
+    
+    // كل شيء جاهز
+    btn.style.display = 'flex';
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = 'auto';
+    status.textContent = '👆 ضع إصبعك على مستشعر البصمة';
+    status.className = 'fp-status';
+}
+
+/**
+ * تسجيل بصمة إصبع جديدة
+ */
+async function registerFingerprint() {
+    try {
+        if (!isFingerprintSupported()) {
+            showToast('❌ المتصفح لا يدعم بصمة الإصبط', 'error');
+            return false;
+        }
+        
+        if (!user) {
+            showToast('❌ يجب تسجيل الدخول أولاً', 'error');
+            return false;
+        }
+        
+        setStatus('🔐 جاري تسجيل بصمة الإصبع...');
+        
+        // إنشاء challenge عشوائي
+        const challenge = new Uint8Array(32);
+        crypto.getRandomValues(challenge);
+        
+        // طلب إنشاء بيانات اعتماد
+        const credential = await navigator.credentials.create({
+            publicKey: {
+                challenge: challenge,
+                rp: {
+                    name: "Axentro Attendance System",
+                    id: window.location.hostname
+                },
+                user: {
+                    id: new Uint8Array(16),
+                    name: user.code,
+                    displayName: user.name
+                },
+                pubKeyCredParams: [
+                    { alg: -7, type: "public-key" },   // ES256
+                    { alg: -257, type: "public-key" }   // RS256
+                ],
+                authenticatorSelection: {
+                    authenticatorAttachment: "platform",
+                    userVerification: "required"
+                },
+                timeout: 60000,
+                attestation: "direct"
+            }
+        });
+        
+        if (credential) {
+            // حفظ معرف البصمة
+            localStorage.setItem('axentro_fp_id', bufferToBase64(credential.rawId));
+            
+            showToast('✅ تم تسجيل بصمة الإصبع بنجاح!', 'success');
+            updateFingerprintButtonVisibility();
+            
+            playSound('login-success');
+            return true;
+        }
+        
+        return false;
+        
+    } catch (error) {
+        console.error('Fingerprint registration error:', error);
+        
+        let errorMsg = '❌ فشل تسجيل البصمة';
+        
+        if (error.name === 'NotAllowedError') {
+            errorMsg = '❌ تم إلغاء عملية التسجيل';
+        } else if (error.name === 'SecurityError') {
+            errorMsg = '❌ يجب استخدام HTTPS';
+        } else if (error.name === 'NotSupportedError') {
+            errorMsg = '❌ الجهاز لا يدعم بصمة الإصبع';
+        } else if (error.name === 'NotReadableError') {
+            errorMsg = '❌ لا يمكن الوصول لمستشعر البصمة';
+        }
+        
+        showToast(errorMsg, 'error');
+        return false;
+    }
+}
+
+/**
+ * تسجيل الدخول ببصمة الإصبع
+ */
+async function loginWithFingerprint() {
+    const btn = $('fingerprintLoginBtn');
+    const status = $('fingerprintStatus');
+    
+    try {
+        // التحقق من البيانات المحفوظة
+        const savedFpId = localStorage.getItem('axentro_fp_id');
+        const savedLogin = localStorage.getItem('axentro_saved_login');
+        
+        if (!savedFpId || !savedLogin) {
+            showToast('❌ لا توجد بصمة مسجلة، سجل دخولك أولاً', 'error');
+            return;
+        }
+        
+        // تحديث واجهة الزر
+        if (btn) {
+            btn.classList.add('scanning');
+            btn.querySelector('span')?.remove();
+            btn.innerHTML = '<i class="fas fa-fingerprint"></i><span>جاري التحقق...</span>';
+        }
+        if (status) {
+            status.textContent = '🔍 ضع إصبعك على المستشعر...';
+            status.className = 'fp-status';
+        }
+        
+        setStatus('👆 جاري التحقق من البصمة...');
+        
+        // إنشاء challenge
+        const challenge = new Uint8Array(32);
+        crypto.getRandomValues(challenge);
+        
+        // طلب التحقق
+        const assertion = await navigator.credentials.get({
+            publicKey: {
+                challenge: challenge,
+                allowCredentials: [{
+                    id: base64ToBuffer(savedFpId),
+                    type: 'public-key'
+                }],
+                userVerification: "required",
+                timeout: 60000
+            }
+        });
+        
+        if (assertion) {
+            // نجاح التحقق - تسجيل الدخول بالبيانات المحفوظة
+            setStatus('✅ تم التحقق بنجاح، جاري تسجيل الدخول...');
+            
+            const loginData = JSON.parse(savedLogin);
+            
+            // التحقق من قاعدة البيانات
+            const { data: emp, error } = await db.from('employees')
+                .select('*')
+                .eq('code', loginData.code)
+                .eq('password', loginData.pass)
+                .single();
+                
+            if (!error && emp) {
+                // إنشاء جلسة المستخدم
+                user = {
+                    name: emp.name,
+                    code: emp.code,
+                    isAdmin: emp.is_admin,
+                    isFirstLogin: emp.is_first_login
+                };
+                
+                // تحديث الجلسة
+                localStorage.setItem('rememberedUser', JSON.stringify({
+                    data: user,
+                    timestamp: Date.now()
+                }));
+                
+                sessionDescriptor = emp.face_descriptor;
+                
+                // تحديث الواجهة
+                if (btn) {
+                    btn.classList.remove('scanning');
+                    btn.classList.add('success');
+                    btn.innerHTML = '<i class="fas fa-check-circle"></i><span>تم التحقق ✓</span>';
+                }
+                if (status) {
+                    status.textContent = '✅ تم تسجيل الدخول بنجاح!';
+                    status.className = 'fp-status success';
+                }
+                
+                playSound('login-success');
+                showToast(`🎉 مرحباً ${user.name}!`, 'success');
+                
+                // الانتقال للتطبيق
+                setTimeout(() => {
+                    if (!sessionDescriptor) {
+                        firstTimeSetupMode = true;
+                        if (!await openCamera()) {
+                            firstTimeSetupMode = false;
+                            logout();
+                        }
+                    } else {
+                        showApp();
+                        fetchUserDataInBackground();
+                    }
+                }, 500);
+                
+            } else {
+                throw new Error('Invalid credentials - البيانات تغيرت');
+            }
+        }
+        
+    } catch (error) {
+        console.error('Fingerprint login error:', error);
+        
+        // إعادة الزر للحالة الطبيعية
+        if (btn) {
+            btn.classList.remove('scanning', 'success');
+            btn.classList.add('error');
+            btn.innerHTML = '<i class="fas fa-fingerprint"></i><span>تسجيل الدخول ببصمة الإصبع</span>';
+            
+            setTimeout(() => {
+                btn.classList.remove('error');
+                updateFingerprintButtonVisibility();
+            }, 2000);
+        }
+        
+        if (status) {
+            status.className = 'fp-status error';
+        }
+        
+        let errorMsg = '❌ فشل التحقق من البصمة';
+        
+        if (error.name === 'NotAllowedError') {
+            errorMsg = '❌ تم إلغاء التحقق من البصمة';
+            if (status) status.textContent = 'تم الإلغاء';
+        } else if (error.message === 'Invalid credentials - البيانات تغيرت') {
+            errorMsg = '❌ بيانات الدخول تغيرت، سجل دخولك مرة أخرى';
+            if (status) status.textContent = 'البيانات غير متطابقة';
+            
+            // مسح البيانات القديمة
+            localStorage.removeItem('axentro_fp_id');
+            localStorage.removeItem('axentro_saved_login');
+            updateFingerprintButtonVisibility();
+        } else if (error.name === 'NotReadableError') {
+            errorMsg = '❌ لا يمكن قراءة البصمة';
+            if (status) status.textContent = 'خطأ في قراءة البصمة';
+        } else {
+            if (status) status.textContent = 'فشل التحقق';
+        }
+        
+        showToast(errorMsg, 'error');
+        setStatus('النظام جاهز');
+    }
+}
+
+// ==========================================
 // 🤖 الذكاء الاصطناعي والكاميرا
 // ==========================================
 async function extractStableDescriptor() {
@@ -590,7 +946,7 @@ async function extractStableDescriptor() {
         const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 })).withFaceLandmarks().withFaceDescriptor();
         if (!det) return null;
         samples.push(Array.from(det.descriptor));
-        if (i === 0) await new Promise(r => setTimeout(r, 150)); // تأخير بسيط للاستقرار
+        if (i === 0) await new Promise(r => setTimeout(r, 150));
     }
     const avg = new Array(samples[0].length).fill(0);
     for (const s of samples) for (let j = 0; j < s.length; j++) avg[j] += s[j] / 2;
@@ -657,7 +1013,7 @@ async function drawFaceBox() {
                 if (stabilityCounter >= STABLE_FRAMES_REQUIRED) { 
                     setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> تم الالتقاط!'); 
                     $('stabilityRing').classList.remove('active'); 
-                    if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 300); // تأخير 300ms
+                    if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 300);
                 }
                 else { setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك... (' + stabilityCounter + '/' + STABLE_FRAMES_REQUIRED + ')'); }
                 return;
@@ -670,7 +1026,7 @@ async function drawFaceBox() {
                 if (stabilityCounter >= STABLE_FRAMES_REQUIRED) { 
                     setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> جاري المعالجة...'); 
                     $('stabilityRing').classList.remove('active'); 
-                    if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 500); // تأخير 500ms للحضور/الانصراف
+                    if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 500);
                 }
                 else { setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك... (' + stabilityCounter + '/' + STABLE_FRAMES_REQUIRED + ')'); }
                 return;
@@ -684,7 +1040,7 @@ async function drawFaceBox() {
 }
 
 // ==========================================
-// 💾 العمليات الرئيسية (Supabase + Emails)
+// 💾 العمليات الرئيسية
 // ==========================================
 async function performCapture() {
     if(isProcessingCapture) return;
@@ -693,10 +1049,9 @@ async function performCapture() {
     $('scanLine').classList.remove('active');
     setCamStatus('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
     
-    // التقاط الصورة للإيميل قبل أي عملية
     const capturedImageForEmail = captureImageForEmail();
-    
     const newDescriptor = await extractStableDescriptor();
+    
     if(!newDescriptor) { 
         playSound('faceid-error'); 
         setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة...'); 
@@ -704,7 +1059,6 @@ async function performCapture() {
         $('scanLine').classList.add('active'); startDetectionLoop(); return;
     }
 
-    // ===== تسجيل موظف جديد =====
     if(regMode) {
         setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البيانات...');
         try {
@@ -719,7 +1073,7 @@ async function performCapture() {
                 face_descriptor: newDescriptor, is_first_login: true 
             });
             if(!error) {
-                playSound('faceid-success'); showToast(`تم إنشاء الحساب! (جاري إرسال الإيميل)`, 'success'); 
+                playSound('faceid-success'); showToast(`تم إنشاء الحساب!`, 'success'); 
                 closeCamera(); showLoginScreen();
                 fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ 
                     action: 'sendNewEmpEmails', name: regData.name, code: newCode, password: tempPass, email: regData.email 
@@ -727,7 +1081,6 @@ async function performCapture() {
             } else throw error;
         } catch(e) { playSound('faceid-error'); showToast('حدث خطأ', 'error'); closeCamera(); }
     }
-    // ===== أول تسجيل وجه للموظف =====
     else if(firstTimeSetupMode) {
         setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البصمة...');
         try {
@@ -744,7 +1097,6 @@ async function performCapture() {
             else throw error;
         } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل الحفظ', 'error'); restartCamLoop(); }
     }
-    // ===== تحديث بصمة =====
     else if(updateFaceMode || adminResetFaceMode) {
         const targetCode = updateFaceMode ? user.code : targetEmpForAdmin.code;
         const targetName = updateFaceMode ? user.name : targetEmpForAdmin.name;
@@ -760,15 +1112,12 @@ async function performCapture() {
             else throw error;
         } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل التحديث', 'error'); restartCamLoop(); }
     }
-    // ===== تحقق الأدمن =====
     else if(adminVerifyMode) {
         if(!sessionDescriptor) { playSound('faceid-error'); showToast('لا توجد بصمة أدمن!', 'error'); closeCamera(); return; }
         if(euclideanDistance(newDescriptor, sessionDescriptor) < MATCH_THRESHOLD) {
             showMatchResult(true); setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق...');
             
-            // حالة حذف موظف - حماية الأدمن
             if(targetEmpForAdmin.type === 'حذف موظف') {
-                // منع حذف الأدمن!
                 if(targetEmpForAdmin.code === 'ADMIN') {
                     playSound('faceid-error'); showToast('❌ لا يمكن حذف حساب الأدمن!', 'error');
                     setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> محظور!');
@@ -786,7 +1135,6 @@ async function performCapture() {
                 isProcessingCapture = false; return;
             }
 
-            // حالة تسجيل حضور/انصراف يدوي
             const { error } = await db.from('attendance').insert({ 
                 employee_code: targetEmpForAdmin.code, employee_name: targetEmpForAdmin.name, 
                 type: targetEmpForAdmin.type, location_link: currentLoc, shift: 'تسجيل يدوي بواسطة الأدمن' 
@@ -802,7 +1150,6 @@ async function performCapture() {
             setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> انتحال هوية مرفوض!'); restartCamLoop(); 
         }
     }
-    // ===== تسجيل حضور/انصراف =====
     else if(attMode) {
         if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة', 'error'); closeCamera(); return; }
         
@@ -810,7 +1157,6 @@ async function performCapture() {
         if(distance < MATCH_THRESHOLD) {
             showMatchResult(true);
             
-            // تغيير كلمة المرور
             if(attType === 'تغيير كلمة المرور') {
                 const { error } = await db.from('employees').update({ password: window._pendingPwChange.newPassword }).eq('code', user.code).eq('password', window._pendingPwChange.oldPassword);
                 if(!error) { playSound('login-success'); showToast('تم تغيير كلمة المرور', 'success'); setTimeout(()=>closeCamera(), 800); }
@@ -818,7 +1164,6 @@ async function performCapture() {
                 isProcessingCapture = false; return;
             }
             
-            // ⛔ فحص الموقع - منع الغش
             if(!locationPermissionGranted || !currentLat || !currentLon) {
                 playSound('faceid-error'); 
                 showToast('⚠️ يرجى السماح بالموقع أولاً!', 'error');
@@ -834,11 +1179,8 @@ async function performCapture() {
                 setCamStatus('مرفوض: خارج نطاق المقر'); restartCamLoop(); return; 
             }
             
-            // الحصول على بيانات الشيفت
             const selShift = document.querySelector('input[name="shift"]:checked');
             const shiftValue = selShift ? selShift.value : 'لم يتم التحديد';
-            
-            // حساب ساعات العمل والأوفر تايم
             let hoursWorked = null, overtimeVal = '0 دقيقة';
             
             if(attType === 'انصراف') {
@@ -859,19 +1201,12 @@ async function performCapture() {
                 }
             }
             
-            // تنسيق الوقت
             const now = new Date();
             const datetime = formatDateTimeFull(now);
             
-            // إدراج في قاعدة البيانات
             const { error } = await db.from('attendance').insert({
-                employee_code: user.code, 
-                employee_name: user.name, 
-                type: attType, 
-                location_link: currentLoc, 
-                shift: shiftValue,
-                hours_worked: hoursWorked,
-                overtime: overtimeVal
+                employee_code: user.code, employee_name: user.name, type: attType, 
+                location_link: currentLoc, shift: shiftValue, hours_worked: hoursWorked, overtime: overtimeVal
             });
             
             if(!error) {
@@ -879,22 +1214,11 @@ async function performCapture() {
                 playSound('faceid-success'); showToast(successMsg, 'success'); 
                 setTimeout(()=>closeCamera(), 800); calculateMonthlyHours();
                 
-                // إرسال إيميل تنبيه للأدمن مع الصورة
-                fetch(EMAIL_API_URL, { 
-                    method: 'POST', 
-                    body: JSON.stringify({ 
-                        action: 'sendAttAlert', 
-                        name: user.name, 
-                        code: user.code, 
-                        type: attType, 
-                        datetime, 
-                        location: currentLoc, 
-                        shift: shiftValue,
-                        hoursWorked: hoursWorked || '-',
-                        overtime: overtimeVal,
-                        imgBase64: capturedImageForEmail // إرسال الصورة
-                    }) 
-                }).catch(e => console.log("Email Err:", e));
+                fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ 
+                    action: 'sendAttAlert', name: user.name, code: user.code, type: attType, 
+                    datetime, location: currentLoc, shift: shiftValue, hoursWorked: hoursWorked || '-', 
+                    overtime: overtimeVal, imgBase64: capturedImageForEmail 
+                }) }).catch(e => console.log("Email Err:", e));
             } else throw error;
         } else { 
             playSound('faceid-error'); showMatchResult(false); 
@@ -929,7 +1253,7 @@ async function loadModelsAsync() {
 }
 
 // ==========================================
-// 👤 تحميل بيانات المستخدم (إصلاح الصور)
+// 👤 تحميل بيانات المستخدم
 // ==========================================
 async function fetchUserDataInBackground() {
     if(!user) return;
@@ -938,18 +1262,11 @@ async function fetchUserDataInBackground() {
         if(emp && emp.face_descriptor) {
             sessionDescriptor = emp.face_descriptor;
             const { data: imgData } = db.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
-            // إضافة timestamp لمنع الكاش
             userImage = imgData.publicUrl + '?t=' + Date.now();
             
-            // تحديث الصورة فوراً في الواجهة
             const imgs = document.querySelectorAll('.emp-profile-img');
-            imgs.forEach(img => {
-                if(img.alt !== 'Admin' && img.alt !== 'Profile') {
-                    img.src = userImage;
-                }
-            });
+            imgs.forEach(img => { if(img.alt !== 'Admin' && img.alt !== 'Profile') img.src = userImage; });
             
-            // تحديث صورة الموظف في البطاقة
             const profileImg = document.querySelector('#empMicroInteractions .emp-profile-img');
             if(profileImg) profileImg.src = userImage;
         }
@@ -972,9 +1289,21 @@ async function handleLogin() {
         const { data: emp, error } = await db.from('employees').select('*').eq('code', code).eq('password', pass).single();
         if(!error && emp) {
             user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login };
+            
+            // حفظ بيانات الدخول إذا اختار "تذكرني"
             if($('rememberMe').checked) { 
                 localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); 
                 localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass })); 
+                
+                // محاولة تسجيل بصمة الإصبع تلقائياً
+                setTimeout(() => {
+                    registerFingerprint().then(success => {
+                        if (success) {
+                            showToast('🔐 تم تفعيل تسجيل الدخول بالبصمة!', 'info');
+                            updateFingerprintButtonVisibility();
+                        }
+                    });
+                }, 1500);
             }
             else { sessionStorage.setItem('user', JSON.stringify(user)); localStorage.removeItem('axentro_saved_login'); }
             
@@ -989,7 +1318,6 @@ async function handleLogin() {
                 }
                 else { 
                     playSound('login-success'); showApp(); fetchUserDataInBackground(); 
-                    if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000); 
                 }
             }
         } else { playSound('login-error'); showToast('بيانات خاطئة', 'error'); setStatus('النظام جاهز'); }
@@ -1021,6 +1349,9 @@ function logout() {
     user = null; sessionDescriptor = null; userImage = ''; 
     $('mainApp').style.display='none'; $('loginScreen').classList.remove('hidden'); 
     setStatus('النظام جاهز'); 
+    
+    // إعادة تعيين زر البصمة
+    updateFingerprintButtonVisibility();
 }
 
 async function refreshData(silent = false) { 
@@ -1075,7 +1406,6 @@ function showApp() {
             </div>
         `);
         
-        // تحديث الصورة فوراً إذا كانت متوفرة
         if(userImage) {
             const mainImg = document.getElementById('empProfileImgMain');
             if(mainImg) mainImg.src = userImage;
@@ -1086,20 +1416,18 @@ function showApp() {
     autoRefreshTimer = setInterval(() => { if(user) refreshData(true); }, AUTO_REFRESH_INTERVAL);
 }
 
-// صورة افتراضية
 function getDefaultAvatar(type) {
     return `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCAwIDAgMC00IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+`;
 }
 
 // ==========================================
-// 👥 إدارة الموظفين (الأدمن) - إخفاء الأدمن
+// 👥 إدارة الموظفين
 // ==========================================
 async function loadEmployees() { 
     try { 
-        // استبعاد الأدمن من القائمة!
         const { data: emps } = await db.from('employees')
             .select('code, name')
-            .eq('is_admin', false) // فقط الموظفين العاديين
+            .eq('is_admin', false)
             .order('created_at', { ascending: true });
             
         if(emps) { employees = emps; $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); }
@@ -1117,12 +1445,12 @@ function renderEmployeeList(list) {
                 <p>${e.code}</p>
             </div>
             <div class="emp-actions">
-                <button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')" title="تسجيل حضور"><i class="fas fa-check"></i></button>
-                <button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')" title="تسجيل انصراف"><i class="fas fa-times"></i></button>
-                <button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')" title="تقرير"><i class="fas fa-chart-bar"></i></button>
-                <button class="btn btn-sm btn-excel" onclick="exportEmployeeExcel('${e.code}', '${e.name}')" title="تصدير Excel" style="background:linear-gradient(135deg,#059669,#047857);"><i class="fas fa-file-excel"></i></button>
-                <button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}', '${e.name}')" title="إعادة تسجيل بصمة"><i class="fas fa-sync-alt"></i></button>
-                <button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${e.code}', '${e.name}')" title="حذف الموظف"><i class="fas fa-trash"></i></button>
+                <button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button>
+                <button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button>
+                <button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button>
+                <button class="btn btn-sm btn-excel" onclick="exportEmployeeExcel('${e.code}', '${e.name}')" style="background:linear-gradient(135deg,#059669,#047857);"><i class="fas fa-file-excel"></i></button>
+                <button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}', '${e.name}')"><i class="fas fa-sync-alt"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${e.code}', '${e.name}')"><i class="fas fa-trash"></i></button>
             </div>
         </div>
     `).join(''); 
@@ -1134,13 +1462,13 @@ $('searchInput')?.addEventListener('input', (e) => {
 });
 
 async function adminDirectAtt(type, code, name) {
-    if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن، جاري التسجيل...', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
+    if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
     adminVerifyMode = true; targetEmpForAdmin = { type, code, name }; attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
     if(!await openCamera()) { adminVerifyMode=false; showToast('فشل فتح الكاميرا','error'); }
 }
 
 async function adminDeleteEmp(code, name) {
-    if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن، جاري التسجيل...', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
+    if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
     adminVerifyMode = true; targetEmpForAdmin = { type: 'حذف موظف', code, name }; attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
     if(!await openCamera()) { adminVerifyMode=false; showToast('فشل فتح الكاميرا','error'); }
 }
@@ -1151,11 +1479,10 @@ async function adminDeleteEmp(code, name) {
 async function handleAttendance(type) {
     if(!sessionDescriptor) return showToast('بيانات الوجه غير مسجلة، تواصل مع الأدمن.','error');
     
-    // فحص الموقع أولاً
     if(!locationPermissionGranted) {
         showToast('⚠️ يرجى السماح بالموقع أولاً!', 'warning');
         $('locationWarning').style.display = 'flex';
-        getLocation(); // طلب الموقع مرة أخرى
+        getLocation();
         return;
     }
     
@@ -1201,7 +1528,7 @@ async function submitChangePassword() {
 }
 
 // ==========================================
-// 📊 التقارير المحسنة + تصدير Excel
+// 📊 التقارير + Excel
 // ==========================================
 function closeReportModal() { $('reportModal').classList.remove('active'); }
 
@@ -1222,57 +1549,35 @@ async function loadEmpReport(code,name) {
 async function fetchAndRenderReport(code) { 
     try { 
         const { data: records } = await db.from('attendance')
-            .select('*')
-            .eq('employee_code', code)
-            .order('created_at', { ascending: false })
-            .limit(100);
+            .select('*').eq('employee_code', code)
+            .order('created_at', { ascending: false }).limit(100);
             
         if(records && records.length>0) { 
-            // زر تصدير Excel
             const excelBtn = `<button class="btn btn-excel" onclick="exportToExcel('${code}')" style="margin-bottom:15px; width:100%;"><i class="fas fa-file-excel"></i> تصدير تقرير Excel</button>`;
             
-            // ملخص
             let totalHours = 0, totalOvertime = 0, attendanceCount = 0, leaveCount = 0;
             records.forEach(r => {
                 if(r.type === 'حضور') attendanceCount++;
                 if(r.type === 'انصراف') { leaveCount++; }
                 if(r.hours_worked) totalHours += parseFloat(r.hours_worked) || 0;
-                if(r.overtime && r.overtime !== '0 دقيقة') {
-                    const ot = parseInt(r.overtime) || 0;
-                    totalOvertime += ot;
-                }
+                if(r.overtime && r.overtime !== '0 دقيقة') totalOvertime += parseInt(r.overtime) || 0;
             });
             
-            const summaryHtml = `
-                <div style="background:rgba(59,130,246,0.1);border-radius:14px;padding:15px;margin-bottom:15px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
-                    <div style="text-align:center;padding:8px 15px;"><p style="color:#94a3b8;font-size:11px;margin:0;">أيام الحضور</p><h3 style="color:#10b981;margin:4px 0 0;font-size:20px;">${attendanceCount}</h3></div>
-                    <div style="text-align:center;padding:8px 15px;"><p style="color:#94a3b8;font-size:11px;margin:0;">أيام الانصراف</p><h3 style="color:#ef4444;margin:4px 0 0;font-size:20px;">${leaveCount}</h3></div>
-                    <div style="text-align:center;padding:8px 15px;"><p style="color:#94a3b8;font-size:11px;margin:0;">إجمالي الساعات</p><h3 style="color:#38bdf8;margin:4px 0 0;font-size:20px;">${totalHours.toFixed(1)}س</h3></div>
-                    <div style="text-align:center;padding:8px 15px;"><p style="color:#94a3b8;font-size:11px;margin:0;">الأوفر تايم</p><h3 style="color:#f59e0b;margin:4px 0 0;font-size:20px;">${totalOvertime}د</h3></div>
-                </div>
-            `;
+            const summaryHtml = `<div style="background:rgba(59,130,246,0.1);border-radius:14px;padding:15px;margin-bottom:15px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
+                <div style="text-align:center;padding:8px 15px;"><p style="color:#94a3b8;font-size:11px;margin:0;">أيام الحضور</p><h3 style="color:#10b981;margin:4px 0 0;font-size:20px;">${attendanceCount}</h3></div>
+                <div style="text-align:center;padding:8px 15px;"><p style="color:#94a3b8;font-size:11px;margin:0;">أيام الانصراف</p><h3 style="color:#ef4444;margin:4px 0 0;font-size:20px;">${leaveCount}</h3></div>
+                <div style="text-align:center;padding:8px 15px;"><p style="color:#94a3b8;font-size:11px;margin:0;">إجمالي الساعات</p><h3 style="color:#38bdf8;margin:4px 0 0;font-size:20px;">${totalHours.toFixed(1)}س</h3></div>
+                <div style="text-align:center;padding:8px 15px;"><p style="color:#94a3b8;font-size:11px;margin:0;">الأوفر تايم</p><h3 style="color:#f59e0b;margin:4px 0 0;font-size:20px;">${totalOvertime}د</h3></div>
+            </div>`;
             
-            // الجدول
             const tableHtml = `<table class="report-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>التاريخ</th>
-                        <th>التوقيت</th>
-                        <th>الحالة</th>
-                        <th>الشفت</th>
-                        <th>الساعات</th>
-                        <th>أوفر تايم</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>#</th><th>التاريخ</th><th>التوقيت</th><th>الحالة</th><th>الشفت</th><th>الساعات</th><th>أوفر تايم</th></tr></thead>
                 <tbody>${records.map((r, idx) => { 
                     const d = new Date(r.created_at);
-                    const dateStr = d.toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
-                    const timeStr = formatTime12(d);
                     return `<tr>
                         <td style="font-size:11px;color:#64748b;">${idx + 1}</td>
-                        <td style="font-size:12px;">${dateStr}</td>
-                        <td style="font-size:11px;color:#38bdf8;">${timeStr}</td>
+                        <td style="font-size:12px;">${d.toLocaleDateString('ar-EG')}</td>
+                        <td style="font-size:11px;color:#38bdf8;">${formatTime12(d)}</td>
                         <td><span class="att-badge ${r.type==='حضور'?'att-in':'att-out'}">${r.type}</span></td>
                         <td style="font-size:10px;">${r.shift ? r.shift.split('(')[0].trim() : '-'}</td>
                         <td style="font-weight:bold;color:${r.hours_worked?'#38bdf8':'#64748b'};font-size:12px;">${r.hours_worked||'-'}</td>
@@ -1282,8 +1587,6 @@ async function fetchAndRenderReport(code) {
             </table>`;
             
             $('reportBody').innerHTML = excelBtn + summaryHtml + tableHtml; 
-            
-            // تخزين البيانات للتصدير
             window.currentReportData = records;
         } else {
             $('reportBody').innerHTML='<center style="color:#64748b; padding:30px;"><i class="fas fa-chart-bar" style="font-size:40px;margin-bottom:10px;display:block;"></i>لا توجد سجلات.</center>'; 
@@ -1293,7 +1596,6 @@ async function fetchAndRenderReport(code) {
     } 
 }
 
-// تصدير Excel
 function exportToExcel(employeeCode) {
     if(!window.currentReportData || window.currentReportData.length === 0) {
         showToast('لا توجد بيانات للتصدير', 'error');
@@ -1311,11 +1613,7 @@ function exportToExcel(employeeCode) {
     }));
     
     const ws = XLSX.utils.json_to_sheet(data);
-    
-    // عرض الأعمدة
-    ws['!cols'] = [
-        { wch: 5 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 25 }, { wch: 12 }, { wch: 14 }
-    ];
+    ws['!cols'] = [{ wch: 5 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 25 }, { wch: 12 }, { wch: 14 }];
     
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'تقرير الحضور');
@@ -1326,24 +1624,13 @@ function exportToExcel(employeeCode) {
     showToast('✅ تم تصدير التقرير بنجاح', 'success');
 }
 
-// تصدير Excel لموظف محدد من لوحة الأدمن
 async function exportEmployeeExcel(code, name) {
     try {
-        const { data: records } = await db.from('attendance')
-            .select('*')
-            .eq('employee_code', code)
-            .order('created_at', { ascending: false });
-            
-        if(!records || records.length === 0) {
-            showToast(`لا توجد سجلات لـ ${name}`, 'warning');
-            return;
-        }
-        
+        const { data: records } = await db.from('attendance').select('*').eq('employee_code', code).order('created_at', { ascending: false });
+        if(!records || records.length === 0) { showToast(`لا توجد سجلات لـ ${name}`, 'warning'); return; }
         window.currentReportData = records;
         exportToExcel(code);
-    } catch(e) {
-        showToast('فشل التصدير', 'error');
-    }
+    } catch(e) { showToast('فشل التصدير', 'error'); }
 }
 
 // ==========================================
@@ -1355,12 +1642,7 @@ function closeForgotPw() { $('forgotPwModal').classList.remove('active'); }
 async function submitForgotPw() { 
     const code = $('forgotCode').value.trim(); 
     if(!code) return showToast('يرجى إدخال الكود','error'); 
-    
-    // منع إعادة تعيين كلمة مرور الأدمن بهذه الطريقة
-    if(code === 'ADMIN') {
-        showToast('❌ لا يمكن إعادة تعيين كلمة مرور الأدمن من هنا!', 'error');
-        return;
-    }
+    if(code === 'ADMIN') { showToast('❌ لا يمكن إعادة تعيين كلمة مرور الأدمن!', 'error'); return; }
     
     const tempPass = Math.random().toString(36).slice(-8);
     const { data: emp } = await db.from('employees').select('name, email').eq('code', code).single();
@@ -1394,7 +1676,7 @@ async function adminResetFace(code, name) {
 }
 
 // ==========================================
-// 📍 الموقع - حماية من الغش
+// 📍 الموقع
 // ==========================================
 function getLocation() {
     if(navigator.geolocation) {
@@ -1422,7 +1704,7 @@ function getLocation() {
 }
 
 // ==========================================
-# 💾 استعادة الجلسة
+// 💾 استعادة الجلسة
 // ==========================================
 function restoreSession() {
     const savedSessionStr = localStorage.getItem('rememberedUser');
@@ -1472,12 +1754,15 @@ function restoreSession() {
 }
 
 // ==========================================
-# 🚀 التهيئة
+// 🚀 التهيئة
 // ==========================================
 function init() {
     restoreSession(); 
     loadModelsAsync(); 
-    getLocation(); // تحديد الموقع فوراً
+    getLocation();
+    
+    // تهيئة بصمة الإصبع
+    updateFingerprintButtonVisibility();
     
     document.addEventListener('click', unlockAudio, { once: true });
     document.addEventListener('touchstart', unlockAudio, { once: true });
