@@ -18,271 +18,147 @@
     <audio id="faceid-error" src="faceid-error.mp3" preload="auto"></audio>
 
     <style>
-        :root {
-            --primary: #3b82f6; --primary-dark: #2563eb; --success: #10b981; --danger: #ef4444;
-            --warning: #f59e0b; --dark: #0f172a; --card-bg: rgba(30, 41, 59, 0.6); --glass: rgba(255,255,255,0.05);
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html { height: 100%; overflow-x: hidden; overflow-y: auto; }
-        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: linear-gradient(145deg, #020617 0%, #0f172a 50%, #020617 100%); color: #f1f5f9; direction: rtl; min-height: 100%; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
-        
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideInRight { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes qrPulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 50% { transform: scale(1.05); box-shadow: 0 0 15px 5px rgba(59, 130, 246, 0); } }
-        @keyframes btnGlow { 0% { box-shadow: 0 0 5px rgba(59,130,246,0.4); } 50% { box-shadow: 0 0 20px rgba(59,130,246,0.8); } 100% { box-shadow: 0 0 5px rgba(59,130,246,0.4); } }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulseGreen { 0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); } }
-        @keyframes pulseRed { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } }
-        @keyframes scanLine { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
-        @keyframes matchPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
-        
-        .app-container { flex: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: 15px; position: relative; z-index: 1; animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-        h1 { font-size: 26px; text-align: center; background: linear-gradient(135deg, #fff, #93c5fd); -webkit-background-clip: text; color: transparent; margin-bottom: 20px; font-weight: 800; letter-spacing: -0.5px; }
-
-        .camera-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; padding: 20px; padding-top: max(20px, env(safe-area-inset-top)); }
-        .camera-overlay.active { display: flex; }
-        .camera-container { background: #000; border-radius: 24px; overflow: hidden; position: relative; width: 100%; max-width: 500px; aspect-ratio: 4/3; box-shadow: 0 25px 80px -10px rgba(0,0,0,1); border: 2px solid var(--primary); animation: btnGlow 2s infinite; }
-        video { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; transform: scaleX(-1); }
-        .face-canvas { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 10; transform: scaleX(-1); }
-        .scan-line { position: absolute; left: 5%; width: 90%; height: 2px; background: linear-gradient(90deg, transparent, #38bdf8, transparent); z-index: 11; transform: scaleX(-1); pointer-events: none; animation: scanLine 2s linear infinite; display: none; }
-        .scan-line.active { display: block; }
-        .match-result { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); z-index: 15; width: 120px; height: 120px; border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 50px; animation: matchPop 0.4s ease-out forwards; pointer-events: none; }
-        .match-result.success { background: rgba(16, 185, 129, 0.9); display: flex; }
-        .match-result.fail { background: rgba(239, 68, 68, 0.9); display: flex; }
-        .model-progress { width: 80%; max-width: 300px; height: 4px; background: #1e293b; border-radius: 10px; margin-top: 12px; overflow: hidden; display: none; }
-        .model-progress.active { display: block; }
-        .model-progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--primary), #38bdf8); border-radius: 10px; transition: width 0.5s ease; }
-        .stability-ring { position: absolute; bottom: 12px; left: 12px; z-index: 15; width: 44px; height: 44px; display: none; transform: scaleX(-1); }
-        .stability-ring.active { display: block; }
-        .stability-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-        .stability-ring circle { fill: none; stroke-width: 3; }
-        .stability-ring .bg { stroke: #1e293b; }
-        .stability-ring .fg { stroke: var(--success); stroke-dasharray: 126; stroke-dashoffset: 126; stroke-linecap: round; transition: stroke-dashoffset 0.3s ease; }
-        .stability-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 800; color: white; }
-        
-        #camStatus { margin-top: 20px; color: #38bdf8; font-size: 16px; font-weight: bold; z-index: 20; text-align: center; animation: fadeInUp 0.5s; min-height: 24px; }
-        .close-cam { position: absolute; top: max(20px, env(safe-area-inset-top)); right: 20px; z-index: 30; background: rgba(239, 68, 68, 0.9); border: none; color: white; width: 45px; height: 45px; border-radius: 50%; font-size: 20px; cursor: pointer; transition: 0.2s; }
-        .close-cam:active { transform: scale(0.9); }
-
-        .card { background: var(--card-bg); backdrop-filter: blur(20px); border-radius: 24px; padding: 25px; margin-bottom: 20px; border: 1px solid var(--glass); box-shadow: 0 20px 40px -15px rgba(0,0,0,0.5); }
-        input, select { width: 100%; padding: 15px 20px; border-radius: 16px; background: rgba(0,0,0,0.4); border: 1.5px solid #334155; color: white; font-size: 16px; outline: none; margin-bottom: 14px; transition: all 0.3s ease; appearance: none; }
-        input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(59,130,246,0.15); background: rgba(0,0,0,0.6); }
-        input::placeholder { color: #64748b; }
-        .password-wrapper { position: relative; width: 100%; margin-bottom: 14px; }
-        .password-wrapper input { margin-bottom: 0; padding-left: 50px; }
-        .toggle-password { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #64748b; cursor: pointer; font-size: 18px; transition: 0.2s; }
-        .toggle-password:active { color: white; }
-        
-        .btn { 
-            width: 100%; 
-            padding: 15px; 
-            border-radius: 16px; 
-            border: none; 
-            font-size: 15px; 
-            font-weight: 700; 
-            cursor: pointer; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 10px; 
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); 
-            color: white; 
-            position: relative; 
-            overflow: hidden;
-            cursor: pointer !important;
-            pointer-events: auto !important;
-        }
-        .btn:active { transform: scale(0.97); }
-        .btn-login { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); box-shadow: 0 10px 25px -5px rgba(59,130,246,0.4); }
-        .btn-reg { background: linear-gradient(135deg, var(--warning), #d97706); box-shadow: 0 10px 25px -5px rgba(245,158,11,0.4); }
-        .btn-att { background: linear-gradient(135deg, var(--success), #059669); box-shadow: 0 10px 25px -5px rgba(16,185,129,0.4); animation: pulseGreen 2s infinite; }
-        .btn-leave { background: linear-gradient(135deg, var(--danger), #dc2626); box-shadow: 0 10px 25px -5px rgba(239,68,68,0.4); animation: pulseRed 2s infinite; }
-        .btn-action { padding: 10px 16px; width: auto; font-size: 13px; border-radius: 12px; }
-        .btn-change-pw { background: linear-gradient(135deg, #8b5cf6, #6d28d9); box-shadow: 0 10px 20px -5px rgba(139,92,246,0.4); }
-        .btn-report { background: linear-gradient(135deg, #14b8a6, #0d9488); box-shadow: 0 10px 20px -5px rgba(20,184,166,0.4); }
-        .btn-sm { padding: 10px 14px; font-size: 13px; width: auto; border-radius: 12px; }
-        .btn-danger { background: linear-gradient(135deg, #dc2626, #991b1b); box-shadow: 0 10px 20px -5px rgba(220,38,38,0.4); }
-        
-        /* ✅ زر بصمة الإصبع */
-        .btn-fingerprint { 
-            background: linear-gradient(135deg, #8b5cf6, #6d28d9) !important; 
-            border: 1.5px solid rgba(139, 92, 246, 0.5) !important; 
-            color: white !important; 
-            margin-bottom: 12px !important; 
-            box-shadow: 0 10px 25px -5px rgba(139,92,246,0.4) !important;
-            cursor: pointer !important;
-            pointer-events: auto !important;
-            display: flex !important;
-        }
-        .btn-fingerprint:hover { 
-            background: linear-gradient(135deg, #7c3aed, #5b21b6) !important; 
-            box-shadow: 0 15px 30px -5px rgba(139,92,246,0.6) !important; 
-        }
-        .btn-fingerprint:active { 
-            transform: scale(0.97) !important; 
-        }
-        .btn-fingerprint i { font-size: 20px; }
-
-        /* ✅ زر تصدير Excel */
-        .btn-excel {
-            background: linear-gradient(135deg, #059669, #047857);
-            box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.4);
-        }
-
-        .action-group { display: flex; gap: 12px; margin-top: 15px; }
-        .action-group .btn { flex: 1; }
-
-        .shift-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
-        .shift-card { position: relative; background: rgba(0,0,0,0.3); border: 1.5px solid #334155; border-radius: 16px; padding: 15px 20px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 15px; }
-        .shift-card:hover { border-color: #475569; background: rgba(30, 41, 59, 0.8); }
-        .shift-card input { display: none; }
-        .shift-radio { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #475569; position: relative; flex-shrink: 0; transition: 0.3s; }
-        .shift-card input:checked ~ .shift-radio { border-color: var(--primary); background: var(--primary); box-shadow: inset 0 0 0 4px #0f172a; }
-        .shift-card input:checked ~ .shift-details { color: white; }
-        .shift-details h4 { font-size: 15px; color: #94a3b8; margin-bottom: 2px; transition: 0.3s; }
-        .shift-details span { font-size: 12px; color: #64748b; }
-        .shift-card.selected { border-color: var(--primary); background: rgba(59, 130, 246, 0.1); box-shadow: 0 0 20px rgba(59, 130, 246, 0.1); }
-
-        .status-bar { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); padding: 10px 15px; border-radius: 50px; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 13px; margin-bottom: 15px; border: 1px solid var(--glass); flex-wrap: wrap; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-        .status-dot.online { background: var(--success); box-shadow: 0 0 10px var(--success); animation: qrPulse 2s infinite; }
-        .status-dot.offline { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
-        .stat-card { background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(30, 41, 59, 0.8)); padding: 25px; border-radius: 24px; text-align: center; border: 1px solid rgba(59,130,246,0.3); margin-bottom: 20px; }
-        .stat-card h2 { font-size: 48px; color: white; margin-bottom: 5px; text-shadow: 0 0 20px rgba(59,130,246,0.5); }
-        .stat-card p { color: #93c5fd; font-size: 14px; font-weight: 600; }
-
-        .emp-profile-card { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; background: var(--card-bg); backdrop-filter: blur(20px); padding: 15px 20px; border-radius: 20px; border: 1px solid var(--glass); }
-        .emp-profile-img { 
-            width: 60px; 
-            height: 60px; 
-            border-radius: 50%; 
-            border: 2px solid var(--primary); 
-            object-fit: cover; 
-            background: linear-gradient(135deg, #1e293b, #334155);
-            animation: pulseGreen 2s infinite;
-        }
-        .emp-profile-img.loaded {
-            animation: none;
-        }
-        .emp-month-hours { background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(30, 41, 59, 0.8)); padding: 15px; border-radius: 16px; text-align: center; border: 1px solid rgba(139,92,246,0.3); margin-bottom: 20px; }
-
-        .overtime-card {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(30, 41, 59, 0.8));
-            padding: 15px;
-            border-radius: 16px;
-            text-align: center;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-            margin-bottom: 20px;
-        }
-
-        .admin-tools { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        .admin-tools .btn { flex: 1; font-size: 13px; padding: 14px; min-width: 140px; }
-        .emp-list-container { max-height: 70vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-        .emp-list-container::-webkit-scrollbar { width: 4px; }
-        .emp-list-container::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        .emp-item { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass); border-radius: 16px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
-        .emp-item:active { transform: scale(0.98); background: rgba(30, 41, 59, 0.8); }
-        .emp-info h4 { margin-bottom: 4px; font-size: 15px; }
-        .emp-info p { color: #64748b; font-size: 12px; font-family: monospace; }
-        .emp-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-
-        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 23, 0.98); backdrop-filter: blur(20px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-        .overlay.hidden { display: none; }
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); display: none; align-items: center; justify-content: center; z-index: 1500; padding: 20px; }
-        .modal.active { display: flex; }
-        .modal-content { background: linear-gradient(145deg, #1e293b, #0f172a); width: 100%; max-width: 600px; border-radius: 24px; padding: 30px; text-align: right; position: relative; animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1); max-height: 90vh; overflow-y: auto; border: 1px solid var(--glass); }
-        .modal-close { position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.1); width: 36px; height: 36px; border-radius: 50%; border: none; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-        .modal-close:active { background: rgba(255,255,255,0.2); }
-
-        .unified-footer { width: 100%; text-align: center; padding: 30px 20px max(20px, env(safe-area-inset-bottom)); margin-top: auto; background: linear-gradient(to top, rgba(15,23,42,1), transparent); }
-        .footer-brand { font-size: 18px; font-weight: 800; color: white; margin-bottom: 8px; letter-spacing: -0.5px; }
-        .footer-copy { color: #475569; font-size: 12px; line-height: 1.6; }
-        .footer-qr-container { margin-top: 20px; display: inline-block; }
-        .footer-qr-link { display: block; width: 80px; height: 80px; margin: 0 auto 10px; border-radius: 12px; overflow: hidden; border: 3px solid #334155; animation: qrPulse 2.5s infinite; transition: 0.3px; }
-        .footer-qr-link:active { transform: scale(0.95); }
-        .footer-qr-link img { width: 100%; height: 100%; object-fit: cover; border-radius: 9px; }
-        .footer-qr-text { font-size: 12px; color: #38bdf8; font-weight: 700; letter-spacing: 1px; }
-
-        .remember-me { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; cursor: pointer; user-select: none; }
-        .remember-me input[type="checkbox"] { display: none; }
-        .checkmark { width: 24px; height: 24px; border-radius: 8px; border: 2px solid #475569; background: rgba(0,0,0,0.3); position: relative; flex-shrink: 0; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; }
-        .checkmark::after { content: '\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 14px; color: white; opacity: 0; transform: scale(0); transition: all 0.2s ease; }
-        .remember-me input:checked ~ .checkmark { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); }
-        .remember-me input:checked ~ .checkmark::after { opacity: 1; transform: scale(1); }
-        .remember-me label { color: #94a3b8; font-size: 14px; cursor: pointer; transition: 0.2s; }
-        .remember-me:hover label { color: #e2e8f0; }
-
-        .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(50px); background: #1e293b; color: white; padding: 14px 28px; border-radius: 50px; font-size: 15px; font-weight: 600; z-index: 3000; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); opacity: 0; border: 1px solid var(--glass); text-align: center; max-width: 90%; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5); }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        .toast.success { background: linear-gradient(135deg, #059669, #10b981); border: none; }
-        .toast.error { background: linear-gradient(135deg, #dc2626, #ef4444); border: none; }
-        .toast.warning { background: linear-gradient(135deg, #d97706, #f59e0b); border: none; }
-
-        .report-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
-        .report-table th { background: rgba(59,130,246,0.2); padding: 12px; color: #38bdf8; border-bottom: 2px solid rgba(59,130,246,0.3); }
-        .report-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1; }
-        .att-badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
-        .att-in { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-        .att-out { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        
-        .overtime-badge {
-            background: rgba(245, 158, 11, 0.2);
-            color: #f59e0b;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        .report-summary {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 20px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-        }
-        .summary-item {
-            text-align: center;
-            padding: 15px;
-            background: rgba(30, 41, 59, 0.6);
-            border-radius: 12px;
-            border: 1px solid var(--glass);
-        }
-        .summary-item h3 {
-            font-size: 24px;
-            color: white;
-            margin-bottom: 5px;
-        }
-        .summary-item p {
-            font-size: 12px;
-            color: #94a3b8;
-        }
-
-        @media (max-width: 400px) {
-            .btn { font-size: 14px; padding: 13px; }
-            .admin-tools { flex-direction: column; }
-            .emp-item { flex-direction: column; text-align: center; gap: 10px; }
-            .emp-actions { width: 100%; justify-content: center; }
-        }
-
-        @media (min-width: 1024px) {
-            .app-container {
-                padding: 30px;
-            }
-            .admin-tools .btn {
-                font-size: 14px;
-                padding: 16px;
-            }
-            .emp-list-container {
-                max-height: 60vh;
-            }
-        }
+        :root{--primary:#3b82f6;--primary-dark:#2563eb;--success:#10b981;--danger:#ef4444;--warning:#f59e0b;--dark:#0f172a;--card-bg:rgba(30,41,59,0.6);--glass:rgba(255,255,255,0.05)}
+        *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+        html{height:100%;overflow-x:hidden;overflow-y:auto}
+        body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:linear-gradient(145deg,#020617 0%,#0f172a 50%,#020617 100%);color:#f1f5f9;direction:rtl;min-height:100%;display:flex;flex-direction:column;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom)}
+        @keyframes fadeInUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes slideInRight{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes qrPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(59,130,246,0.7)}50%{transform:scale(1.05);box-shadow:0 0 15px 5px rgba(59,130,246,0)}}
+        @keyframes btnGlow{0%{box-shadow:0 0 5px rgba(59,130,246,0.4)}50%{box-shadow:0 0 20px rgba(59,130,246,0.8)}100%{box-shadow:0 0 5px rgba(59,130,246,0.4)}}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes pulseGreen{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.7)}70%{box-shadow:0 0 0 15px rgba(16,185,129,0)}}
+        @keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.7)}70%{box-shadow:0 0 0 15px rgba(239,68,68,0)}}
+        @keyframes scanLine{0%{top:0;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:100%;opacity:0}}
+        @keyframes matchPop{0%{transform:translate(-50%,-50%) scale(0);opacity:0}50%{transform:translate(-50%,-50%) scale(1.2)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+        .app-container{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:15px;position:relative;z-index:1;animation:fadeInUp .6s cubic-bezier(.16,1,.3,1)}
+        h1{font-size:26px;text-align:center;background:linear-gradient(135deg,#fff,#93c5fd);-webkit-background-clip:text;color:transparent;margin-bottom:20px;font-weight:800;letter-spacing:-.5px}
+        .camera-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);z-index:2000;display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px;padding-top:max(20px,env(safe-area-inset-top))}
+        .camera-overlay.active{display:flex}
+        .camera-container{background:#000;border-radius:24px;overflow:hidden;position:relative;width:100%;max-width:500px;aspect-ratio:4/3;box-shadow:0 25px 80px -10px rgba(0,0,0,1);border:2px solid var(--primary);animation:btnGlow 2s infinite}
+        video{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;transform:scaleX(-1)}
+        .face-canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:10;transform:scaleX(-1)}
+        .scan-line{position:absolute;left:5%;width:90%;height:2px;background:linear-gradient(90deg,transparent,#38bdf8,transparent);z-index:11;transform:scaleX(-1);pointer-events:none;animation:scanLine 2s linear infinite;display:none}
+        .scan-line.active{display:block}
+        .match-result{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);z-index:15;width:120px;height:120px;border-radius:50%;display:none;align-items:center;justify-content:center;font-size:50px;animation:matchPop .4s ease-out forwards;pointer-events:none}
+        .match-result.success{background:rgba(16,185,129,.9);display:flex}
+        .match-result.fail{background:rgba(239,68,68,.9);display:flex}
+        .model-progress{width:80%;max-width:300px;height:4px;background:#1e293b;border-radius:10px;margin-top:12px;overflow:hidden;display:none}
+        .model-progress.active{display:block}
+        .model-progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--primary),#38bdf8);border-radius:10px;transition:width .5s ease}
+        .stability-ring{position:absolute;bottom:12px;left:12px;z-index:15;width:44px;height:44px;display:none;transform:scaleX(-1)}
+        .stability-ring.active{display:block}
+        .stability-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+        .stability-ring circle{fill:none;stroke-width:3}
+        .stability-ring .bg{stroke:#1e293b}
+        .stability-ring .fg{stroke:var(--success);stroke-dasharray:126;stroke-dashoffset:126;stroke-linecap:round;transition:stroke-dashoffset .3s ease}
+        .stability-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;font-weight:800;color:white}
+        #camStatus{margin-top:20px;color:#38bdf8;font-size:16px;font-weight:bold;z-index:20;text-align:center;animation:fadeInUp .5s;min-height:24px}
+        .close-cam{position:absolute;top:max(20px,env(safe-area-inset-top));right:20px;z-index:30;background:rgba(239,68,68,.9);border:none;color:white;width:45px;height:45px;border-radius:50%;font-size:20px;cursor:pointer;transition:.2s}
+        .close-cam:active{transform:scale(.9)}
+        .card{background:var(--card-bg);backdrop-filter:blur(20px);border-radius:24px;padding:25px;margin-bottom:20px;border:1px solid var(--glass);box-shadow:0 20px 40px -15px rgba(0,0,0,.5)}
+        input,select{width:100%;padding:15px 20px;border-radius:16px;background:rgba(0,0,0,.4);border:1.5px solid #334155;color:white;font-size:16px;outline:none;margin-bottom:14px;transition:all .3s ease;appearance:none}
+        input:focus{border-color:var(--primary);box-shadow:0 0 0 4px rgba(59,130,246,.15);background:rgba(0,0,0,.6)}
+        input::placeholder{color:#64748b}
+        .password-wrapper{position:relative;width:100%;margin-bottom:14px}
+        .password-wrapper input{margin-bottom:0;padding-left:50px}
+        .toggle-password{position:absolute;left:15px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;transition:.2s}
+        .toggle-password:active{color:white}
+        .btn{width:100%;padding:15px;border-radius:16px;border:none;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s cubic-bezier(.16,1,.3,1);color:white;position:relative;overflow:hidden}
+        .btn:active{transform:scale(.97)}
+        .btn-login{background:linear-gradient(135deg,var(--primary),var(--primary-dark));box-shadow:0 10px 25px -5px rgba(59,130,246,.4)}
+        .btn-login:hover{box-shadow:0 15px 30px -5px rgba(59,130,246,.6)}
+        .btn-reg{background:linear-gradient(135deg,var(--warning),#d97706);box-shadow:0 10px 25px -5px rgba(245,158,11,.4)}
+        .btn-att{background:linear-gradient(135deg,var(--success),#059669);box-shadow:0 10px 25px -5px rgba(16,185,129,.4);animation:pulseGreen 2s infinite}
+        .btn-leave{background:linear-gradient(135deg,var(--danger),#dc2626);box-shadow:0 10px 25px -5px rgba(239,68,68,.4);animation:pulseRed 2s infinite}
+        .btn-action{padding:10px 16px;width:auto;font-size:13px;border-radius:12px}
+        .btn-change-pw{background:linear-gradient(135deg,#8b5cf6,#6d28d9);box-shadow:0 10px 20px -5px rgba(139,92,246,.4)}
+        .btn-report{background:linear-gradient(135deg,#14b8a6,#0d9488);box-shadow:0 10px 20px -5px rgba(20,184,166,.4)}
+        .btn-sm{padding:10px 14px;font-size:13px;width:auto;border-radius:12px}
+        .btn-danger{background:linear-gradient(135deg,#dc2626,#991b1b);box-shadow:0 10px 20px -5px rgba(220,38,38,.4)}
+        .btn-fingerprint{background:linear-gradient(135deg,#8b5cf6,#6d28d9);border:1.5px solid rgba(139,92,246,.5);color:white;margin-bottom:12px;box-shadow:0 10px 25px -5px rgba(139,92,246,.4)}
+        .btn-fingerprint:hover{background:linear-gradient(135deg,#7c3aed,#5b21b6);box-shadow:0 15px 30px -5px rgba(139,92,246,.6)}
+        .btn-fingerprint:active{transform:scale(.97)}
+        .btn-fingerprint i{font-size:20px}
+        .btn-excel{background:linear-gradient(135deg,#059669,#047857);box-shadow:0 10px 25px -5px rgba(5,150,105,.4)}
+        .action-group{display:flex;gap:12px;margin-top:15px}
+        .action-group .btn{flex:1}
+        .shift-container{display:flex;flex-direction:column;gap:10px;margin-bottom:15px}
+        .shift-card{position:relative;background:rgba(0,0,0,.3);border:1.5px solid #334155;border-radius:16px;padding:15px 20px;cursor:pointer;transition:all .3s ease;display:flex;align-items:center;gap:15px}
+        .shift-card:hover{border-color:#475569;background:rgba(30,41,59,.8)}
+        .shift-card input{display:none}
+        .shift-radio{width:22px;height:22px;border-radius:50%;border:2px solid #475569;position:relative;flex-shrink:0;transition:.3s}
+        .shift-card input:checked~.shift-radio{border-color:var(--primary);background:var(--primary);box-shadow:inset 0 0 0 4px #0f172a}
+        .shift-card input:checked~.shift-details{color:white}
+        .shift-details h4{font-size:15px;color:#94a3b8;margin-bottom:2px;transition:.3s}
+        .shift-details span{font-size:12px;color:#64748b}
+        .shift-card.selected{border-color:var(--primary);background:rgba(59,130,246,.1);box-shadow:0 0 20px rgba(59,130,246,.1)}
+        .status-bar{background:rgba(15,23,42,.8);backdrop-filter:blur(10px);padding:10px 15px;border-radius:50px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;margin-bottom:15px;border:1px solid var(--glass);flex-wrap:wrap}
+        .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+        .status-dot.online{background:var(--success);box-shadow:0 0 10px var(--success);animation:qrPulse 2s infinite}
+        .status-dot.offline{background:var(--danger);box-shadow:0 0 10px var(--danger)}
+        .stat-card{background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(30,41,59,.8));padding:25px;border-radius:24px;text-align:center;border:1px solid rgba(59,130,246,.3);margin-bottom:20px}
+        .stat-card h2{font-size:48px;color:white;margin-bottom:5px;text-shadow:0 0 20px rgba(59,130,246,.5)}
+        .stat-card p{color:#93c5fd;font-size:14px;font-weight:600}
+        .emp-profile-card{display:flex;align-items:center;gap:15px;margin-bottom:20px;background:var(--card-bg);backdrop-filter:blur(20px);padding:15px 20px;border-radius:20px;border:1px solid var(--glass)}
+        .emp-profile-img{width:60px;height:60px;border-radius:50%;border:2px solid var(--primary);object-fit:cover;background:linear-gradient(135deg,#1e293b,#334155);animation:pulseGreen 2s infinite}
+        .emp-profile-img.loaded{animation:none}
+        .emp-month-hours{background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(30,41,59,.8));padding:15px;border-radius:16px;text-align:center;border:1px solid rgba(139,92,246,.3);margin-bottom:20px}
+        .overtime-card{background:linear-gradient(135deg,rgba(245,158,11,.2),rgba(30,41,59,.8));padding:15px;border-radius:16px;text-align:center;border:1px solid rgba(245,158,11,.3);margin-bottom:20px}
+        .admin-tools{display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap}
+        .admin-tools .btn{flex:1;font-size:13px;padding:14px;min-width:140px}
+        .emp-list-container{max-height:70vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+        .emp-list-container::-webkit-scrollbar{width:4px}
+        .emp-list-container::-webkit-scrollbar-thumb{background:#334155;border-radius:10px}
+        .emp-item{background:rgba(15,23,42,.6);border:1px solid var(--glass);border-radius:16px;padding:15px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;transition:all .2s}
+        .emp-item:active{transform:scale(.98);background:rgba(30,41,59,.8)}
+        .emp-info h4{margin-bottom:4px;font-size:15px}
+        .emp-info p{color:#64748b;font-size:12px;font-family:monospace}
+        .emp-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+        .overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(2,6,23,.98);backdrop-filter:blur(20px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+        .overlay.hidden{display:none}
+        .modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;z-index:1500;padding:20px}
+        .modal.active{display:flex}
+        .modal-content{background:linear-gradient(145deg,#1e293b,#0f172a);width:100%;max-width:600px;border-radius:24px;padding:30px;text-align:right;position:relative;animation:slideInRight .4s cubic-bezier(.16,1,.3,1);max-height:90vh;overflow-y:auto;border:1px solid var(--glass)}
+        .modal-close{position:absolute;top:20px;left:20px;background:rgba(255,255,255,.1);width:36px;height:36px;border-radius:50%;border:none;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s}
+        .modal-close:active{background:rgba(255,255,255,.2)}
+        .unified-footer{width:100%;text-align:center;padding:30px 20px max(20px,env(safe-area-inset-bottom));margin-top:auto;background:linear-gradient(to top,rgba(15,23,42,1),transparent)}
+        .footer-brand{font-size:18px;font-weight:800;color:white;margin-bottom:8px;letter-spacing:-.5px}
+        .footer-copy{color:#475569;font-size:12px;line-height:1.6}
+        .footer-qr-container{margin-top:20px;display:inline-block}
+        .footer-qr-link{display:block;width:80px;height:80px;margin:0 auto 10px;border-radius:12px;overflow:hidden;border:3px solid #334155;animation:qrPulse 2.5s infinite;transition:.3px}
+        .footer-qr-link:active{transform:scale(.95)}
+        .footer-qr-link img{width:100%;height:100%;object-fit:cover;border-radius:9px}
+        .footer-qr-text{font-size:12px;color:#38bdf8;font-weight:700;letter-spacing:1px}
+        .remember-me{display:flex;align-items:center;gap:12px;margin-bottom:20px;cursor:pointer;user-select:none}
+        .remember-me input[type=checkbox]{display:none}
+        .checkmark{width:24px;height:24px;border-radius:8px;border:2px solid #475569;background:rgba(0,0,0,.3);position:relative;flex-shrink:0;transition:all .3s ease;display:flex;align-items:center;justify-content:center}
+        .checkmark::after{content:'\f00c';font-family:'Font Awesome 6 Free';font-weight:900;font-size:14px;color:white;opacity:0;transform:scale(0);transition:all .2s ease}
+        .remember-me input:checked~.checkmark{background:var(--primary);border-color:var(--primary);box-shadow:0 0 10px rgba(59,130,246,.4)}
+        .remember-me input:checked~.checkmark::after{opacity:1;transform:scale(1)}
+        .remember-me label{color:#94a3b8;font-size:14px;cursor:pointer;transition:.2s}
+        .remember-me:hover label{color:#e2e8f0}
+        .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(50px);background:#1e293b;color:white;padding:14px 28px;border-radius:50px;font-size:15px;font-weight:600;z-index:3000;transition:all .4s cubic-bezier(.16,1,.3,1);opacity:0;border:1px solid var(--glass);text-align:center;max-width:90%;box-shadow:0 20px 40px -10px rgba(0,0,0,.5)}
+        .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+        .toast.success{background:linear-gradient(135deg,#059669,#10b981);border:none}
+        .toast.error{background:linear-gradient(135deg,#dc2626,#ef4444);border:none}
+        .toast.warning{background:linear-gradient(135deg,#d97706,#f59e0b);border:none}
+        .report-table{width:100%;border-collapse:collapse;margin-top:15px;font-size:13px}
+        .report-table th{background:rgba(59,130,246,.2);padding:12px;color:#38bdf8;border-bottom:2px solid rgba(59,130,246,.3)}
+        .report-table td{padding:12px;border-bottom:1px solid rgba(255,255,255,.05);color:#cbd5e1}
+        .att-badge{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:bold}
+        .att-in{background:rgba(16,185,129,.2);color:#10b981}
+        .att-out{background:rgba(239,68,68,.2);color:#ef4444}
+        .overtime-badge{background:rgba(245,158,11,.2);color:#f59e0b;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:bold}
+        .report-summary{background:rgba(15,23,42,.6);border-radius:16px;padding:20px;margin-bottom:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px}
+        .summary-item{text-align:center;padding:15px;background:rgba(30,41,59,.6);border-radius:12px;border:1px solid var(--glass)}
+        .summary-item h3{font-size:24px;color:white;margin-bottom:5px}
+        .summary-item p{font-size:12px;color:#94a3b8}
+        @media(max-width:400px){.btn{font-size:14px;padding:13px}.admin-tools{flex-direction:column}.emp-item{flex-direction:column;text-align:center;gap:10px}.emp-actions{width:100%;justify-content:center}}
+        @media(min-width:1024px){.app-container{padding:30px}.admin-tools .btn{font-size:14px;padding:16px}.emp-list-container{max-height:60vh}}
     </style>
 </head>
 <body>
-
 <div id="cameraOverlay" class="camera-overlay">
     <button class="close-cam" onclick="closeCamera()"><i class="fas fa-times"></i></button>
     <div class="camera-container" id="camContainer">
@@ -299,16 +175,16 @@
     <div id="modelProgress" class="model-progress"><div id="modelProgressBar" class="model-progress-bar"></div></div>
 </div>
 
-<div id="changePwModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeChangePwModal()"><i class="fas fa-times"></i></button><h2 style="text-align:center; margin-bottom:20px;" id="changePwTitle">تغيير كلمة السر</h2><div style="text-align: center;" id="changePwBody"></div></div></div>
-<div id="forgotPwModal" class="modal"><div class="modal-content" style="text-align: center;"><button class="modal-close" onclick="closeForgotPw()"><i class="fas fa-times"></i></button><h2 style="margin-bottom: 20px;"><i class="fas fa-key"></i> استعادة كلمة المرور</h2><input type="text" id="forgotCode" placeholder="أدخل كود الموظف"><button class="btn btn-login" onclick="submitForgotPw()" style="margin-top:10px;"><i class="fas fa-paper-plane"></i> إرسال كلمة السر</button></div></div>
-<div id="reportModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeReportModal()"><i class="fas fa-times"></i></button><h2 style="text-align:center; margin-bottom:20px;" id="reportTitle">التقارير</h2><div id="reportBody"></div></div></div>
-<div id="forcePwModal" class="modal"><div class="modal-content" style="text-align: center;"><h2 style="margin-bottom: 10px; color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> تحديث أمني مطلوب</h2><p style="color: #94a3b8; margin-bottom: 25px;">يجب عليك تغيير كلمة المرور المؤقتة قبل المتابعة.</p><div class="password-wrapper" style="margin-bottom:15px;"><input type="password" id="firstNewPw" placeholder="أدخل كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('firstNewPw')"><i class="fas fa-eye"></i></button></div><button class="btn btn-login" onclick="submitFirstPwChange()"><i class="fas fa-save"></i> حفظ وتسجيل الوجه</button></div></div>
+<div id="changePwModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeChangePwModal()"><i class="fas fa-times"></i></button><h2 style="text-align:center;margin-bottom:20px;" id="changePwTitle">تغيير كلمة السر</h2><div style="text-align:center;" id="changePwBody"></div></div></div>
+<div id="forgotPwModal" class="modal"><div class="modal-content" style="text-align:center;"><button class="modal-close" onclick="closeForgotPw()"><i class="fas fa-times"></i></button><h2 style="margin-bottom:20px;"><i class="fas fa-key"></i> استعادة كلمة المرور</h2><input type="text" id="forgotCode" placeholder="أدخل كود الموظف"><button class="btn btn-login" onclick="submitForgotPw()" style="margin-top:10px;"><i class="fas fa-paper-plane"></i> إرسال كلمة السر</button></div></div>
+<div id="reportModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="closeReportModal()"><i class="fas fa-times"></i></button><h2 style="text-align:center;margin-bottom:20px;" id="reportTitle">التقارير</h2><div id="reportBody"></div></div></div>
+<div id="forcePwModal" class="modal"><div class="modal-content" style="text-align:center;"><h2 style="margin-bottom:10px;color:var(--warning);"><i class="fas fa-exclamation-triangle"></i> تحديث أمني مطلوب</h2><p style="color:#94a3b8;margin-bottom:25px;">يجب عليك تغيير كلمة المرور المؤقتة قبل المتابعة.</p><div class="password-wrapper" style="margin-bottom:15px;"><input type="password" id="firstNewPw" placeholder="أدخل كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('firstNewPw')"><i class="fas fa-eye"></i></button></div><button class="btn btn-login" onclick="submitFirstPwChange()"><i class="fas fa-save"></i> حفظ وتسجيل الوجه</button></div></div>
 
 <div id="loginScreen" class="overlay">
-    <div class="card" style="max-width: 420px; width: 100%; margin-bottom: 20px; animation: fadeInUp 0.8s ease-out;">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="margin-bottom: 5px; font-size: 32px;"><i class="fas fa-fingerprint"></i> Axentro System</h1>
-            <p style="color: #64748b; font-size: 14px; font-weight: 600;">نظام إدارة الحضور والانصراف المتقدم</p>
+    <div class="card" style="max-width:420px;width:100%;margin-bottom:20px;animation:fadeInUp .8s ease-out;">
+        <div style="text-align:center;margin-bottom:30px;">
+            <h1 style="margin-bottom:5px;font-size:32px;"><i class="fas fa-fingerprint"></i> Axentro System</h1>
+            <p style="color:#64748b;font-size:14px;font-weight:600;">نظام إدارة الحضور والانصراف المتقدم</p>
         </div>
         <input type="text" id="loginCode" placeholder="اسم المستخدم أو الكود" autocomplete="username">
         <div class="password-wrapper">
@@ -320,15 +196,15 @@
             <div class="checkmark"></div>
             <label for="rememberMe">تذكرني (حفظ جلسة الدخول)</label>
         </div>
-        <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom: 12px;"><i class="fas fa-arrow-right-to-bracket"></i> تسجيل الدخول</button>
+        <button class="btn btn-login" onclick="handleLogin()" style="margin-bottom:12px;"><i class="fas fa-arrow-right-to-bracket"></i> تسجيل الدخول</button>
         
-        <!-- ✅✅✅ زر الدخول بالبصمة - موجود هنا ✅✅✅ -->
-        <button id="fingerprintLoginBtn" class="btn btn-fingerprint" onclick="loginWithFingerprint()" style="display: none;">
+        <!-- زر بصمة الإصبع -->
+        <button id="fingerprintLoginBtn" class="btn btn-fingerprint" onclick="loginWithFingerprint()" style="display:none;">
             <i class="fas fa-fingerprint"></i> تسجيل الدخول ببصمة الإصبع
         </button>
         
         <button class="btn btn-reg" onclick="showRegisterScreen()"><i class="fas fa-user-plus"></i> إنشاء حساب جديد</button>
-        <p style="text-align: center; margin-top: 20px;"><a href="#" onclick="showForgotPw()" style="color: #64748b; text-decoration: none; font-size: 13px;">نسيت كلمة المرور؟</a></p>
+        <p style="text-align:center;margin-top:20px;"><a href="#" onclick="showForgotPw()" style="color:#64748b;text-decoration:none;font-size:13px;">نسيت كلمة المرور؟</a></p>
     </div>
     <div class="unified-footer">
         <div class="footer-brand">Axentro</div>
@@ -343,16 +219,16 @@
 </div>
 
 <div id="registerScreen" class="overlay hidden">
-    <div class="card" style="max-width: 420px; width: 100%; animation: fadeInUp 0.6s ease-out;">
-        <h3 style="margin-bottom: 25px; text-align:center;"><i class="fas fa-id-card" style="color: var(--primary);"></i> تسجيل موظف جديد</h3>
+    <div class="card" style="max-width:420px;width:100%;animation:fadeInUp .6s ease-out;">
+        <h3 style="margin-bottom:25px;text-align:center;"><i class="fas fa-id-card" style="color:var(--primary);"></i> تسجيل موظف جديد</h3>
         <input type="text" id="regName" placeholder="اسم الموظف الثلاثي">
         <input type="email" id="regEmail" placeholder="البريد الإلكتروني">
-        <button class="btn btn-reg" onclick="startRegistration()" style="margin-top: 10px;"><i class="fas fa-camera"></i> التقاط الوجه والتسجيل</button>
-        <button class="btn" onclick="showLoginScreen()" style="background: #334155; margin-top: 12px;"><i class="fas fa-arrow-right"></i> رجوع لتسجيل الدخول</button>
+        <button class="btn btn-reg" onclick="startRegistration()" style="margin-top:10px;"><i class="fas fa-camera"></i> التقاط الوجه والتسجيل</button>
+        <button class="btn" onclick="showLoginScreen()" style="background:#334155;margin-top:12px;"><i class="fas fa-arrow-right"></i> رجوع لتسجيل الدخول</button>
     </div>
 </div>
 
-<div class="app-container" id="mainApp" style="display: none;">
+<div class="app-container" id="mainApp" style="display:none;">
     <h1 id="mainAppTitle">نظام متابعة الموظفين</h1>
     <div class="status-bar" id="statusBar">
         <span class="status-dot online" id="connDot"></span>
@@ -360,52 +236,41 @@
         <button class="btn btn-action btn-login" onclick="refreshData()" title="تحديث" id="refreshBtn"><i class="fas fa-sync-alt"></i></button>
         <button class="btn btn-action btn-leave" onclick="logout()" title="خروج"><i class="fas fa-sign-out-alt"></i></button>
     </div>
-    <div class="status-bar" id="locBar" style="font-size: 12px;"><i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span></div>
+    <div class="status-bar" id="locBar" style="font-size:12px;"><i class="fas fa-map-marker-alt"></i> <span>جاري تحديد الموقع...</span></div>
     
-    <!-- لوحة تحكم المدير -->
-    <div id="adminPanel" style="display: none;">
+    <div id="adminPanel" style="display:none;">
         <div class="stat-card"><h2 id="empCount">0</h2><p>إجمالي الموظفين المسجلين</p></div>
         <div class="admin-tools">
             <button class="btn btn-change-pw" onclick="openChangePwModal('own')"><i class="fas fa-user-shield"></i> كلمة سرى</button>
-            <button class="btn btn-change-pw" onclick="openChangePwModal('employee')" style="background: linear-gradient(135deg, #4f46e5, #4338ca);"><i class="fas fa-key"></i> سر موظف</button>
+            <button class="btn btn-change-pw" onclick="openChangePwModal('employee')" style="background:linear-gradient(135deg,#4f46e5,#4338ca);"><i class="fas fa-key"></i> سر موظف</button>
         </div>
-        <div class="card" style="padding: 15px;">
-            <div style="position: relative;">
-                <input type="text" id="searchInput" placeholder="ابحث بالاسم أو الكود..." style="margin-bottom: 15px; padding-right: 45px;">
-                <i class="fas fa-search" style="position: absolute; right: 15px; top: 50%; transform: translateY(-70%); color: #64748b;"></i>
+        <div class="card" style="padding:15px;">
+            <div style="position:relative;">
+                <input type="text" id="searchInput" placeholder="ابحث بالاسم أو الكود..." style="margin-bottom:15px;padding-right:45px;">
+                <i class="fas fa-search" style="position:absolute;right:15px;top:50%;transform:translateY(-70%);color:#64748b;"></i>
             </div>
             <div id="searchResults" class="emp-list-container"></div>
         </div>
     </div>
     
-    <!-- لوحة الموظف -->
-    <div id="employeePanel" style="display: none;">
-        <div class="card" style="padding: 15px 20px;">
-            <p style="margin-bottom: 15px; color: #94a3b8; font-size: 14px; font-weight: 600;"><i class="fas fa-clock"></i> اختر وردية العمل الخاصة بك</p>
+    <div id="employeePanel" style="display:none;">
+        <div class="card" style="padding:15px 20px;">
+            <p style="margin-bottom:15px;color:#94a3b8;font-size:14px;font-weight:600;"><i class="fas fa-clock"></i> اختر وردية العمل الخاصة بك</p>
             <div class="shift-container" id="shiftContainer">
                 <label class="shift-card" onclick="selectShift(this)">
                     <input type="radio" name="shift" value="EARLY SHIFT (صباحي)" data-start="09:00 AM" data-end="05:00 PM">
                     <div class="shift-radio"></div>
-                    <div class="shift-details">
-                        <h4>EARLY SHIFT (صباحي)</h4>
-                        <span>9:00 ص - 5:00 م (9 ساعات)</span>
-                    </div>
+                    <div class="shift-details"><h4>EARLY SHIFT (صباحي)</h4><span>9:00 ص - 5:00 م (9 ساعات)</span></div>
                 </label>
                 <label class="shift-card" onclick="selectShift(this)">
                     <input type="radio" name="shift" value="BETWEEN SHIFT (بعد الظهر)" data-start="02:00 PM" data-end="10:00 PM">
                     <div class="shift-radio"></div>
-                    <div class="shift-details">
-                        <h4>BETWEEN SHIFT (بعد الظهر)</h4>
-                        <span>2:00 م - 10:00 م (8 ساعات)</span>
-                    </div>
+                    <div class="shift-details"><h4>BETWEEN SHIFT (بعد الظهر)</h4><span>2:00 م - 10:00 م (8 ساعات)</span></div>
                 </label>
                 <label class="shift-card" onclick="selectShift(this)">
                     <input type="radio" name="shift" value="NIGHT SHIFT (مسائي)" data-start="10:00 PM" data-end="06:00 AM">
                     <div class="shift-radio"></div>
-                    <div class="shift-details">
-                        <h4>NIGHT SHIFT (مسائي)</h4>
-                        <span>10:00 م - 6:00 ص (8 ساعات)</span>
-                    </div>
+                    <div class="shift-details"><h4>NIGHT SHIFT (مسائي)</h4><span>10:00 م - 6:00 ص (8 ساعات)</span></div>
                 </label>
             </div>
         </div>
@@ -413,11 +278,11 @@
             <button class="btn btn-att" onclick="handleAttendance('حضور')"><i class="fas fa-sign-in-alt"></i> حضور</button>
             <button class="btn btn-leave" onclick="handleAttendance('انصراف')"><i class="fas fa-sign-out-alt"></i> انصراف</button>
         </div>
-        <button class="btn btn-report" onclick="loadMyReport()" style="margin-top: 15px;"><i class="fas fa-chart-bar"></i> سجل تقاريري</button>
-        <button class="btn btn-change-pw" onclick="openChangePwModal('own')" style="margin-top: 10px;"><i class="fas fa-lock"></i> تغيير كلمة المرور</button>
+        <button class="btn btn-report" onclick="loadMyReport()" style="margin-top:15px;"><i class="fas fa-chart-bar"></i> سجل تقاريري</button>
+        <button class="btn btn-change-pw" onclick="openChangePwModal('own')" style="margin-top:10px;"><i class="fas fa-lock"></i> تغيير كلمة المرور</button>
     </div>
     
-    <div class="unified-footer" style="margin-top: 40px;">
+    <div class="unified-footer" style="margin-top:40px;">
         <div class="footer-brand">Axentro</div>
         <p class="footer-copy">© 2024 Axentro – All Rights Reserved<br>By Axentro Team</p>
         <div class="footer-qr-container">
@@ -433,906 +298,144 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-    // تهيئة Supabase
-    const SUPABASE_URL = 'https://qgbokzzynieoedhloxqt.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc';
-    const { createClient } = window.supabase; 
-    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY); 
-    const EMAIL_API_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
+const SUPABASE_URL='https://qgbokzzynieoedhloxqt.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc';
+const {createClient}=window.supabase;
+const db=createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const EMAIL_API_URL='https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
-    // ثوابت النظام
-    const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 500;
-    const MATCH_THRESHOLD = 0.55, AUTO_REFRESH_INTERVAL = 30000, STABLE_FRAMES_REQUIRED = 5;
-    const MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
-    const STORE_IMG_MAX = 400;
-    const NORMAL_SHIFT_HOURS = 9;
-    
-    // متغيرات النظام
-    let user = null, lightModels = false, heavyModels = false, stream = null, employees = [];
-    let sessionDescriptor = null;
-    let regMode = false, attMode = false, updateFaceMode = false, adminVerifyMode = false, firstTimeSetupMode = false, adminResetFaceMode = false, attType = '', regData = {}, autoCaptureTimeout = null;
-    let targetEmpForAdmin = null, isProcessingCapture = false;
-    let currentLat = null, currentLon = null, currentLoc = 'غير متوفر', userImage = '', lastCamStatusText = '';
-    let currentAccuracy = 0, autoRefreshTimer = null, detectionLoopTimeout = null;
-    let livenessActive = false, livenessStartYaw = null, livenessMoved = false, stabilityCounter = 0;
-    let isOnline = navigator.onLine, audioUnlocked = false, modelsLoadProgress = 0;
-    
-    const $ = id => document.getElementById(id);
-    const video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
+const OFFICE_LAT=30.1407941,OFFICE_LON=31.3800838,MAX_DISTANCE_METERS=500;
+const MATCH_THRESHOLD=.55,AUTO_REFRESH_INTERVAL=30000,STABLE_FRAMES_REQUIRED=5;
+const MODELS_URL='https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
+const STORE_IMG_MAX=400;
+const NORMAL_SHIFT_HOURS=9;
 
-    // دوال الأصوات
-    function unlockAudio() {
-        if (audioUnlocked) return;
-        try { 
-            const a = $('login-success'); 
-            if (a) { 
-                a.play().then(() => { 
-                    a.pause(); a.currentTime = 0; audioUnlocked = true; 
-                }).catch(() => {}); 
-            } 
-        } catch(e) {}
-    }
+let user=null,lightModels=false,heavyModels=false,stream=null,employees=[];
+let sessionDescriptor=null;
+let regMode=false,attMode=false,updateFaceMode=false,adminVerifyMode=false,firstTimeSetupMode=false,adminResetFaceMode=false,attType='',regData={},autoCaptureTimeout=null;
+let targetEmpForAdmin=null,isProcessingCapture=false;
+let currentLat=null,currentLon=null,currentLoc='غير متوفر',userImage='',lastCamStatusText='';
+let currentAccuracy=0,autoRefreshTimer=null,detectionLoopTimeout=null;
+let livenessActive=false,livenessStartYaw=null,livenessMoved=false,stabilityCounter=0;
+let isOnline=navigator.onLine,audioUnlocked=false,modelsLoadProgress=0;
 
-    function playSound(id) {
-        if(!audioUnlocked) { unlockAudio(); return; }
-        try { 
-            const audio = $(id); 
-            if (!audio) return; 
-            audio.currentTime = 0; 
-            audio.play().catch(() => {}); 
-        } catch(e) {}
-    }
+const $=id=>document.getElementById(id);
+const video=$('video'),canvas=$('canvas'),ctx=canvas.getContext('2d');
 
-    // دوال المساعدة
-    function showToast(msg, type='') { 
-        const t = $('toast'); 
-        t.textContent = msg; 
-        t.className = `toast show ${type}`; 
-        setTimeout(() => t.classList.remove('show'), 4500); 
-    }
-    
-    function setStatus(txt) { 
-        $('connText').textContent = txt; 
-    }
-    
-    function togglePassword(id) { 
-        const i = $(id); 
-        i.type = i.type === 'password' ? 'text' : 'password'; 
-    }
-    
-    function deg2rad(deg) { return deg * (Math.PI/180); }
-    
-    function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) { 
-        const R = 6371; 
-        const dLat = deg2rad(lat2-lat1); 
-        const dLon = deg2rad(lon2-lon1); 
-        const a = Math.sin(dLat/2)**2 + Math.cos(deg2rad(lat1))*Math.cos(deg2rad(lat2))*Math.sin(dLon/2)**2; 
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-        return R * c * 1000; 
-    }
-    
-    function euclideanDistance(desc1, desc2) { 
-        let sum=0; 
-        for(let i=0;i<desc1.length;i++) sum+=(desc1[i]-desc2[i])**2; 
-        return Math.sqrt(sum); 
-    }
-    
-    function bufferToBase64(buffer) { 
-        let binary=''; 
-        const bytes=new Uint8Array(buffer); 
-        for(let i=0;i<bytes.byteLength;i++) binary+=String.fromCharCode(bytes[i]); 
-        return btoa(binary); 
-    }
-    
-    function base64ToBuffer(base64) { 
-        const binary=atob(base64); 
-        const bytes=new Uint8Array(binary.length); 
-        for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); 
-        return bytes.buffer; 
-    }
-    
-    function selectShift(element) { 
-        document.querySelectorAll('.shift-card').forEach(c=>c.classList.remove('selected')); 
-        element.classList.add('selected'); 
-        element.querySelector('input').checked=true; 
-    }
-    
-    const setCamStatus = (html) => { 
-        if(html!==lastCamStatusText) { 
-            $('camStatus').innerHTML=html; 
-            lastCamStatusText=html; 
-        } 
-    };
-    
-    function updateStabilityRing(current, max) {
-        const circle = $('stabilityCircle'), text = $('stabilityText'), ring = $('stabilityRing');
-        if (!circle || !text || !ring) return;
-        const circumference = 2 * Math.PI * 20;
-        const offset = circumference - (current / max) * circumference;
-        circle.style.strokeDashoffset = offset; 
-        text.textContent = current;
-        if (current > 0) ring.classList.add('active'); else ring.classList.remove('active');
-    }
-    
-    function showMatchResult(success) {
-        const el = $('matchResult'); 
-        if (!el) return;
-        el.className = `match-result ${success ? 'success' : 'fail'}`;
-        el.innerHTML = success ? '<i class="fas fa-check" style="color:white;"></i>' : '<i class="fas fa-times" style="color:white;"></i>';
-        setTimeout(() => { el.className = 'match-result'; }, 1500);
-    }
-    
-    function updateModelProgress(percent) {
-        const bar = $('modelProgressBar'), container = $('modelProgress'); 
-        if (!bar || !container) return;
-        bar.style.width = percent + '%';
-        if (percent > 0 && percent < 100) container.classList.add('active'); else container.classList.remove('active');
-    }
-    
-    function createStorageImageBlob() {
-        const c = document.createElement('canvas');
-        let w = video.videoWidth, h = video.videoHeight;
-        const ratio = Math.min(STORE_IMG_MAX / w, STORE_IMG_MAX / h);
-        if(ratio < 1) { w = Math.round(w * ratio); h = Math.round(h * ratio); }
-        c.width = w; c.height = h; c.getContext('2d').drawImage(video, 0, 0, w, h);
-        return new Promise(resolve => c.toBlob(resolve, 'image/jpeg', 0.8));
-    }
-    
-    async function captureImageAsBase64() {
-        const c = document.createElement('canvas');
-        let w = video.videoWidth, h = video.videoHeight;
-        const ratio = Math.min(STORE_IMG_MAX / w, STORE_IMG_MAX / h);
-        if(ratio < 1) { w = Math.round(w * ratio); h = Math.round(h * ratio); }
-        c.width = w; c.height = h; c.getContext('2d').drawImage(video, 0, 0, w, h);
-        return c.toDataURL('image/jpeg', 0.85);
-    }
-    
-    function getHeadYaw(landmarks) { 
-        const nose = landmarks.getNose()[3]; 
-        const leftEye = landmarks.getLeftEye()[0]; 
-        const rightEye = landmarks.getRightEye()[3]; 
-        return nose.x - ((leftEye.x + rightEye.x)/2); 
-    }
-    
-    function resetLiveness() { 
-        livenessActive = true; 
-        livenessStartYaw = null; 
-        livenessMoved = false; 
-        stabilityCounter = 0; 
-    }
-    
-    function updateLiveness(yaw) {
-        if (!livenessActive) return true;
-        if (livenessStartYaw === null) { 
-            livenessStartYaw = yaw; 
-            setCamStatus('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...'); 
-            return false; 
-        }
-        if (Math.abs(yaw - livenessStartYaw) > 0.08) { 
-            livenessMoved = true; 
-            livenessActive = false; 
-            setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، ثبت وجهك...'); 
-            return true; 
-        }
-        return false;
-    }
+function unlockAudio(){if(audioUnlocked)return;try{const a=$('login-success');if(a){a.play().then(()=>{a.pause();a.currentTime=0;audioUnlocked=true}).catch(()=>{})}}catch(e){}}
 
-    // حساب الأوفر تايم
-    function calculateOvertime(hoursWorked) {
-        if (!hoursWorked || hoursWorked <= NORMAL_SHIFT_HOURS) {
-            return { overtime: 0, normalHours: hoursWorked || 0, isOvertime: false };
-        }
-        const overtime = hoursWorked - NORMAL_SHIFT_HOURS;
-        return {
-            overtime: parseFloat(overtime.toFixed(2)),
-            normalHours: NORMAL_SHIFT_HOURS,
-            isOvertime: true,
-            overtimeFormatted: `${overtime.toFixed(2)} ساعة`
-        };
-    }
+function playSound(id){if(!audioUnlocked){unlockAudio();return}try{const audio=$(id);if(!audio)return;audio.currentTime=0;audio.play().catch(()=>{})}catch(e){}}
 
-    function formatTime12(date) {
-        return date.toLocaleString('ar-EG', { 
-            hour12: true, 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            second: '2-digit' 
-        });
-    }
+function showToast(msg,type=''){const t=$('toast');t.textContent=msg;t.className=`toast show ${type}`;setTimeout(()=>t.classList.remove('show'),4500)}
+function setStatus(txt){$('connText').textContent=txt}
+function togglePassword(id){const i=$(id);i.type=i.type==='password'?'text':'password'}
+function deg2rad(deg){return deg*(Math.PI/180)}
+function getDistanceFromLatLonInKm(lat1,lon1,lat2,lon2){const R=6371;const dLat=deg2rad(lat2-lat1),dLon=deg2rad(lon2-lon1);const a=Math.sin(dLat/2)**2+Math.cos(deg2rad(lat1))*Math.cos(deg2rad(lat2))*Math.sin(dLon/2)**2;const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));return R*c*1000}
+function euclideanDistance(desc1,desc2){let sum=0;for(let i=0;i<desc1.length;i++)sum+=(desc1[i]-desc2[i])**2;return Math.sqrt(sum)}
+function bufferToBase64(buffer){let binary='';const bytes=new Uint8Array(buffer);for(let i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);return btoa(binary)}
+function base64ToBuffer(base64){const binary=atob(base64);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes.buffer}
+function selectShift(element){document.querySelectorAll('.shift-card').forEach(c=>c.classList.remove('selected'));element.classList.add('selected');element.querySelector('input').checked=true}
+const setCamStatus=(html)=>{if(html!==lastCamStatusText){$('camStatus').innerHTML=html;lastCamStatusText=html}};
 
-    function formatDateTime12(date) {
-        const d = new Date(date);
-        return `${d.toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })} - ${formatTime12(d)}`;
-    }
+function updateStabilityRing(current,max){const circle=$('stabilityCircle'),text=$('stabilityText'),ring=$('stabilityRing');if(!circle||!text||!ring)return;const circumference=2*Math.PI*20;const offset=circumference-(current/max)*circumference;circle.style.strokeDashoffset=offset;text.textContent=current;if(current>0)ring.classList.add('active');else ring.classList.remove('active')}
+function showMatchResult(success){const el=$('matchResult');if(!el)return;el.className=`match-result ${success?'success':'fail'}`;el.innerHTML=success?'<i class="fas fa-check" style="color:white;"></i>':'<i class="fas fa-times" style="color:white;"></i>';setTimeout(()=>{el.className='match-result'},1500)}
+function updateModelProgress(percent){const bar=$('modelProgressBar'),container=$('modelProgress');if(!bar||!container)return;bar.style.width=percent+'%';if(percent>0&&percent<100)container.classList.add('active');else container.classList.remove('active')}
+function createStorageImageBlob(){const c=document.createElement('canvas');let w=video.videoWidth,h=video.videoHeight;const ratio=Math.min(STORE_IMG_MAX/w,STORE_IMG_MAX/h);if(ratio<1){w=Math.round(w*ratio);h=Math.round(h*ratio)}c.width=w;c.height=h;c.getContext('2d').drawImage(video,0,0,w,h);return new Promise(resolve=>c.toBlob(resolve,'image/jpeg',0.8))}
+async function captureImageAsBase64(){const c=document.createElement('canvas');let w=video.videoWidth,h=video.videoHeight;const ratio=Math.min(STORE_IMG_MAX/w,STORE_IMG_MAX/h);if(ratio<1){w=Math.round(w*ratio);h=Math.round(h*ratio)}c.width=w;c.height=h;c.getContext('2d').drawImage(video,0,0,w,h);return c.toDataURL('image/jpeg',0.85)}
+function getHeadYaw(landmarks){const nose=landmarks.getNose()[3],leftEye=landmarks.getLeftEye()[0],rightEye=landmarks.getRightEye()[3];return nose.x-((leftEye.x+rightEye.x)/2)}
+function resetLiveness(){livenessActive=true;livenessStartYaw=null;livenessMoved=false;stabilityCounter=0}
+function updateLiveness(yaw){if(!livenessActive)return true;if(livenessStartYaw===null){livenessStartYaw=yaw;setCamStatus('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...');return false}if(Math.abs(yaw-livenessStartYaw)>.08){livenessMoved=true;livenessActive=false;setCamStatus('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، ثبت وجهك...');return true}return false}
 
-    // Avatar افتراضي
-    function getDefaultAvatar() {
-        return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCA0IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+';
-    }
+function calculateOvertime(hoursWorked){if(!hoursWorked||hoursWorked<=NORMAL_SHIFT_HOURS)return{overtime:0,normalHours:hoursWorked||0,isOvertime:false};const overtime=hoursWorked-NORMAL_SHIFT_HOURS;return{overtime:parseFloat(overtime.toFixed(2)),normalHours:NORMAL_SHIFT_HOURS,isOvertime:true,overtimeFormatted:`${overtime.toFixed(2)} ساعة`}}
+function formatTime12(date){return date.toLocaleString('ar-EG',{hour12:true,hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+function formatDateTime12(date){const d=new Date(date);return`${d.toLocaleDateString('ar-EG',{year:'numeric',month:'2-digit',day:'2-digit'})} - ${formatTime12(d)}`}
 
-    // دالة آمنة للحصول على صورة المستخدم
-    async function getCurrentUserImageUrl(userCode) {
-        try {
-            if (!userCode) return null;
-            
-            const { data: emp, error } = await db
-                .from('employees')
-                .select('profile_image_url, code')
-                .eq('code', userCode)
-                .single();
-            
-            if (emp?.profile_image_url) {
-                return emp.profile_image_url + '?v=' + Date.now() + '&u=' + Math.random().toString(36).substr(2, 9);
-            }
-            
-            const { data: storageData } = db.storage
-                .from('faces')
-                .getPublicUrl(`${userCode}_face.jpg`);
-            
-            if (storageData?.publicUrl) {
-                return storageData.publicUrl + '?v=' + Date.now() + '&u=' + Math.random().toString(36).substr(2, 9);
-            }
-            
-            return null;
-        } catch (error) {
-            console.error('Error getting user image:', error);
-            return null;
-        }
-    }
+// Avatar افتراضي
+function getDefaultAvatar(){return'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM2NDc0OGIiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjAgMjF2LTJhNCA0IDAgMCAwLTQtNEg4YTQgNCA0IDR2MiI+PC9wYXRoPjxjaXJjbGUgY3g9IjEyIiBjeT0iNyIgcj0iNCI+PC9jaXJjbGU+PC9zdmc+'}
 
-    async function safeUpdateUserImage() {
-        if (!user || !user.code) return;
-        
-        const imageUrl = await getCurrentUserImageUrl(user.code);
-        
-        if (imageUrl) {
-            userImage = imageUrl;
-            updateUserImageInUI(imageUrl);
-            console.log('✅ Image updated for:', user.code);
-        } else {
-            updateUserImageInUI(getDefaultAvatar());
-        }
-    }
+async function getCurrentUserImageUrl(userCode){try{if(!userCode)return null;const{data:emp,error}=await db.from('employees').select('profile_image_url,code').eq('code',userCode).single();if(emp?.profile_image_url)return emp.profile_image_url+'?v='+Date.now()+'&u='+Math.random().toString(36).substr(2,9);const{data:storageData}=db.storage.from('faces').getPublicUrl(`${userCode}_face.jpg`);if(storageData?.publicUrl)return storageData.publicUrl+'?v='+Date.now()+'&u='+Math.random().toString(36).substr(2,9);return null}catch(error){console.error('Error:',error);return null}}
 
-    // الذكاء الاصطناعي والكاميرا
-    async function extractStableDescriptor() {
-        const samples = [];
-        for (let i = 0; i < 2; i++) {
-            const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 })).withFaceLandmarks().withFaceDescriptor();
-            if (!det) return null;
-            samples.push(Array.from(det.descriptor));
-            if (i === 0) await new Promise(r => setTimeout(r, 120));
-        }
-        const avg = new Array(samples[0].length).fill(0);
-        for (const s of samples) for (let j = 0; j < s.length; j++) avg[j] += s[j] / 2;
-        return avg;
-    }
-    
-    async function openCamera() {
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } });
-            video.srcObject = stream; await video.play();
-            $('cameraOverlay').classList.add('active'); lastCamStatusText = '';
-            $('scanLine').classList.add('active');
-            setCamStatus(lightModels && heavyModels ? '<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...' : '<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...');
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED);
-            if (attMode || adminVerifyMode || adminResetFaceMode) resetLiveness();
-            isProcessingCapture = false;
-            startDetectionLoop(); return true;
-        } catch(e) { console.error(e); showToast('فشل الوصول للكاميرا', 'error'); return false; }
-    }
-    
-    function closeCamera() {
-        if(stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; }
-        video.srcObject = null; $('cameraOverlay').classList.remove('active');
-        $('scanLine').classList.remove('active'); $('matchResult').className = 'match-result'; $('stabilityRing').classList.remove('active');
-        updateModelProgress(0);
-        regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false; firstTimeSetupMode = false; adminResetFaceMode = false;
-        attType = ''; targetEmpForAdmin = null; isProcessingCapture = false;
-        if(autoCaptureTimeout) { clearTimeout(autoCaptureTimeout); autoCaptureTimeout=null; }
-        if(detectionLoopTimeout) { clearTimeout(detectionLoopTimeout); detectionLoopTimeout=null; }
-        stabilityCounter = 0; livenessActive = false;
-    }
-    
-    function startDetectionLoop() {
-        if(detectionLoopTimeout) clearTimeout(detectionLoopTimeout);
-        async function detect() {
-            if(!video.srcObject || !$('cameraOverlay').classList.contains('active') || isProcessingCapture) return;
-            await drawFaceBox();
-            detectionLoopTimeout = setTimeout(detect, 200);
-        }
-        detect();
-    }
-    
-    async function drawFaceBox() {
-        if(!video.srcObject || video.videoWidth===0) return;
-        if(!lightModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل النماذج...'); updateModelProgress(modelsLoadProgress); return; }
-        try {
-            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.2 })).withFaceLandmarks(true);
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            if(detection) {
-                const box = detection.detection.box;
-                ctx.strokeStyle = '#38bdf8'; ctx.lineWidth=3; ctx.strokeRect(box.x,box.y,box.width,box.height);
-                const cLen=25; ctx.strokeStyle='#10b981'; ctx.lineWidth=4;
-                ctx.beginPath(); ctx.moveTo(box.x,box.y+cLen); ctx.lineTo(box.x,box.y); ctx.lineTo(box.x+cLen,box.y); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen,box.y); ctx.lineTo(box.x+box.width,box.y); ctx.lineTo(box.x+box.width,box.y+cLen); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(box.x,box.y+box.height-cLen); ctx.lineTo(box.x,box.y+box.height); ctx.lineTo(box.x+cLen,box.y+box.height); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(box.x+box.width-cLen,box.y+box.height); ctx.lineTo(box.x+box.width,box.y+box.height); ctx.lineTo(box.x+box.width,box.y+box.height-cLen); ctx.stroke();
-                
-                if (regMode || updateFaceMode || firstTimeSetupMode || adminResetFaceMode) {
-                    if (!heavyModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف ' + Math.round(modelsLoadProgress) + '%'); updateModelProgress(modelsLoadProgress); return; }
-                    stabilityCounter++; updateStabilityRing(stabilityCounter, STABLE_FRAMES_REQUIRED);
-                    if (stabilityCounter >= STABLE_FRAMES_REQUIRED) { setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> تم الالتقاط!'); $('stabilityRing').classList.remove('active'); if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 200); }
-                    else { setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...'); }
-                    return;
-                }
-                if (attMode || adminVerifyMode) {
-                    if (!heavyModels) { setCamStatus('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف ' + Math.round(modelsLoadProgress) + '%'); updateModelProgress(modelsLoadProgress); return; }
-                    const livenessOk = updateLiveness(getHeadYaw(detection.landmarks));
-                    if (!livenessOk) { if(autoCaptureTimeout) clearTimeout(autoCaptureTimeout); stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); return; }
-                    stabilityCounter++; updateStabilityRing(stabilityCounter, STABLE_FRAMES_REQUIRED);
-                    if (stabilityCounter >= STABLE_FRAMES_REQUIRED) { setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم الالتقاط!'); $('stabilityRing').classList.remove('active'); if(!autoCaptureTimeout && !isProcessingCapture) autoCaptureTimeout = setTimeout(()=>performCapture(), 200); }
-                    else { setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...'); }
-                    return;
-                }
-            } else {
-                setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');
-                if(autoCaptureTimeout) clearTimeout(autoCaptureTimeout); stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED);
-                if (attMode || adminVerifyMode || adminResetFaceMode) resetLiveness();
-            }
-        } catch(e) {}
-    }
+async function safeUpdateUserImage(){if(!user||!user.code)return;const imageUrl=await getCurrentUserImageUrl(user.code);if(imageUrl){userImage=imageUrl;updateUserImageInUI(imageUrl)}else updateUserImageInUI(getDefaultAvatar())}
 
-    // العمليات الرئيسية
-    async function performCapture() {
-        if(isProcessingCapture) return;
-        isProcessingCapture = true; autoCaptureTimeout = null;
-        if(detectionLoopTimeout) { clearTimeout(detectionLoopTimeout); detectionLoopTimeout=null; }
-        $('scanLine').classList.remove('active');
-        setCamStatus('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
-        const newDescriptor = await extractStableDescriptor();
-        const imgBase64 = await captureImageAsBase64();
-        
-        if(!newDescriptor) { playSound('faceid-error'); setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة...'); isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); return; }
+function updateUserImageInUI(imageUrl){if(!imageUrl)imageUrl=getDefaultAvatar();userImage=imageUrl;const profileImages=document.querySelectorAll('.emp-profile-img');profileImages.forEach(img=>{if(img){const uniqueUrl=imageUrl.includes('?')?imageUrl+'&refresh='+Date.now():imageUrl+'?refresh='+Date.now();img.src=uniqueUrl;img.onload=()=>{img.classList.add('loaded')};img.onerror=()=>{img.src=getDefaultAvatar();img.classList.add('loaded')}}})}
 
-        if(regMode) {
-            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البيانات...');
-            try {
-                const { count } = await db.from('employees').select('*', { count: 'exact', head: true });
-                const newCode = `EMP${String(count + 1).padStart(3, '0')}`;
-                const tempPass = Math.random().toString(36).slice(-8);
-                const imgBlob = await createStorageImageBlob();
-                await db.storage.from('faces').upload(`${newCode}_face.jpg`, imgBlob, { upsert: true });
-                const { data: imgData } = db.storage.from('faces').getPublicUrl(`${newCode}_face.jpg`);
-                const { error } = await db.from('employees').insert({ code: newCode, name: regData.name, email: regData.email, password: tempPass, face_descriptor: newDescriptor, is_first_login: true });
-                if(!error) {
-                    playSound('faceid-success'); showToast(`تم إنشاء الحساب!`, 'success'); 
-                    closeCamera(); showLoginScreen();
-                    fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ action: 'sendNewEmpEmails', name: regData.name, code: newCode, password: tempPass, email: regData.email }) }).catch(e => {});
-                } else throw error;
-            } catch(e) { playSound('faceid-error'); showToast('حدث خطأ', 'error'); closeCamera(); }
-        }
-        else if(firstTimeSetupMode) {
-            setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البصمة...');
-            try {
-                const imgBlob = await createStorageImageBlob();
-                await db.storage.from('faces').upload(`${user.code}_face.jpg`, imgBlob, { upsert: true });
-                const { data: imgData } = db.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);
-                const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', user.code);
-                if(!error) { 
-                    playSound('faceid-success'); sessionDescriptor = newDescriptor; 
-                    userImage = imgData.publicUrl + '?t=' + Date.now() + '&cache=' + Math.random();
-                    updateUserImageInUI(userImage);
-                    showMatchResult(true); showToast('تم تسجيل البصمة!', 'success'); 
-                    setTimeout(()=>{ closeCamera(); showApp(); }, 800); 
-                } else throw error;
-            } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل الحفظ', 'error'); restartCamLoop(); }
-        }
-        else if(updateFaceMode || adminResetFaceMode) {
-            const targetCode = updateFaceMode ? user.code : targetEmpForAdmin.code;
-            const targetName = updateFaceMode ? user.name : targetEmpForAdmin.name;
-            try {
-                const imgBlob = await createStorageImageBlob();
-                await db.storage.from('faces').upload(`${targetCode}_face.jpg`, imgBlob, { upsert: true });
-                const { error } = await db.from('employees').update({ face_descriptor: newDescriptor }).eq('code', targetCode);
-                if(!error) { playSound('faceid-success'); showMatchResult(true); showToast(`تم تحديث بصمة ${targetName}`, 'success'); setTimeout(()=>closeCamera(), 800); if(updateFaceMode) showApp(); }
-                else throw error;
-            } catch(e) { playSound('faceid-error'); showMatchResult(false); showToast('فشل التحديث', 'error'); restartCamLoop(); }
-        }
-        else if(adminVerifyMode) {
-            if(!sessionDescriptor) { playSound('faceid-error'); showToast('لا توجد بصمة أدمن!', 'error'); closeCamera(); return; }
-            if(euclideanDistance(newDescriptor, sessionDescriptor) < MATCH_THRESHOLD) {
-                showMatchResult(true); setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق...');
-                
-                if(targetEmpForAdmin.type === 'حذف موظف') {
-                    if(targetEmpForAdmin.code === 'ADMIN' || targetEmpForAdmin.isAdmin) {
-                        playSound('faceid-error'); showToast('❌ لا يمكن حذف الأدمن!', 'error');
-                        setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> محاولة حذف الأدمن مرفوضة!');
-                        isProcessingCapture = false; restartCamLoop(); return;
-                    }
-                    
-                    const { error: attErr } = await db.from('attendance').delete().eq('employee_code', targetEmpForAdmin.code);
-                    const { error: empErr } = await db.from('employees').delete().eq('code', targetEmpForAdmin.code);
-                    try { await db.storage.from('faces').remove([`${targetEmpForAdmin.code}_face.jpg`]); } catch(e){}
-                    if(!empErr) { playSound('faceid-success'); showToast(`تم حذف ${targetEmpForAdmin.name}`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
-                    else { playSound('faceid-error'); showToast('فشل الحذف', 'error'); restartCamLoop(); }
-                    isProcessingCapture = false; return;
-                }
+async function extractStableDescriptor(){const samples=[];for(let i=0;i<2;i++){const det=await faceapi.detectSingleFace(video,new faceapi.TinyFaceDetectorOptions({inputSize:416,scoreThreshold:.2})).withFaceLandmarks().withFaceDescriptor();if(!det)return null;samples.push(Array.from(det.descriptor));if(i===0)await new Promise(r=>setTimeout(r,120))}const avg=new Array(samples[0].length).fill(0);for(const s of samples)for(let j=0;j<s.length;j++)avg[j]+=s[j]/2;return avg}
 
-                const { error } = await db.from('attendance').insert({ employee_code: targetEmpForAdmin.code, employee_name: targetEmpForAdmin.name, type: targetEmpForAdmin.type, location_link: currentLoc, shift: 'تسجيل يدوي بواسطة الأدمن' });
-                if(!error) { playSound('faceid-success'); showToast(`تم تسجيل ${targetEmpForAdmin.type}`, 'success'); setTimeout(()=>closeCamera(), 800); loadEmployees(); }
-                else { playSound('faceid-error'); showToast('فشل التسجيل', 'error'); restartCamLoop(); }
-            } else { playSound('faceid-error'); showMatchResult(false); showToast('وجه الأدمن غير مطابق!', 'error'); setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> انتحال هوية مرفوض!'); restartCamLoop(); }
-        }
-        else if(attMode) {
-            if(!sessionDescriptor) { playSound('faceid-error'); showToast('بيانات الوجه غير متوفرة', 'error'); closeCamera(); return; }
-            const distance = euclideanDistance(newDescriptor, sessionDescriptor);
-            if(distance < MATCH_THRESHOLD) {
-                showMatchResult(true);
-                if(attType === 'تغيير كلمة المرور') {
-                    const { error } = await db.from('employees').update({ password: window._pendingPwChange.newPassword }).eq('code', user.code).eq('password', window._pendingPwChange.oldPassword);
-                    if(!error) { playSound('login-success'); showToast('تم تغيير كلمة المرور', 'success'); setTimeout(()=>closeCamera(), 800); }
-                    else { playSound('login-error'); showToast('كلمة السر الحالية خاطئة', 'error'); restartCamLoop(); }
-                    isProcessingCapture = false; return;
-                }
-                if(currentLat && currentLon) {
-                    const dist = getDistanceFromLatLonInKm(currentLat, currentLon, OFFICE_LAT, OFFICE_LON);
-                    if(dist > MAX_DISTANCE_METERS) { playSound('faceid-error'); showToast(`بعيد عن المقر (${Math.round(dist)} متر)`, 'error'); setCamStatus('مرفوض: خارج نطاق المقر'); restartCamLoop(); return; }
-                }
-                const selShift = document.querySelector('input[name="shift"]:checked');
-                let hoursWorked = null, overtimeInfo = null;
-                
-                if(attType === 'انصراف') {
-                    const today = new Date().toISOString().split('T')[0];
-                    const { data: lastCheckIn } = await db.from('attendance').select('created_at').eq('employee_code', user.code).eq('type', 'حضور').gte('created_at', today).order('created_at', { ascending: false }).limit(1).single();
-                    if(lastCheckIn) { 
-                        const diff = (new Date() - new Date(lastCheckIn.created_at)) / (1000 * 60 * 60); 
-                        hoursWorked = parseFloat(diff.toFixed(2));
-                        overtimeInfo = calculateOvertime(hoursWorked);
-                    }
-                }
-                
-                const now = new Date();
-                const datetime = formatDateTime12(now);
-                
-                const { error } = await db.from('attendance').insert({ 
-                    employee_code: user.code, 
-                    employee_name: user.name, 
-                    type: attType, 
-                    location_link: currentLoc, 
-                    shift: selShift ? selShift.value : 'لم يتم التحديد', 
-                    hours_worked: hoursWorked ? `${hoursWorked} ساعة` : null,
-                    overtime: overtimeInfo?.isOvertime ? `${overtimeInfo.overtime} ساعة` : '0 دقيقة'
-                });
-                
-                if(!error) {
-                    const msg = `تم تسجيل ${attType} بنجاح${hoursWorked ? ` (${hoursWorked} ساعة)` : ''}${overtimeInfo?.isOvertime ? ` | ⏰ أوفر تايم: ${overtimeInfo.overtimeFormatted}` : ''}`;
-                    playSound('faceid-success'); showToast(msg, 'success'); 
-                    setTimeout(()=>closeCamera(), 800); calculateMonthlyHours();
-                    
-                    fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ 
-                        action: 'sendAttAlert', 
-                        name: user.name, 
-                        code: user.code, 
-                        type: attType, 
-                        datetime, 
-                        location: currentLoc, 
-                        shift: selShift ? selShift.value : '', 
-                        hoursWorked: hoursWorked ? `${hoursWorked} ساعة` : '-',
-                        overtime: overtimeInfo?.isOvertime ? `${overtimeInfo.overtime} ساعة` : 'لا يوجد',
-                        imgBase64: imgBase64 
-                    }) }).catch(e => {});
-                } else throw error;
-            } else { playSound('faceid-error'); showMatchResult(false); showToast('الوجه غير مطابق!', 'error'); setCamStatus('الوجه غير مطابق!'); restartCamLoop(); }
-        }
-        isProcessingCapture = false;
-    }
+async function openCamera(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}}});video.srcObject=stream;await video.play();$('cameraOverlay').classList.add('active');lastCamStatusText='';$('scanLine').classList.add('active');setCamStatus(lightModels&&heavyModels?'<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...':'<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...');canvas.width=video.videoWidth;canvas.height=video.videoHeight;stabilityCounter=0;updateStabilityRing(0,STABLE_FRAMES_REQUIRED);if(attMode||adminVerifyMode||adminResetFaceMode)resetLiveness();isProcessingCapture=false;startDetectionLoop();return true}catch(e){console.error(e);showToast('فشل الوصول للكاميرا','error');return false}}
 
-    function restartCamLoop() { isProcessingCapture = false; stabilityCounter = 0; updateStabilityRing(0, STABLE_FRAMES_REQUIRED); $('scanLine').classList.add('active'); startDetectionLoop(); }
+function closeCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}video.srcObject=null;$('cameraOverlay').classList.remove('active');$('scanLine').classList.remove('active');$('matchResult').className='match-result';$('stabilityRing').classList.remove('active');updateModelProgress(0);regMode=false;attMode=false;updateFaceMode=false;adminVerifyMode=false;firstTimeSetupMode=false;adminResetFaceMode=false;attType='';targetEmpForAdmin=null;if(autoCaptureTimeout){clearTimeout(autoCaptureTimeout);autoCaptureTimeout=null}if(detectionLoopTimeout){clearTimeout(detectionLoopTimeout);detectionLoopTimeout=null}stabilityCounter=0;livenessActive=false}
 
-    async function loadModelsAsync() {
-        try {
-            setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL); modelsLoadProgress = 25;
-            setStatus('جاري تحميل الذكاء الاصطناعي (2/4)...');
-            await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODELS_URL); modelsLoadProgress = 50; lightModels = true;
-            setStatus('جاري تحميل الذكاء الاصطناعي (3/4)...');
-            await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL); modelsLoadProgress = 75;
-            setStatus('جاري تحميل الذكاء الاصطناعي (4/4)...');
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL); modelsLoadProgress = 100; heavyModels = true;
-            updateModelProgress(100); setTimeout(()=>updateModelProgress(0), 600); setStatus('النظام جاهز');
-        } catch(e) { console.error(e); setStatus('خطأ في تحميل النماذج'); }
-    }
+function startDetectionLoop(){if(detectionLoopTimeout)clearTimeout(detectionLoopTimeout);async function detect(){if(!video.srcObject||!$('cameraOverlay').classList.contains('active')||isProcessingCapture)return;await drawFaceBox();detectionLoopTimeout=setTimeout(detect,200)}detect()}
 
-    // تحديث صورة الموظف في UI
-    function updateUserImageInUI(imageUrl) {
-        if (!imageUrl) imageUrl = getDefaultAvatar();
-        userImage = imageUrl;
-        const profileImages = document.querySelectorAll('.emp-profile-img');
-        profileImages.forEach(img => {
-            if (img) {
-                const uniqueUrl = imageUrl.includes('?') ? imageUrl + '&refresh=' + Date.now() : imageUrl + '?refresh=' + Date.now();
-                img.src = uniqueUrl;
-                img.onload = () => { img.classList.add('loaded'); };
-                img.onerror = () => { img.src = getDefaultAvatar(); img.classList.add('loaded'); };
-            }
-        });
-    }
+async function drawFaceBox(){if(!video.srcObject||video.videoWidth===0)return;if(!lightModels){setCamStatus('<i class="fas fa-cog fa-spin"></i> جاري تحميل النماذج...');updateModelProgress(modelsLoadProgress);return}try{const detection=await faceapi.detectSingleFace(video,new faceapi.TinyFaceDetectorOptions({inputSize:320,scoreThreshold:.2})).withFaceLandmarks(true);ctx.clearRect(0,0,canvas.width,canvas.height);if(detection){const box=detection.detection.box;ctx.strokeStyle='#38bdf8';ctx.lineWidth=3;ctx.strokeRect(box.x,box.y,box.width,box.height);const cLen=25;ctx.strokeStyle='#10b981';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(box.x,box.y+cLen);ctx.lineTo(box.x,box.y);ctx.lineTo(box.x+cLen,box.y);ctx.stroke();ctx.beginPath();ctx.moveTo(box.x+box.width-cLen,box.y);ctx.lineTo(box.x+box.width,box.y);ctx.lineTo(box.x+box.width,box.y+cLen);ctx.stroke();ctx.beginPath();ctx.moveTo(box.x,box.y+box.height-cLen);ctx.lineTo(box.x,box.y+box.height);ctx.lineTo(box.x+cLen,box.y+box.height);ctx.stroke();ctx.beginPath();ctx.moveTo(box.x+box.width-cLen,box.y+box.height);ctx.lineTo(box.x+box.width,box.y+box.height);ctx.lineTo(box.x+box.width,box.y+box.height-cLen);ctx.stroke();if(regMode||updateFaceMode||firstTimeSetupMode||adminResetFaceMode){if(!heavyModels){setCamStatus('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف '+Math.round(modelsLoadProgress)+'%');updateModelProgress(modelsLoadProgress);return}stabilityCounter++;updateStabilityRing(stabilityCounter,STABLE_FRAMES_REQUIRED);if(stabilityCounter>=STABLE_FRAMES_REQUIRED){setCamStatus('<i class="fas fa-camera" style="color:var(--success);"></i> تم الالتقاط!');$('stabilityRing').classList.remove('active');if(!autoCaptureTimeout&&!isProcessingCapture)autoCaptureTimeout=setTimeout(()=>performCapture(),200)}else{setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...')}return}if(attMode||adminVerifyMode){if(!heavyModels){setCamStatus('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف '+Math.round(modelsLoadProgress)+'%');updateModelProgress(modelsLoadProgress);return}const livenessOk=updateLiveness(getHeadYaw(detection.landmarks));if(!livenessOk){if(autoCaptureTimeout)clearTimeout(autoCaptureTimeout);stabilityCounter=0;updateStabilityRing(0,STABLE_FRAMES_REQUIRED);return}stabilityCounter++;updateStabilityRing(stabilityCounter,STABLE_FRAMES_REQUIRED);if(stabilityCounter>=STABLE_FRAMES_REQUIRED){setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم الالتقاط!');$('stabilityRing').classList.remove('active');if(!autoCaptureTimeout&&!isProcessingCapture)autoCaptureTimeout=setTimeout(()=>performCapture(),200)}else{setCamStatus('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...')}return}}else{setCamStatus('<i class="fas fa-spinner fa-spin"></i> جاري البحث عن الوجه...');if(autoCaptureTimeout)clearTimeout(autoCaptureTimeout);stabilityCounter=0;updateStabilityRing(0,STABLE_FRAMES_REQUIRED);if(attMode||adminVerifyMode||adminResetFaceMode)resetLiveness()}}catch(e){}}
 
-    // جلب بيانات المستخدم
-    async function fetchUserDataInBackground() {
-        if(!user) return;
-        try {
-            const { data: emp } = await db.from('employees').select('face_descriptor, is_admin, profile_image_url').eq('code', user.code).single();
-            if(emp && emp.face_descriptor) sessionDescriptor = emp.face_descriptor;
-            await safeUpdateUserImage();
-            if(!sessionDescriptor && !$('cameraOverlay').classList.contains('active')) {
-                playSound('faceid-error'); showToast('يرجى تسجيل بصمة وجهك أولاً', 'error');
-                firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; }
-            }
-        } catch(e) { console.error('Error:', e); } setStatus('النظام جاهز');
-    }
+async function performCapture(){if(isProcessingCapture)return;isProcessingCapture=true;autoCaptureTimeout=null;if(detectionLoopTimeout){clearTimeout(detectionLoopTimeout);detectionLoopTimeout=null}$('scanLine').classList.remove('active');setCamStatus('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');const newDescriptor=await extractStableDescriptor();const imgBase64=await captureImageAsBase64();if(!newDescriptor){playSound('faceid-error');setCamStatus('<i class="fas fa-times-circle" style="color:red;"></i> لحظة غير مناسبة...');isProcessingCapture=false;stabilityCounter=0;updateStabilityRing(0,STABLE_FRAMES_REQUIRED);$('scanLine').classList.add('active');startDetectionLoop();return}if(regMode){setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البيانات...');try{const{count}=await db.from('employees').select('*',{count:'exact',head:true});const newCode=`EMP${String(count+1).padStart(3,'0')}`;const tempPass=Math.random().toString(36).slice(-8);const imgBlob=await createStorageImageBlob();await db.storage.from('faces').upload(`${newCode}_face.jpg`,imgBlob,{upsert:true});const{data:imgData}=db.storage.from('faces').getPublicUrl(`${newCode}_face.jpg`);const{error}=await db.from('employees').insert({code:newCode,name:regData.name,email:regData.email,password:tempPass,face_descriptor:newDescriptor,is_first_login:true});if(!error){playSound('faceid-success');showToast(`تم إنشاء الحساب!`,'success');closeCamera();showLoginScreen();fetch(EMAIL_API_URL,{method:'POST',body:JSON.stringify({action:'sendNewEmpEmails',name:regData.name,code:newCode,password:tempPass,email:regData.email})}).catch(e=>{})}else throw error}catch(e){playSound('faceid-error');showToast('حدث خطأ','error');closeCamera()}}else if(firstTimeSetupMode){setCamStatus('<i class="fas fa-upload"></i> جاري حفظ البصمة...');try{const imgBlob=await createStorageImageBlob();await db.storage.from('faces').upload(`${user.code}_face.jpg`,imgBlob,{upsert:true});const{data:imgData}=db.storage.from('faces').getPublicUrl(`${user.code}_face.jpg`);const{error}=await db.from('employees').update({face_descriptor:newDescriptor}).eq('code',user.code);if(!error){playSound('faceid-success');sessionDescriptor=newDescriptor;userImage=imgData.publicUrl+'?t='+Date.now()+'&cache='+Math.random();updateUserImageInUI(userImage);showMatchResult(true);showToast('تم تسجيل البصمة!','success');setTimeout(()=>{closeCamera();showApp()},800)}else throw error}catch(e){playSound('faceid-error');showMatchResult(false);showToast('فشل الحفظ','error');restartCamLoop()}}else if(updateFaceMode||adminResetFaceMode){const targetCode=updateFaceMode?user.code:targetEmpForAdmin.code;const targetName=updateFaceMode?user.name:targetEmpForAdmin.name;try{const imgBlob=await createStorageImageBlob();await db.storage.from('faces').upload(`${targetCode}_face.jpg`,imgBlob,{upsert:true});const{error}=await db.from('employees').update({face_descriptor:newDescriptor}).eq('code',targetCode);if(!error){playSound('faceid-success');showMatchResult(true);showToast(`تم تحديث بصمة ${targetName}`,'success');setTimeout(()=>closeCamera(),800);if(updateFaceMode)showApp()}else throw error}catch(e){playSound('faceid-error');showMatchResult(false);showToast('فشل التحديث','error');restartCamLoop()}}else if(adminVerifyMode){if(!sessionDescriptor){playSound('faceid-error');showToast('لا توجد بصمة أدمن!','error');closeCamera();return}if(euclideanDistance(newDescriptor,sessionDescriptor)<MATCH_THRESHOLD){showMatchResult(true);setCamStatus('<i class="fas fa-check-circle" style="color:var(--success);"></i> تم التحقق...');if(targetEmpForAdmin.type==='حذف موظف'){if(targetEmpForAdmin.code==='ADMIN'||targetEmpForAdmin.isAdmin){playSound('faceid-error');showToast('❌ لا يمكن حساب الأدمن!','error');setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> محاولة حذف الأدمن مرفوضة!');isProcessingCapture=false;restartCamLoop();return}const{error:attErr}=await db.from('attendance').delete().eq('employee_code',targetEmpForAdmin.code);const{error:empErr}=await db.from('employees').delete().eq('code',targetEmpForAdmin.code);try{await db.storage.from('faces').remove([`${targetEmpForAdmin.code}_face.jpg`])}catch(e){}if(!empErr){playSound('faceid-success');showToast(`تم حذف ${targetEmpForAdmin.name}`,'success');setTimeout(()=>closeCamera(),800);loadEmployees()}else{playSound('faceid-error');showToast('فشل الحذف','error');restartCamLoop()}isProcessingCapture;return}const{error}=await db.from('attendance').insert({employee_code:targetEmpForAdmin.code,employee_name:targetEmpForAdmin.name,type:targetEmpForAdmin.type,location_link:currentLoc,shift:'تسجيل يدوي بواسطة الأدمن'});if(!error){playSound('faceid-success');showToast(`تم تسجيل ${targetEmpForAdmin.type} لـ ${targetEmpForAdmin.name}`,'success');setTimeout(()=>closeCamera(),800);loadEmployees()}else{playSound('faceid-error');showToast('فشل التسجيل','error');restartCamLoop()}}else{playSound('faceid-error');showMatchResult(false);showToast('وجه الأدمن غير مطابق!','error');setCamStatus('<i class="fas fa-ban" style="color:var(--danger);"></i> انتحال هوية مرفوض!');restartCamLoop()}}else if(attMode){if(!sessionDescriptor){playSound('faceid-error');showToast('بيانات الوجه غير متوفرة','error');closeCamera();return}const distance=euclideanDistance(newDescriptor,sessionDescriptor);if(distance<MATCH_THRESHOLD){showMatchResult(true);if(attType==='تغيير كلمة المرور'){const{error}=await db.from('employees').update({password:window._pendingPwChange.newPassword}).eq('code',user.code).eq('password',window._pendingPwChange.oldPassword);if(!error){playSound('login-success');showToast('تم تغيير كلمة المرور','success');setTimeout(()=>closeCamera(),800)}else{playSound('login-error');showToast('كلمة السر الحالية خاطئة','error');restartCamLoop()}isProcessingCapture;return}if(currentLat&&currentLon){const dist=getDistanceFromLatLonInKm(currentLat,currentLon,OFFICE_LAT,OFFICE_LON);if(dist>MAX_DISTANCE_METERS){playSound('faceid-error');showToast(`بعيد عن المقر (${Math.round(dist)} متر)`,'error');setCamStatus('مرفوض: خارج نطاق المقر');restartCamLoop();return}}const selShift=document.querySelector('input[name="shift"]:checked');let hoursWorked=null,overtimeInfo=null;if(attType==='انصراف'){const today=new Date().toISOString().split('T')[0];const{data:lastCheckIn}=await db.from('attendance').select('created_at').eq('employee_code',user.code).eq('type','حضور').gte('created_at',today).order('created_at',{ascending:false}).limit(1).single();if(lastCheckIn){const diff=(new Date()-new Date(lastCheckIn.created_at))/(1000*60*60);hoursWorked=parseFloat(diff.toFixed(2));overtimeInfo=calculateOvertime(hoursWorked)}}const now=new Date();const datetime=formatDateTime12(now);const{error}=await db.from('attendance').insert({employee_code:user.code,employee_name:user.name,type:attType,location_link:currentLoc,shift:selShift?selShift.value:'لم يتم التحديد',hours_worked:hoursWorked?`${hoursWorked} ساعة`:null,overtime:overtimeInfo?.isOvertime?`${overtimeInfo.overtime} ساعة`:'0 دقيقة'});if(!error){const msg=`تم تسجيل ${attType} بنجاح${hoursWorked?` (${hoursWorked} ساعة)`:''}${overtimeInfo?.isOvertime?` | ⏰ أوفر تايم: ${overtimeInfo.overtimeFormatted}`:''}`;playSound('faceid-success');showToast(msg,'success');setTimeout(()=>closeCamera(),800);calculateMonthlyHours();fetch(EMAIL_API_URL,{method:'POST',body:JSON.stringify({action:'sendAttAlert',name:user.name,code:user.code,type:attType,datetime,location:currentLoc,shift:selShift?selShift.value:'',hoursWorked:hoursWorked?`${hoursWorked} ساعة`:'-',overtime:overtimeInfo?.isOvertime?`${overtimeInfo.overtime} ساعة`:'لا يوجد',imgBase64:imgBase64})}).catch(e=>{})}else throw error}else{playSound('faceid-error');showMatchResult(false);showToast('الوجه غير مطابق!','error');setCamStatus('الوجه غير مطابق!');restartCamLoop()}}isProcessingCapture=false}
 
-    // تسجيل الدخول
-    async function handleLogin() {
-        const code = $('loginCode').value.trim(), pass = $('loginPass').value.trim();
-        if(!code || !pass) return showToast('يرجى إدخال البيانات', 'error');
-        setStatus('جاري التحقق...');
-        try {
-            const { data: emp, error } = await db.from('employees').select('*').eq('code', code).eq('password', pass).single();
-            if(!error && emp) {
-                userImage = '';
-                user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login, email: emp.email || '' };
-                
-                if($('rememberMe').checked) { localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); localStorage.setItem('axentro_saved_login', JSON.stringify({ code, pass })); }
-                else { sessionStorage.setItem('user', JSON.stringify(user)); localStorage.removeItem('axentro_saved_login'); }
-                
-                if(!emp.is_admin && emp.is_first_login) { $('forcePwModal').classList.add('active'); setStatus('النظام جاهز'); }
-                else {
-                    sessionDescriptor = emp.face_descriptor;
-                    if(!sessionDescriptor) { firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
-                    else { 
-                        playSound('login-success'); 
-                        await safeUpdateUserImage();
-                        showApp(); 
-                        if($('rememberMe').checked && window.PublicKeyCredential) setTimeout(()=>registerFingerprint(),1000); 
-                    }
-                }
-            } else { playSound('login-error'); showToast('بيانات خاطئة', 'error'); setStatus('النظام جاهز'); }
-        } catch(e) { playSound('login-error'); showToast('خطأ في الاتصال', 'error'); setStatus('غير متصل'); }
-    }
+function restartCamLoop(){isProcessingCapture=false;stabilityCounter=0;updateStabilityRing(0,STABLE_FRAMES_REQUIRED);$('scanLine').classList.add('active');startDetectionLoop()}
 
-    async function submitFirstPwChange() {
-        const newPw = $('firstNewPw').value.trim();
-        if(!newPw || newPw.length<4) return showToast('كلمة السر ضعيفة','error');
-        setStatus('جاري التغيير...');
-        try {
-            const { error } = await db.from('employees').update({ password: newPw, is_first_login: false }).eq('code', user.code);
-            if(!error) {
-                $('forcePwModal').classList.remove('active'); user.isFirstLogin = false;
-                if($('rememberMe').checked) localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() }));
-                else sessionStorage.setItem('user', JSON.stringify(user));
-                showToast('تم تحديث كلمة السر', 'success');
-                const { data: emp } = await db.from('employees').select('face_descriptor').eq('code', user.code).single();
-                if (emp && emp.face_descriptor) { playSound('login-success'); showApp(); fetchUserDataInBackground(); }
-                else { showToast('الآن سجل بصمة وجهك', 'success'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
-            } else throw error;
-        } catch(e) { playSound('login-error'); showToast('خطأ في التحديث','error'); }
-    }
+async function loadModelsAsync(){try{setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);modelsLoadProgress=25;setStatus('جاري تحميل الذكاء الاصطناعي (2/4)...');await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODELS_URL);modelsLoadProgress=50;lightModels=true;setStatus('جاري تحميل الذكاء الاصطناعي (3/4)...');await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL);modelsLoadProgress=75;setStatus('جاري تحميل الذكاء الاصطناعي (4/4)...');await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL);modelsLoadProgress=100;heavyModels=true;updateModelProgress(100);setTimeout(()=>updateModelProgress(0),600);setStatus('النظام جاهز')}catch(e){console.error(e);setStatus('خطأ في تحميل النماذج')}}
 
-    function logout() { 
-        playSound('logout-success'); 
-        if(autoRefreshTimer) clearInterval(autoRefreshTimer); 
-        localStorage.removeItem('rememberedUser'); 
-        sessionStorage.removeItem('user'); 
-        user = null; 
-        sessionDescriptor = null; 
-        userImage = ''; 
-        $('mainApp').style.display='none'; 
-        $('loginScreen').classList.remove('hidden'); 
-        setStatus('النظام جاهز');
-    }
-    
-    async function refreshData(silent = false) { 
-        const icon = $('refreshBtn').querySelector('i'); icon.style.animation='spin 0.5s linear'; setTimeout(()=>icon.style.animation='',600); 
-        if(user?.isAdmin) await loadEmployees(); else if(user) fetchUserDataInBackground(); 
-        if(!silent) showToast('تم التحديث','success'); 
-    }
+async function fetchUserDataInBackground(){if(!user)return;try{const{data:emp}=await db.from('employees').select('face_descriptor,is_admin,profile_image_url').eq('code',user.code).single();if(emp&&emp.face_descriptor)sessionDescriptor=emp.face_descriptor;await safeUpdateUserImage();if(!sessionDescriptor&&!$('cameraOverlay').classList.contains('active')){playSound('faceid-error');showToast('يرجى تسجيل بصمة وجهك أولاً','error');firstTimeSetupMode=true;if(!await openCamera()){firstTimeSetupMode=false}}}catch(e){console.error('Error:',e)}setStatus('النظام جاهز')}
 
-    // عرض التطبيق الرئيسي
-    function showApp() {
-        if(autoRefreshTimer) clearInterval(autoRefreshTimer);
-        $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block';
-        if(user.isAdmin) {
-            $('mainAppTitle').textContent='لوحة تحكم المدير'; $('adminPanel').style.display='block'; $('employeePanel').style.display='none';
-            showToast('مرحباً بك في لوحة التحكم','success');
-            
-            const existing = document.getElementById('adminMicroInteractions'); if(existing) existing.remove();
-            $('adminPanel').insertAdjacentHTML('afterbegin', `
-                <div id="adminMicroInteractions">
-                    <div class="emp-profile-card">
-                        <img src="${userImage || getDefaultAvatar()}" class="emp-profile-img" alt="Admin" onerror="this.src='${getDefaultAvatar()}'; this.classList.add('loaded');">
-                        <div><h3 style="margin:0; color:white; font-size:18px;">مرحباً بك يا ${user.name}</h3><p style="margin:0; color:#64748b; font-size:12px;">مدير النظام</p></div>
-                    </div>
-                </div>
-            `);
-            
-            if (userImage) setTimeout(() => updateUserImageInUI(userImage), 100);
-            loadEmployees();
-        } else {
-            $('mainAppTitle').textContent='لوحة الموظف'; $('adminPanel').style.display='none'; $('employeePanel').style.display='block';
-            
-            const existing = document.getElementById('empMicroInteractions'); if(existing) existing.remove();
-            $('employeePanel').insertAdjacentHTML('afterbegin', `
-                <div id="empMicroInteractions">
-                    <div class="emp-profile-card">
-                        <img src="${userImage || getDefaultAvatar()}" class="emp-profile-img" alt="Profile" onerror="this.src='${getDefaultAvatar()}'; this.classList.add('loaded');">
-                        <div><h3 style="margin:0; color:white; font-size:18px;">مرحباً يا ${user.name}</h3><p style="margin:0; color:#64748b; font-size:12px;">${user.code}</p></div>
-                    </div>
-                    <div id="monthlyHoursCard" class="emp-month-hours"><p style="color:#c4b5fd; font-size:13px; margin-bottom:5px;"><i class="fas fa-hourglass-half"></i> إجمالي ساعات العمل هذا الشهر</p><h2 id="monthHoursValue" style="color:white; font-size:28px; margin:0;">...</h2></div>
-                    <div id="overtimeCard" class="overtime-card"><p style="color:#fbbf24; font-size:13px; margin-bottom:5px;"><i class="fas fa-clock"></i> إجمالي الأوفر تايم هذا الشهر</p><h2 id="monthOvertimeValue" style="color:white; font-size:28px; margin:0;">...</h2></div>
-                </div>
-            `);
-            
-            if (userImage) setTimeout(() => updateUserImageInUI(userImage), 100);
-            calculateMonthlyHours();
-        }
-        autoRefreshTimer = setInterval(() => { if(user) refreshData(true); }, AUTO_REFRESH_INTERVAL);
-    }
+async function handleLogin(){const code=$('loginCode').value.trim(),pass=$('loginPass').value.trim();if(!code||!pass)return showToast('يرجى إدخال البيانات','error');setStatus('جاري التحقق...');try{const{data:emp,error}=await db.from('employees').select('*').eq('code',code).eq('password',pass).single();if(!error&&emp){userImage='';user={name:emp.name,code:emp.code,isAdmin:emp.is_admin,isFirstLogin:emp.is_first_login,email:emp.email||''};if($('rememberMe').checked){localStorage.setItem('rememberedUser',JSON.stringify({data:user,timestamp:Date.now()}));localStorage.setItem('axentro_saved_login',JSON.stringify({code,pass}))}else{sessionStorage.setItem('user',JSON.stringify(user));localStorage.removeItem('axentro_saved_login')}if(!emp.is_admin&&emp.is_first_login){$('forcePwModal').classList.add('active');setStatus('النظام جاهز')}else{sessionDescriptor=emp.face_descriptor;if(!sessionDescriptor){firstTimeSetupMode=true;if(!await openCamera()){firstTimeSetupMode=false;logout()}}else{playSound('login-success');await safeUpdateUserImage();showApp();if($('rememberMe').checked&&window.PublicKeyCredential)setTimeout(()=>registerFingerprint(),1000)}}else{playSound('login-error');showToast('بيانات خاطئة','error');setStatus('النظام جاهز')}}catch(e){playSound('login-error');showToast('خطأ في الاتصال','error');setStatus('غير متصل')}}
 
-    async function calculateMonthlyHours() { 
-        try { 
-            const now = new Date(); const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-            const { data } = await db.from('attendance').select('created_at, type, hours_worked, overtime').eq('employee_code', user.code).gte('created_at', startOfMonth);
-            if(data) { 
-                let totalHours = 0, totalOvertime = 0;
-                data.forEach(rec => { 
-                    if(rec.type === 'انصراف' && rec.hours_worked) {
-                        const hours = parseFloat(rec.hours_worked) || 0;
-                        totalHours += hours;
-                        if(rec.overtime && rec.overtime !== '0 دقيقة') totalOvertime += parseFloat(rec.overtime) || 0;
-                    }
-                }); 
-                $('monthHoursValue').textContent = totalHours > 0 ? totalHours.toFixed(2) + ' ساعة' : '0 ساعة';
-                $('monthOvertimeValue').textContent = totalOvertime > 0 ? totalOvertime.toFixed(2) + ' ساعة' : '0 ساعة';
-            }
-        } catch(e) { $('monthHoursValue').textContent = '--'; if($('monthOvertimeValue')) $('monthOvertimeValue').textContent = '--'; } 
-    }
+async function submitFirstPwChange(){const newPw=$('firstNewPw').value.trim();if(!newPw||newPw.length<4)return showToast('كلمة السر ضعيفة','error');setStatus('جاري التغيير...');try{const{error}=await db.from('employees').update({password:newPw,is_first_login:false}).eq('code',user.code);if(!error){$('forcePwModal').classList.remove('active');user.isFirstLogin=false;if($('rememberMe').checked))localStorage.setItem('rememberedUser',JSON.stringify({data:user,timestamp:Date.now()}));else sessionStorage.setItem('user',JSON.stringify(user));showToast('تم تحديث كلمة السر','success');const{data:emp}=await db.from('employees').select('face_descriptor').eq('code',user.code).single();if(emp&&emp.face_descriptor){playSound('login-success');showApp();fetchUserDataInBackground()}else{showToast('الآن سجل بصمة وجهك','success');firstTimeSetupMode=true;if(!await openCamera()){firstTimeSetupMode=false;logout()}}}else throw error}catch(e){playSound('login-error');showToast('خطأ في التحديث','error')}}
 
-    async function loadEmployees() { 
-        try { 
-            const { data: emps } = await db.from('employees').select('code, name, is_admin').not('code', 'eq', 'ADMIN').not('is_admin', 'eq', true).order('created_at', { ascending: true });
-            if(emps) { employees = emps.filter(emp => !emp.is_admin); $('empCount').textContent=employees.length; renderEmployeeList(employees); setStatus('متصل'); }
-        } catch(e) { console.error('Error:', e); setStatus('غير متصل'); } 
-    }
+function logout(){playSound('logout-success');if(autoRefreshTimer)clearInterval(autoRefreshTimer);localStorage.removeItem('rememberedUser');sessionStorage.removeItem('user');user=null;sessionDescriptor=null;userImage='';$('mainApp').style.display='none';$('loginScreen').classList.remove('hidden');setStatus('النظام جاهز')}
 
-    function renderEmployeeList(list) { 
-        if(!list.length) { $('searchResults').innerHTML='<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين</p>'; return; } 
-        $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button><button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}', '${e.name}')" title="إعادة تسجيل بصمة"><i class="fas fa-sync-alt"></i></button><button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${e.code}', '${e.name}')" title="حذف الموظف"><i class="fas fa-trash"></i></button></div></div>`).join(''); 
-    }
-    $('searchInput')?.addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); renderEmployeeList(q ? employees.filter(emp=>emp.name.toLowerCase().includes(q)||emp.code.toLowerCase().includes(q)) : employees); });
+async function refreshData(silent=false){const icon=$('refreshBtn').querySelector('i');icon.style.animation='spin .5s linear';setTimeout(()=>icon.style.animation='',600);if(user?.isAdmin)await loadEmployees();else if(user) fetchUserDataInBackground();if(!silent)showToast('تم التحديث','success')}
 
-    async function adminDirectAtt(type, code, name) {
-        if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
-        adminVerifyMode = true; targetEmpForAdmin = { type, code, name }; attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
-        if(!await openCamera()) { adminVerifyMode=false; showToast('فشل فتح الكاميرا','error'); }
-    }
-    
-    async function adminDeleteEmp(code, name) {
-        if(code === 'ADMIN') { showToast('❌ لا يمكن حذف الأدمن!', 'error'); return; }
-        try {
-            const { data: emp } = await db.from('employees').select('is_admin').eq('code', code).single();
-            if (emp && emp.is_admin) { showToast('❌ لا يمكن حذف أدمن!', 'error'); return; }
-        } catch(e) { console.log('Error:', e); }
-        if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
-        adminVerifyMode = true; targetEmpForAdmin = { type: 'حذف موظف', code, name }; attMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
-        if(!await openCamera()) { adminVerifyMode=false; showToast('فشل فتح الكاميرا','error'); }
-    }
+function showApp(){if(autoRefreshTimer)clearInterval(autoRefreshTimer);$('loginScreen').classList.add('hidden');$('registerScreen').classList.add('hidden');$('mainApp').style.display='block';if(user.isAdmin){$('mainAppTitle').textContent='لوحة تحكم المدير';$('adminPanel').style.display='block';$('employeePanel').style.display='none';showToast('مرحباً بك في لوحة التحكم','success');const existing=document.getElementById('adminMicroInteractions');if(existing)existing.remove();$('adminPanel').insertAdjacentHTML('afterbegin',`<div id="adminMicroInteractions"><div class="emp-profile-card"><img src="${userImage||getDefaultAvatar()}" class="emp-profile-img" alt="Admin" onerror="this.src='${getDefaultAvatar()}';this.classList.add('loaded');"><div><h3 style="margin:0;color:white;font-size:18px;">مرحباً بك يا ${user.name}</h3><p style="margin:0;color:#64748b;font-size:12px;">مدير النظام</p></div></div></div>`);if(userImage)setTimeout(()=>updateUserImageInUI(userImage),100);loadEmployees()}else{$('mainAppTitle').textContent='لوحة الموظف';$('adminPanel').style.display='none';$('employeePanel').style.display='block';const existing=document.getElementById('empMicroInteractions');if(existing)existing.remove();$('employeePanel').insertAdjacentHTML('afterbegin',`<div id="empMicroInteractions"><div class="emp-profile-card"><img src="${userImage||getDefaultAvatar()}" class="emp-profile-img" alt="Profile" onerror="this.src='${getDefaultAvatar()}';this.classList.add('loaded');"><div><h3 style="margin:0;color:white;font-size:18px;">مرحباً يا ${user.name}</h3><p style="margin:0;color:#64748b;font-size:12px;">${user.code}</p></div></div><div id="monthlyHoursCard" class="emp-month-hours"><p style="color:#c4b5fd;font-size:13px;margin-bottom:5px;"><i class="fas fa-hourglass-half"></i> إجمالي ساعات العمل هذا الشهر</p><h2 id="monthHoursValue" style="color:white;font-size:28px;margin:0;">...</h2></div><div id="overtimeCard" class="overtime-card"><p style="color:#fbbf24;font-size:13px;margin-bottom:5px;"><i class="fas fa-clock"></i> إجمالي الأوفر تايم هذا الشهر</p><h2 id="monthOvertimeValue" style="color:white;font-size:28px;margin:0;">...</h2></div></div>`);if(userImage)setTimeout(()=>updateUserImageInUI(userImage),100);calculateMonthlyHours()}autoRefreshTimer=setInterval(()=>{if(user)refreshData(true)},AUTO_REFRESH_INTERVAL)}
 
-    async function handleAttendance(type) {
-        if(!sessionDescriptor) return showToast('بيانات الوجه غير مسجلة', 'error');
-        attMode=true; attType=type; adminVerifyMode=false; regMode=false; updateFaceMode=false; firstTimeSetupMode=false; adminResetFaceMode=false;
-        if(!await openCamera()) { attMode=false; showToast('فشل فتح الكاميرا','error'); }
-        else setStatus('جاري التحقق من الوجه...');
-    }
+async function calculateMonthlyHours(){try{const now=new Date();const startOfMonth=new Date(now.getFullYear(),now.getMonth(),1).toISOString();const{data}=await db.from('attendance').select('created_at,type,hours_worked,overtime').eq('employee_code',user.code).gte('created_at',startOfMonth);if(data){let totalHours=0,totalOvertime=0;data.forEach(rec=>{if(rec.type==='انصراف'&&rec.hours_worked){const hours=parseFloat(rec.hours_worked)||0;totalHours+=hours;if(rec.overtime&&rec.overtime!=='0 دقيقة')totalOvertime+=parseFloat(rec.overtime)||0}});$('monthHoursValue').textContent=totalHours>0?totalHours.toFixed(2)+' ساعة':'0 ساعة';$('monthOvertimeValue').textContent=totalOvertime>0?totalOvertime.toFixed(2)+' ساعة':'0 ساعة'}}catch(e){$('monthHoursValue').textContent='--';if($('monthOvertimeValue'))$('monthOvertimeValue').textContent='--'}}
 
-    let pwChangeMode='';
-    function openChangePwModal(mode) {
-        pwChangeMode=mode; const body=$('changePwBody'); const title=$('changePwTitle');
-        if(mode==='own') {
-            title.textContent='تغيير كلمة السر الخاصة بي';
-            body.innerHTML=`<div class="password-wrapper"><input type="password" id="oldPassword" placeholder="كلمة السر الحالية"><button class="toggle-password" onclick="togglePassword('oldPassword')"><i class="fas fa-eye"></i></button></div><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تحديث</button>`;
-        } else {
-            title.textContent='تغيير كلمة سر موظف';
-            body.innerHTML=`<input type="text" id="targetEmpCode" placeholder="كود الموظف"><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>`;
-        }
-        $('changePwModal').classList.add('active');
-    }
-    function closeChangePwModal() { $('changePwModal').classList.remove('active'); }
-    
-    async function submitChangePassword() {
-        if(pwChangeMode==='own') {
-            const o=$('oldPassword').value.trim(), n=$('newPassword').value.trim();
-            if(!o||!n) return showToast('يرجى ملء الحقول','error');
-            if(!sessionDescriptor) return showToast('لا توجد بصمة مسجلة لك','error');
-            window._pendingPwChange = { code: user.code, oldPassword: o, newPassword: n };
-            closeChangePwModal();
-            attMode = true; attType = 'تغيير كلمة المرور'; adminVerifyMode = false; regMode = false; updateFaceMode = false; firstTimeSetupMode = false; adminResetFaceMode = false;
-            if(!await openCamera()) { attMode=false; showToast('فشل فتح الكاميرا','error'); }
-            return;
-        } else {
-            const c=$('targetEmpCode').value.trim(), n=$('newPassword').value.trim();
-            if(!c||!n) return showToast('يرجى إدخال البيانات','error');
-            if (c === 'ADMIN') { showToast('❌ لا يمكن تغيير كلمة سر الأدمن من هنا!', 'error'); return; }
-            const { error } = await db.from('employees').update({ password: n, is_first_login: false }).eq('code', c);
-            if(!error) { playSound('login-success'); showToast('تم التغيير بنجاح','success'); closeChangePwModal(); }
-            else { playSound('login-error'); showToast('فشل التغيير (تأكد من الكود)','error'); }
-        }
-    }
+async function loadEmployees(){try{const{data:emps}=await db.from('employees').select('code,name,is_admin').not('code','eq','ADMIN').not('is_admin','eq',true).order('created_at',{ascending:true});if(emps){employees=emps.filter(emp=>!emp.is_admin);$('empCount').textContent=employees.length;renderEmployeeList(employees);setStatus('متصل')}}catch(e){console.error('Error:',e);setStatus('غير متصل')}}
 
-    function closeReportModal() { $('reportModal').classList.remove('active'); }
-    
-    async function loadMyReport() { $('reportTitle').textContent=`تقرير ${user.name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(user.code); }
-    async function loadEmpReport(code,name) { $('reportTitle').textContent=`تقرير ${name}`; $('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>'; $('reportModal').classList.add('active'); await fetchAndRenderReport(code); }
-    
-    async function fetchAndRenderReport(code) { 
-        try { 
-            const { data: records } = await db.from('attendance').select('*').eq('employee_code', code).order('created_at', { ascending: false });
-            if(records && records.length>0) { 
-                let totalDays = 0, totalHours = 0, totalOvertime = 0;
-                records.forEach(r => { if(r.type === 'حضور') totalDays++; if(r.hours_worked) totalHours += parseFloat(r.hours_worked) || 0; if(r.overtime && r.overtime !== '0 دقيقة') totalOvertime += parseFloat(r.overtime) || 0; });
+function renderEmployeeList(list){if(!list.length){$('searchResults').innerHTML='<p style="text-align:center;color:#64748b;padding:30px;">لا يوجد موظفين</p>';return}$('searchResults').innerHTML=list.map(e=>`<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور','${e.code}','${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف','${e.code}','${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}','${e.name}')"><i class="fas fa-chart-bar"></i></button><button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}','${e.name}')" title="إعادة تسجيل بصمة"><i class="fas fa-sync-alt"></i></button><button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${e.code}','${e.name}')" title="حذف الموظف"><i class="fas fa-trash"></i></button></div></div>`).join('')}$('searchInput')?.addEventListener('input',(e)=>{const q=e.target.value.toLowerCase();renderEmployeeList(q?employees.filter(emp=>emp.name.toLowerCase().includes(q)||emp.code.toLowerCase().includes(q)):employees)})}
 
-                const summaryHtml = `<div class="report-summary"><div class="summary-item"><h3>${totalDays}</h3><p>أيام الحضور</p></div><div class="summary-item"><h3 style="color: #38bdf8;">${totalHours.toFixed(1)}</h3><p>إجمالي الساعات</p></div><div class="summary-item"><h3 style="color: #f59e0b;">${totalOvertime.toFixed(1)}</h3><p>الأوفر تايم (ساعة)</p></div></div><div style="text-align: center; margin-bottom: 15px;"><button class="btn btn-excel" onclick="exportToExcel('${code}')" style="width: auto; padding: 12px 24px;"><i class="fas fa-file-excel"></i> تصدير Excel</button></div>`;
+async function adminDirectAtt(type,code,name){if(!sessionDescriptor){showToast('لا يوجد بصمة أدمن، جاري التسجيل...','error');firstTimeSetupMode=true;if(!await openCamera()){firstTimeSetupMode=false}return}adminVerifyMode=true;targetEmpForAdmin={type,code,name};attMode=false;regMode=false;updateFaceMode=false;firstTimeSetupMode=false;adminResetFaceMode=false;if(!await openCamera()){adminVerifyMode=false;showToast('فشل فتح الكاميرا','error')}}
 
-                $('reportBody').innerHTML = summaryHtml + `<table class="report-table"><thead><tr><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>الشفت</th><th>الساعات</th><th>الأوفر تايم</th></tr></thead><tbody>${records.map(r => { const dateStr = new Date(r.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' }); const timeStr = formatTime12(new Date(r.created_at)); return `<tr><td style="font-size:12px;">${dateStr}</td><td style="font-size:11px; color:#94a3b8;">${timeStr}</td><td><span class="att-badge ${r.type==='حضور?'att-in':'att-out'}">${r.type}</span></td><td style="font-size:11px;">${r.shift || '-'}</td><td style="font-weight:bold; color:${r.hours_worked?'#38bdf8':'#64748b'}">${r.hours_worked||'-'}</td><td>${r.overtime && r.overtime !== '0 دقيقة' ? `<span class="overtime-badge">${r.overtime}</span>` : '-'}</td></tr>` }).join('')}</tbody></table>`; 
-            } else $('reportBody').innerHTML='<center style="color:#64748b; padding:30px;">لا توجد سجلات.</center>'; 
-        } catch(e) { $('reportBody').innerHTML='<center style="color:#ef4444; padding:20px;">فشل التحميل</center>'; } 
-    }
-    
-    async function exportToExcel(employeeCode) {
-        try {
-            const { data: records } = await db.from('attendance').select('*').eq('employee_code', employeeCode).order('created_at', { ascending: false });
-            if(!records || records.length === 0) { showToast('لا توجد بيانات للتصدير', 'warning'); return; }
-            const excelData = records.map((r, idx) => ({ '#': idx + 1, 'التاريخ': new Date(r.created_at).toLocaleDateString('ar-EG'), 'الوقت': formatTime12(new Date(r.created_at)), 'الحالة': r.type, 'الشفت': r.shift || '-', 'الساعات (ساعة)': r.hours_worked ? parseFloat(r.hours_worked).toFixed(2) : '-', 'الأوفر تايم (ساعة)': r.overtime && r.overtime !== '0 دقيقة' ? parseFloat(r.overtime).toFixed(2) : '0', 'الموقع': r.location_link ? '✓' : '-' }));
-            const ws = XLSX.utils.json_to_sheet(excelData);
-            ws['!cols'] = [{ wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 25 }, { wch: 15 }, { wch: 18 }, { wch: 8 }];
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'تقرير الحضور');
-            const fileName = `تقرير_${employeeCode}_${new Date().toISOString().split('T')[0]}.xlsx`;
-            XLSX.writeFile(wb, fileName);
-            showToast('✅ تم تصدير التقرير!', 'success');
-        } catch(e) { console.error('Export Error:', e); showToast('فشل التصدير', 'error'); }
-    }
-    
-    function showForgotPw() { $('forgotPwModal').classList.add('active'); $('forgotCode').value=''; }
-    function closeForgotPw() { $('forgotPwModal').classList.remove('active'); }
-    
-    async function submitForgotPw() { 
-        const code = $('forgotCode').value.trim(); if(!code) return showToast('يرجى إدخال الكود','error'); 
-        if (code === 'ADMIN') { showToast('❌ لا يمكن استعادة كلمة سر الأدمن!', 'error'); return; }
-        const tempPass = Math.random().toString(36).slice(-8);
-        const { data: emp } = await db.from('employees').select('name, email').eq('code', code).single();
-        const { error } = await db.from('employees').update({ password: tempPass, is_first_login: true }).eq('code', code);
-        if(!error) {
-            try { await db.from('password_resets').insert({ employee_code: code, reset_token: tempPass, used: false, created_at: new Date().toISOString() }); } catch(insertError) { console.log('Insert failed:', insertError); }
-            playSound('login-success'); showToast('تم إعادة تعيين كلمة السر.', 'success'); closeForgotPw();
-            if(emp) fetch(EMAIL_API_URL, { method: 'POST', body: JSON.stringify({ action: 'sendForgotPw', name: emp.name, code, password: tempPass, email: emp.email }) }).catch(e=>{});
-        } else { playSound('login-error'); showToast('الكود غير صحيح','error'); }
-    }
-    
-    function showRegisterScreen() { $('loginScreen').classList.add('hidden'); $('registerScreen').classList.remove('hidden'); }
-    function showLoginScreen() { $('registerScreen').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); }
-    async function startRegistration() { const name = $('regName').value.trim(), email = $('regEmail').value.trim(); if(!name||!email) return showToast('يرجى إدخال البيانات','error'); regData = { name, email }; regMode = true; if(!await openCamera()) { regMode=false; showToast('فشل فتح الكاميرا','error'); } }
+async function adminDeleteEmp(code,name){if(code==='ADMIN'){showToast('❌ لا يمكن حساب الأدمن!','error');return}try{const{data:emp}=await db.from('employees').select('is_admin').eq('code',code).single();if(emp&&emp.isAdmin){showToast('❌ لا يمكن حساب أدمن!','error');return}}catch(e){console.log('Error:',e)}if(!sessionDescriptor){showToast('لا يوجد بصمة أدمن، جاري التسجيل...','error');firstTimeSetupMode=true;if(!await openCamera()){firstTimeSetupMode=false}return}adminVerifyMode=true;targetEmpForAdmin={type:'حذف موظف',code,name};attMode=false;regMode=false;updateFaceMode=false;firstTimeSetupMode=false;adminResetFaceMode=false;if(!await openCamera()){adminVerifyMode=false;showToast('فشل فتح الكاميرا','error')}}
 
-    async function adminResetFace(code, name) {
-        if (code === 'ADMIN') { showToast('❌ لا يمكن إعادة تسجيل بصمة الأدمن!', 'error'); return; }
-        targetEmpForAdmin = { code, name }; adminResetFaceMode = true;
-        regMode = false; attMode = false; updateFaceMode = false; adminVerifyMode = false; firstTimeSetupMode = false;
-        showToast(`جاري فتح الكاميرا لبصمة ${name}`, 'warning');
-        if(!await openCamera()) { adminResetFaceMode = false; showToast('فشل فتح الكاميرا','error'); }
-    }
+async function handleAttendance(type){if(!sessionDescriptor)return showToast('بيانات الوجه غير مسجلة، تواصل مع الأدمن.','error');attMode=true;attType=type;adminVerifyMode=false;regMode=false;updateFaceMode=false;firstTimeSetupMode=false;adminResetFaceMode=false;if(!await openCamera()){attMode=false;showToast('فشل فتح الكاميرا','error')}else setStatus('جاري التحقق من الوجه...')}
 
-    function getLocation() {
-        if(navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(pos => {
-                currentLat = pos.coords.latitude; currentLon = pos.coords.longitude; currentAccuracy = pos.coords.accuracy || 0;
-                currentLoc = `https://maps.google.com/?q=${currentLat},${currentLon}`;
-                $('locBar').innerHTML = `<i class="fas fa-map-marker-alt" style="color:var(--success);"></i> <a href="${currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">الموقع محدد (±${Math.round(currentAccuracy)}م)</a>`;
-            }, () => { $('locBar').innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`; currentLoc='غير متوفر'; currentLat=null; currentLon=null; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-        }
-    }
+let pwChangeMode=''
+function openChangePwMode(mode){pwChangeMode=mode;const body=$('changePwBody'),title=$('changePwTitle');if(mode==='own'){title.textContent='تغيير كلمة السر الخاصة بي';body.innerHTML=`<div class="password-wrapper"><input type="password" id="oldPassword" placeholder="كلمة السر الحالية"><button class="toggle-password" onclick="togglePassword('oldPassword')"><i class="fas fa-eye"></i></button></div><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تحديث</button>`}else{title.textContent='تغيير كلمة سر موظف';body.innerHTML=`<input type="text" id="targetEmpCode" placeholder="كود الموظف"><div class="password-wrapper"><input type="password" id="newPassword" placeholder="كلمة السر الجديدة"><button class="toggle-password" onclick="togglePassword('newPassword')"><i class="fas fa-eye"></i></button></div><button class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>`}$('changePwModal').classList.add('active')}
+function closeChangePwModal(){$('changePwModal').classList.remove('active')}
 
-    function restoreSession() {
-        const savedSessionStr = localStorage.getItem('rememberedUser'), savedTempStr = sessionStorage.getItem('user'), savedLogin = localStorage.getItem('axentro_saved_login');
-        let savedUser = null;
-        if(savedLogin) { try { const ld = JSON.parse(savedLogin); $('loginCode').value = ld.code||''; $('loginPass').value = ld.pass||''; $('rememberMe').checked = true; } catch(e){} }
-        if(savedSessionStr) { try { const s = JSON.parse(savedSessionStr); if(Date.now()-s.timestamp < 10*60*60*1000) { savedUser = s.data; $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block'; } else { localStorage.removeItem('rememberedUser'); } } catch(e) { localStorage.removeItem('rememberedUser'); } }
-        else if(savedTempStr) { try { savedUser = JSON.parse(savedTempStr); $('loginScreen').classList.add('hidden'); $('registerScreen').classList.add('hidden'); $('mainApp').style.display='block'; } catch(e) { sessionStorage.removeItem('user'); } }
-        if(savedUser) { user = savedUser; showApp(); setTimeout(() => fetchUserDataInBackground(), 500); }
-        else setStatus('النظام جاهز');
-    }
+async function submitChangePassword(){if(pwChangeMode==='own'){const o=$('oldPassword').value.trim(),n=$('newPassword').value.trim();if(!o||!n)return showToast('يرجى ملء الحقول','error');if(!sessionDescriptor)return showToast('لا توجد بصمة مسجلة لك','error');window._pendingPwChange={code:user.code,oldPassword:o,newPassword:n};closeChangePwModal();attMode=true;attType='تغيير كلمة المرور';adminVerifyMode=false;regMode=false;updateFaceMode=false;firstTimeSetupMode=false;adminResetFaceMode=false;if(!await openCamera()){attMode=false;showToast('فشل فتح الكاميرا','error')}return}else{const c=$('targetEmpCode').value.trim(),n=$('newPassword').value.trim();if(!c||!n)return showToast('يرجى إدخال البيانات','error');if(c==='ADMIN'){showToast('❌ لا يمكن تغيير كلمة سر الأدمن من هنا!','error');return}const{error}=await db.from('employees').update({password:n,is_first_login:false}).eq('code',c);if(!error){playSound('login-success');showToast('تم التغيير بنجاح','success');closeChangePwModal()}else{playSound('login-error');showToast('فشل التغيير (تأكد من الكود)','error')}}}
 
-    // ✅✅✅ دالة تسجيل بصمة الإصبع ✅✅✅
-    async function registerFingerprint() { 
-        try { 
-            if(!window.PublicKeyCredential) { console.log('WebAuthn not supported'); return; }
-            const challenge = new Uint8Array(32); crypto.getRandomValues(challenge); 
-            const credential = await navigator.credentials.create({ 
-                publicKey: { challenge, rp:{ name:"Axentro System" }, user:{ id:new Uint8Array(16), name:user.code, displayName:user.name }, pubKeyCredParams:[{alg:-7,type:"public-key"},{alg:-257,type:"public-key"}], authenticatorSelection:{ authenticatorAttachment:"platform", userVerification:"required" }, timeout:60000 } 
-            }); 
-            if(credential) { 
-                localStorage.setItem('axentro_fp_id', bufferToBase64(credential.rawId)); 
-                showToast('✅ تم تسجيل بصمة الإصبع!','success');
-                $('fingerprintLoginBtn').style.display = 'flex';
-            }
-        } catch(e) { console.log('Fingerprint registration error:', e); } 
-    }
+function closeReportModal(){$('reportModal').classList.remove('active')}
 
-    // ✅✅✅ دالة الدخول ببصمة الإصبع ✅✅✅
-    async function loginWithFingerprint() {
-        const savedFpId = localStorage.getItem('axentro_fp_id'), savedLogin = localStorage.getItem('axentro_saved_login');
-        if(!savedFpId || !savedLogin) { 
-            showToast('⚠️ سجل دخولك عادياً وفعّل "تذكرني" أولاً','warning'); 
-            return; 
-        }
-        try { 
-            setStatus('جاري التحقق من البصمة...'); 
-            const challenge = new Uint8Array(32); crypto.getRandomValues(challenge); 
-            const assertion = await navigator.credentials.get({ publicKey: { challenge, allowCredentials:[{ id:base64ToBuffer(savedFpId), type:'public-key' }], userVerification:"required" } }); 
-            if(assertion) { 
-                setStatus('جاري التحقق...'); 
-                const loginData = JSON.parse(savedLogin); 
-                const { data: emp, error } = await db.from('employees').select('*').eq('code', loginData.code).eq('password', loginData.pass).single();
-                if(!error && emp) { 
-                    userImage = '';
-                    user = { name: emp.name, code: emp.code, isAdmin: emp.is_admin, isFirstLogin: emp.is_first_login }; 
-                    localStorage.setItem('rememberedUser', JSON.stringify({ data:user, timestamp:Date.now() })); 
-                    sessionDescriptor = emp.face_descriptor;
-                    if(!sessionDescriptor) { firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; logout(); } }
-                    else { 
-                        playSound('login-success'); 
-                        await safeUpdateUserImage();
-                        showApp(); 
-                    }
-                } else { playSound('login-error'); showToast('فشل التحقق (بيانات تغيرت)','error'); setStatus('النظام جاهز'); }
-            } 
-        } catch(e) { 
-            if(e.name==='NotAllowedError') showToast('تم إلغاء البصمة','error'); 
-            else showToast('فشل التحقق من البصمة','error'); 
-            setStatus('النظام جاهز'); 
-        } 
-    }
+async function loadMyReport(){$('reportTitle').textContent=`تقرير ${user.name}`;$('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>';$('reportModal').classList.add('active');await fetchAndRenderReport(user.code)}
 
-    // ✅✅✅ تهيئة التطبيق - تفعيل زر البصمة ✅✅✅
-    function init() {
-        restoreSession(); 
-        loadModelsAsync(); 
-        getLocation();
-        
-        document.addEventListener('click', unlockAudio, { once: true });
-        document.addEventListener('touchstart', unlockAudio, { once: true });
-        
-        window.addEventListener('online', () => { isOnline = true; $('connDot').classList.remove('offline'); $('connDot').classList.add('online'); setStatus('متصل'); });
-        window.addEventListener('offline', () => { isOnline = false; $('connDot').classList.remove('online'); $('connDot').classList.add('offline'); setStatus('غير متصل'); showToast('أنت غير متصل بالإنترنت', 'warning'); });
-        
-        document.addEventListener('DOMContentLoaded',()=>{
-            // ✅✅✅ تفعيل زر بصمة الإصبع ✅✅✅
-            if(window.PublicKeyCredential) {
-                $('fingerprintLoginBtn').style.display = 'flex';
-                if(localStorage.getItem('axentro_fp_id')) {
-                    $('fingerprintLoginBtn').innerHTML = '<i class="fas fa-fingerprint"></i> تسجيل الدخول ببصمة الإصبع ✓';
-                }
-            }
-            
-            $('loginCode')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); $('loginPass').focus(); } });
-            $('loginPass')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); handleLogin(); } });
-            $('forgotCode')?.addEventListener('keydown',e=>{ if(e.key==='Enter') { e.preventDefault(); submitForgotPw(); } });
-        });
-    }
-    
-    // تشغيل التطبيق
-    init();
+async function loadEmpReport(code,name){$('reportTitle').textContent=`تقرير ${name}`;$('reportBody').innerHTML='<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>';$('reportModal').classList.add('active');await fetchAndRenderReport(code)}
+
+async function fetchAndRenderReport(code){try{const{data:records}=await db.from('attendance').select('*').eq('employee_code',code).order('created_at',{ascending:false});if(records&&records.length>0){let totalDays=0,totalHours=0,totalOvertime=0;records.forEach(r=>{if(r.type==='حضور')totalDays++;if(r.hours_worked)totalHours+=parseFloat(r.hours_worked)||0;if(r.overtime&&r.overtime!=='0 دقيقة')totalOvertime+=parseFloat(r.overtime)||0});const summaryHtml=`<div class="report-summary"><div class="summary-item"><h3>${totalDays}</h3><p>أيام الحضور</p></div><div class="summary-item"><h3 style="color:#38bdf8;">${totalHours.toFixed(1)}</h3><p>إجمالي الساعات</p></div><div class="summary-item"><h3 style="color:#f59e0b;">${totalOvertime.toFixed(1)}</h3><p>الأوفر تايم (ساعة)</p></div></div><div style="text-align:center;margin-bottom:15px;"><button class="btn btn-excel" onclick="exportToExcel('${code}')" style="width:auto;padding:12px 24px;"><i class="fas fa-file-excel"></i> تصدير Excel</button></div>`;$('reportBody').innerHTML=summaryHtml+`<table class="report-table"><thead><tr><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>الشفت</th><th>الساعات</th><th>الأوفر تايم</th></tr></thead><tbody>${records.map(r=>{const dateStr=new Date(r.created_at).toLocaleDateString('ar-EG',{year:'numeric',month:'2-digit',day:'2-digit'});const timeStr=formatTime12(new Date(r.created_at));return`<tr><td style="font-size:12px;">${dateStr}</td><td style="font-size:11px;color:#94a3b8;">${timeStr}</td><td><span class="att-badge ${r.type==='حضور'?'att-in':'att-out'}">${r.type}</span></td><td style="font-size:11px;">${r.shift||'-'}</td><td style="font-weight:bold;color:${r.hours_worked?'#38bdf8':'#64748b'}">${r.hours_worked||'-'}</td><td>${r.overtime&&r.overtime!=='0 دقيقة'?`<span class="overtime-badge">${r.overtime}</span>`:'-'}</td></tr>`}).join('')}</tbody></table>`}else{$('reportBody').innerHTML='<center style="color:#64748b;padding:30px;">لا توجد سجلات.</center>'}}catch(e){console.error('Error:',e);$('reportBody').innerHTML='<center style="color:#ef4444;padding:20px;">فشل التحميل</center>'}>}
+
+async function exportToExcel(employeeCode){try{const{data:records}=await db.from('attendance').select('*').eq('employee_code',employeeCode).order('created_at',{ascending:false});if(!records||records.length===0){showToast('لا توجد بيانات للتصدير','warning');return}const excelData=records.map((r,idx)=>({'#':idx+1,'التاريخ':new Date(r.created_at).toLocaleDateString('ar-EG'),'الوقت':formatTime12(new Date(r.created_t)),'الحالة':r.type,'الشفت':r.shift||'-','الساعات (ساعة)':r.hours_worked?parseFloat(r.hours_worked).toFixed(2()):'-','الأوفر تايم (ساعة)':r.overtime&&r.overtime!=='0 دقيقة'?parseFloat(r.overtime).toFixed(2()):'0','الموقع':r.location_url?'✓':'-'})});const ws=XLSX.utils.json_to_sheet(excelData);ws['!cols']=[{wch:5},{wch:12},{wch:10},{wch:10},{wch:25},{wch:15},{wch:18},{wch:8}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'تقرير الحضور');const fileName=`تقرير_${employeeCode}_${new Date().toISOString().split('T')[0]}.xlsx`;XLSX.writeFile(wb,fileName);showToast('✅ تم تصدير التقرير!','success')}catch(e){console.error('Export Error:',e);showToast('فشل التصدير','error')}}
+
+function showForgotPw(){$('forgotPwModal').classList.add('active');$('forgotCode').value=''}
+function closeForgotPw(){$('forgotPwModal').classList.remove('active')}
+
+async function submitForgotPw(){const code=$('forgotCode').value.trim();if(!code)return showToast('يرجى إدخال الكود','error');if(code==='ADMIN'){showToast('❌ لا يمكن استعادة كلمة سر الأدمن!','error');return}const tempPass=Math.random().toString(36).slice(-8);const{data:emp}=await db.from('employees').select('name,email').eq('code',code).single();const{error}=await db.from('employees').update({password:tempPass,is_first_login:true}).eq('code',code);if(!error){try{await db.from('password_resets').insert({employee_code:code,reset_token:tempPass,used:false,created_at:new Date().toISOString()})}catch(insertError){console.log('Insert failed:',insertError)}playSound('login-success');showToast('تم إعادة تعيين كلمة السر.','success');closeForgotPw();if(emp)fetch(EMAIL_API_URL,{method:'POST',body:JSON.stringify({action:'sendForgotPw',name:emp.name,code,password:tempPass,email:emp.email})}).catch(e=>{})}else{playSound('login-error');showToast('الكود غير صحيح','error')}}
+
+function showRegisterScreen(){$('loginScreen').classList.add('hidden');$('registerScreen').classList.remove('hidden')}
+function showLoginScreen(){$('registerScreen').classList.add('hidden');$('loginScreen').classList.remove('hidden')}
+async function startRegistration(){const name=$('regName').value.trim(),email=$('regEmail').value.trim();if(!name||!email)return showToast('يرجى إدخال البيانات','error');regData={name,email};regMode=true;if(!await openCamera()){regMode=false;showToast('فشل فتح الكاميرا','error')}}
+
+async function adminResetFace(code,name){if(code==='ADMIN'){showToast('❌ لا يمكن إعادة تسجيل بصمة الأدمن!','error');return}targetEmpForAdmin={code,name};adminResetFaceMode=true;regMode=false;attMode=false;updateFaceMode=false;adminVerifyMode=false;firstTimeSetupMode=false;showToast(`جاري فتح الكاميرا لبصمة ${name}`,'warning');if(!await openCamera()){adminResetFaceMode=false;showToast('فشل فتح الكاميرا','error')}}
+
+function getLocation(){if(navigator.geolocation){navigator.geolocation.getCurrentPosition(pos=>{currentLat=pos.coords.latitude;currentLon=pos.coords.longitude;currentAccuracy=pos.coords.accuracy||0;currentLoc=`https://maps.google.com/?q=${currentLat},${currentLon}`;$('locBar').innerHTML=`<i class="fas fa-map-marker-alt" style="color:var(--success);"></i> <a href="${currentLoc}" target="_blank" style="color:#38bdf8;text-decoration:none;">الموقع محدد (±${Math.round(currentAccuracy)}م)</a>`},()=>{$('locBar').innerHTML=`<i class="fas fa-exclamation-triangle" style="color:var(--warning);"></i> <span style="color:#94a3b8;">تعذر تحديد الموقع</span>`;currentLoc='غير متوفر';currentLat=null;currentLon=null},{enableHighAccuracy:true,timeout:15000,maximumAge:0})}}
+
+function restoreSession(){const savedSessionStr=localStorage.getItem('rememberedUser'),savedTempStr=sessionStorage.getItem('user'),savedLogin=localStorage.getItem('axentro_saved_login');let savedUser=null;if(savedLogin){try{const ld=JSON.parse(savedLogin);$('loginCode').value=ld.code||'';$('loginPass').value=ld.pass||'';$('rememberMe').checked=true}catch(e){}}if(savedSessionStr){try{const s=JSON.parse(savedSessionStr);if(Date.now()-s.timestamp<10*60*60*1000){savedUser=s.data;$('loginScreen').classList.add('hidden');$('registerScreen').classList.add('hidden');$('mainApp').style.display='block'}else{localStorage.removeItem('rememberedUser')}}catch(e){localStorage.removeItem('rememberedUser')}}else if(savedTempStr){try{savedUser=JSON.parse(savedTempStr);$('loginScreen').classList.add('hidden');$('registerScreen').classList.add('hidden');$('mainApp').style.display='block'}catch(e){sessionStorage.removeItem('user')}}if(savedUser){user=showApp();setTimeout(()=>fetchUserDataInBackground(),500)}else setStatus('النظام جاهز')}
+
+async function registerFingerprint(){try{if(!window.PublicKeyCredential){console.log('WebAuthn not supported');return}const challenge=new Uint8Array(32);crypto.getRandomValues(challenge);const credential=await navigator.credentials.create({publicKey:{challenge,rp:{name:"Axentro System"},user:{id:new Uint8Array(16),name:user.code,displayName:user.name},pubKeyCredParams:[{alg:-7,type:"public-key"},{alg:-257,type:"public-key"}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required"},timeout:60000}});if(credential){localStorage.setItem('axentro_fp_id',bufferToBase64(credential.rawId));showToast('✅ تم تسجيل بصمة الإصبع!','success');$('fingerprintLoginBtn').style.display='flex'}}catch(e){console.log('Fingerprint registration error:',e)}}
+
+async function loginWithFingerprint(){const savedFpId=localStorage.getItem('axentro_fp_id'),savedLogin=localStorage.getItem('axentro_saved_login');if(!savedFpId||!savedLogin){showToast('⚠️ سجل دخولك عادياً وفعّل "تذكرني" أولاً','warning');return}try{setStatus('جاري التحقق من البصمة...');const challenge=new Uint8Array(32);crypto.getRandomValues(challenge);const assertion=await navigator.credentials.get({publicKey:{challenge,allowCredentials:[{id:base64ToBuffer(savedFpId),type:'public-key'}],userVerification:"required"}});if(assertion){setStatus('جاري التحقق...');const loginData=JSON.parse(savedLogin);const{data:emp,error}=await db.from('employees').select('*').eq('code',loginData.code).eq('password',loginData.pass).single();if(!error&&emp){userImage='';user={name:emp.name,code:emp.code,isAdmin:emp.is_admin,isFirstLogin:emp.is_first_login};localStorage.setItem('rememberedUser',JSON.stringify({data:user,timestamp:Date.now()}));sessionDescriptor=emp.face_descriptor;if(!sessionDescriptor){firstTimeSetupMode=true;if(!await openCamera()){firstTimeSetupMode=false;logout()}}else{playSound('login-success');await safeUpdateUserImage();showTask()}}else{playSound('login-error');showToast('فشل التحقق (بيانات تغيرت)','error');setStatus('النظام جاهز')}}catch(e){if(e.name==='NotAllowedError')showToast('تم إلغاء البصمة','error');else showToast('فشل التحقق من البصمة','error');setStatus('النظام جاهز')}}
+
+function init(){restoreSession();loadModelsAsync();getLocation();document.addEventListener('click',unlockAudio,{once:true});document.addEventListener('touchstart',unlockAudio,{once:true});window.addEventListener('online',()=>{isOnline=true;$('connDot').classList.remove('offline');$('connDot').classList.add('online');setStatus('متصل')});window.addEventListener('offline',()=>{isOnline=false;$('connDot').classList.remove('online');$('connDot').classList.add('offline');setStatus('غير متصل');showToast('أنت غير متصل بالإنترنت','warning')});document.addEventListener('DOMContentLoaded',()=>{if(window.PublicKeyCredential){$('fingerprintLoginBtn').style.display='flex';if(localStorage.getItem('axentro_fp_id')){$('fingerprintLoginBtn').innerHTML='<i class="fas fa-fingerprint"></i> تسجيل الدخول ببصمة الإصبع ✓'}}$('loginCode')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('loginPass').focus()}});$('loginPass')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();handleLogin()}});$('forgotCode')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submitForgotPw()}})})}
+init();
 </script>
 </body>
 </html>
