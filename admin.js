@@ -1,23 +1,20 @@
 /**
  * ============================================
- * ⏰ AXENTRO ATTENDANCE MANAGER v4.0
- * ✅ Check-in/Check-out & Time Tracking
+ * 👨‍💼 AXENTRO ADMIN MANAGER v4.0
+ * ✅ System Administration & Employee Management
  * ============================================
  */
 
-class AttendanceManager {
+class AdminManager {
     constructor() {
-        this.currentStatus = null; // 'in' or 'out'
-        this.todayRecords = [];
-        this.lastCheckIn = null;
-        this.lastCheckOut = null;
-        this.isProcessing = false;
-        
-        // Cooldown tracking
-        this.lastActionTime = 0;
-        
-        // Location data
-        this.currentLocation = null;
+        this.employees = [];
+        this.selectedEmployee = null;
+        this.filters = {
+            search: '',
+            status: 'all',
+            sortBy: 'created_at',
+            sortOrder: 'desc'
+        };
         
         this.init();
     }
@@ -27,587 +24,655 @@ class AttendanceManager {
     // ============================================
 
     /**
-     * Initialize attendance manager
+     * Initialize admin manager
      */
     init() {
-        console.log('⏰ Attendance Manager initialized');
+        console.log('👨‍💼 Admin Manager initialized');
+        
+        // Only initialize if user is admin
+        if (auth.isAdmin()) {
+            this.setupAdminFeatures();
+        }
+    }
+
+    /**
+     * Setup admin-specific features and UI
+     */
+    setupAdminFeatures() {
+        console.log('✅ Admin features enabled');
+        
+        // Add admin panel button to header (if not exists)
+        this.addAdminPanelButton();
+        
+        // Load initial data
+        this.loadDashboardStats();
+    }
+
+    /**
+     * Add admin panel access button
+     */
+    addAdminPanelButton() {
+        const headerActions = document.querySelector('.header-actions');
+        if (!headerActions || document.getElementById('adminPanelBtn')) return;
+
+        const adminBtn = document.createElement('button');
+        adminBtn.id = 'adminPanelBtn';
+        adminBtn.className = 'icon-btn warning';
+        adminBtn.title = 'لوحة التحكم';
+        adminBtn.innerHTML = '<i class="fas fa-user-shield"></i>';
+        adminBtn.addEventListener('click', () => this.openAdminPanel());
+        
+        headerActions.insertBefore(adminBtn, headerActions.firstChild);
     }
 
     // ============================================
-    // 📍 LOCATION TRACKING
+    // 📊 DASHBOARD STATISTICS
     // ============================================
 
     /**
-     * Get current location
-     * @returns {Promise<object>} Location data
+     * Load dashboard statistics for admin view
      */
-    async getCurrentLocation() {
+    async loadDashboardStats() {
         try {
-            const location = await Utils.getLocation({
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            });
+            const [totalEmployees, todayRecords] = await Promise.all([
+                db.getEmployeesCount(),
+                db.getTodayAttendance('ADMIN') // Get all records for admin
+            ]);
 
-            this.currentLocation = location;
+            // Update stats display
+            ui.animateStatValue('totalEmployeesStat', totalEmployees);
 
-            // Update UI
-            const statusEl = document.getElementById('locationStatus');
-            if (statusEl) {
-                statusEl.textContent = `📍 دقة: ${Math.round(location.accuracy)}م`;
-                statusEl.classList.add('text-success');
-            }
-
-            return location;
+            console.log(`📊 Dashboard: ${totalEmployees} employees`);
 
         } catch (error) {
-            console.error('Location error:', error);
+            console.error('Load dashboard stats error:', error);
+        }
+    }
+
+    // ============================================
+    // 👥 EMPLOYEE MANAGEMENT
+    // ============================================
+
+    /**
+     * Load all employees list
+     */
+    async loadEmployees() {
+        try {
+            ui.showElementLoading('#employeesListContainer', 'جاري تحميل الموظفين...');
             
-            const statusEl = document.getElementById('locationStatus');
-            if (statusEl) {
-                statusEl.textContent = '❌ تعذر تحديد الموقع';
-                statusEl.classList.add('text-danger');
-            }
-
-            return null;
-        }
-    }
-
-    /**
-     * Generate Google Maps link from current location
-     * @returns {string|null} Maps URL or null
-     */
-    getLocationLink() {
-        if (!this.currentLocation) return null;
-
-        return Utils.getMapsLink(
-            this.currentLocation.latitude,
-            this.currentLocation.longitude
-        );
-    }
-
-    // ============================================
-    // 📊 TODAY'S RECORDS
-    // ============================================
-
-    /**
-     * Load today's attendance records for current user
-     */
-    async loadTodayRecords() {
-        try {
-            if (!auth.isAuthenticated()) return;
-
-            const userCode = auth.getUserCode();
-            this.todayRecords = await db.getTodayAttendance(userCode);
-
-            // Determine current status
-            this.determineCurrentStatus();
-
-            // Update UI
-            this.updateTodaySummary();
-
-            console.log(`📋 Loaded ${this.todayRecords.length} today's records`);
+            this.employees = await db.getAllEmployees();
+            
+            this.renderEmployeesList();
+            
+            ui.hideElementLoading('#employeesListContainer');
 
         } catch (error) {
-            console.error('Load today records error:', error);
+            console.error('Load employees error:', error);
+            ui.showError('فشل تحميل قائمة الموظفين');
         }
     }
 
     /**
-     * Determine current check-in/check-out status
+     * Filter and sort employees based on current filters
+     * @returns {Array} Filtered and sorted employees
      */
-    determineCurrentStatus() {
-        if (this.todayRecords.length === 0) {
-            this.currentStatus = 'out';
-            this.lastCheckIn = null;
-            this.lastCheckOut = null;
+    getFilteredEmployees() {
+        let filtered = [...this.employees];
+
+        // Apply search filter
+        if (this.filters.search) {
+            const searchTerm = this.filters.search.toLowerCase();
+            filtered = filtered.filter(emp => 
+                emp.name.toLowerCase().includes(searchTerm) ||
+                emp.code.toLowerCase().includes(searchTerm) ||
+                (emp.email && emp.email.toLowerCase().includes(searchTerm))
+            );
+        }
+
+        // Apply status filter
+        switch (this.filters.status) {
+            case 'active':
+                filtered = filtered.filter(emp => !emp.is_deleted);
+                break;
+            case 'deleted':
+                filtered = filtered.filter(emp => emp.is_deleted);
+                break;
+            case 'admins':
+                filtered = filtered.filter(emp => emp.is_admin);
+                break;
+        }
+
+        // Apply sorting
+        filtered = Utils.sortBy(filtered, this.filters.sortBy, this.filters.sortOrder);
+
+        return filtered;
+    }
+
+    /**
+     * Render employees list in UI
+     */
+    renderEmployeesList() {
+        const container = document.getElementById('employeesList');
+        if (!container) return;
+
+        const filtered = this.getFilteredEmployees();
+
+        if (filtered.length === 0) {
+            ui.showEmptyState(container, 'لا يوجد موظفون', 'fas fa-users');
             return;
         }
 
-        // Sort by time (newest first)
-        const sortedRecords = [...this.todayRecords].sort(
-            (a, b) => new Date(b.created_at) - new Date(a.created_at)
-        );
-
-        const lastRecord = sortedRecords[0];
-
-        if (lastRecord.type === 'حضور') {
-            this.currentStatus = 'in';
-            this.lastCheckIn = lastRecord;
-            this.lastCheckOut = sortedRecords.find(r => r.type === 'انصراف') || null;
-        } else {
-            this.currentStatus = 'out';
-            this.lastCheckIn = sortedRecords.find(r => r.type === 'حضور') || null;
-            this.lastCheckOut = lastRecord;
-        }
-    }
-
-    /**
-     * Update UI with today's summary
-     */
-    updateTodaySummary() {
-        // Update times
-        const checkInTimeEl = document.getElementById('checkInTime');
-        const checkOutTimeEl = document.getElementById('checkOutTime');
-
-        if (checkInTimeEl && this.lastCheckIn) {
-            checkInTimeEl.textContent = Utils.formatDate(this.lastCheckIn.created_at, 'time');
-        }
-
-        if (checkOutTimeEl && this.lastCheckOut) {
-            checkOutTimeEl.textContent = Utils.formatDate(this.lastCheckOut.created_at, 'time');
-        }
-
-        // Calculate total hours and overtime
-        let totalHours = 0;
-        let overtimeHours = 0;
-
-        this.todayRecords.forEach(record => {
-            const hours = parseFloat(record.hours_worked) || 0;
-            totalHours += hours;
-
-            const overtimeMatch = record.overtime?.match(/[\d.]+/);
-            if (overtimeMatch) {
-                overtimeHours += parseFloat(overtimeMatch[0]);
-            }
+        container.innerHTML = filtered.map(emp => this.createEmployeeCard(emp)).join('');
+        
+        // Attach event listeners
+        container.querySelectorAll('.employee-card').forEach(card => {
+            card.addEventListener('click', () => this.selectEmployee(card.dataset.code));
         });
-
-        // Update display
-        const totalHoursEl = document.getElementById('totalHoursToday');
-        const overtimeEl = document.getElementById('overtimeToday');
-        const todayHoursEl = document.getElementById('todayHours');
-
-        if (totalHoursEl) {
-            totalHoursEl.textContent = Utils.formatHoursWorked(totalHours);
-        }
-
-        if (overtimeEl) {
-            overtimeEl.textContent = overtimeHours > 0 
-                ? `${overtimeHours.toFixed(1)} ساعة` 
-                : 'لا يوجد';
-        }
-
-        if (todayHoursEl) {
-            todayHoursEl.textContent = totalHours.toFixed(1);
-        }
-
-        // Update action buttons state
-        this.updateActionButtons();
     }
 
     /**
-     * Update action buttons based on current status
+     * Create employee card HTML
+     * @param {object} emp - Employee data
+     * @returns {string} HTML string
      */
-    updateActionButtons() {
-        const checkInBtn = document.getElementById('checkInBtn');
-        const checkOutBtn = document.getElementById('checkOutBtn');
+    createEmployeeCard(emp) {
+        const statusClass = emp.is_deleted ? 'deleted' : '';
+        const adminBadge = emp.is_admin ? '<span class="badge badge-admin">👨‍💼 أدمن</span>' : '';
+        const firstLoginBadge = emp.is_first_login ? '<span class="badge badge-warning">جديد</span>' : '';
 
-        if (!checkInBtn || !checkOutBtn) return;
-
-        if (this.currentStatus === 'in') {
-            // User is checked in - show checkout button active
-            checkInBtn.disabled = true;
-            checkInBtn.classList.add('disabled');
-            checkOutBtn.disabled = false;
-            checkOutBtn.classList.remove('disabled');
-            
-            checkInBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>✓ تم الحضور</span>';
-            checkOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span>انصراف</span>';
-
-        } else {
-            // User is checked out - show checkin button active
-            checkInBtn.disabled = false;
-            checkInBtn.classList.remove('disabled');
-            checkOutBtn.disabled = true;
-            checkOutBtn.classList.add('disabled');
-            
-            checkInBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>حضور</span>';
-            checkOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span>✓ تم الانصراف</span>';
-        }
-    }
-
-    // ============================================
-    // ✅ CHECK-IN / CHECK-OUT OPERATIONS
-    // ============================================
-
-    /**
-     * Handle check-in action
-     */
-    async handleCheckIn() {
-        await this.recordAttendance('حضور');
-    }
-
-    /**
-     * Handle check-out action
-     */
-    async handleCheckOut() {
-        await this.recordAttendance('انصراف');
-    }
-
-    /**
-     * Record attendance (main function)
-     * @param {string} type - 'حضور' or 'انصراف'
-     */
-    async recordAttendance(type) {
-        // Prevent double-clicks
-        if (this.isProcessing) {
-            ui.showWarning('جاري المعالجة... يرجى الانتظار');
-            return;
-        }
-
-        // Check cooldown
-        if (this.isOnCooldown()) {
-            ui.showError(ErrorCodes.ATTENDANCE_COOLDOWN_ACTIVE.message);
-            return;
-        }
-
-        // Validate user is authenticated
-        if (!auth.isAuthenticated()) {
-            ui.showError(ErrorCodes.AUTH_SESSION_EXPIRED.message);
-            ui.navigateTo('loginPage');
-            return;
-        }
-
-        // Validate shift selection
-        const selectedShift = this.getSelectedShift();
-        if (!selectedShift) {
-            ui.showError(ErrorCodes.ATTENDANCE_NO_SHIFT_SELECTED.message);
-            return;
-        }
-
-        // Check if opposite action already exists
-        if (type === 'حضور' && this.currentStatus === 'in') {
-            ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_IN.message);
-            return;
-        }
-
-        if (type === 'انصراف' && this.currentStatus === 'out') {
-            ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_OUT.message);
-            return;
-        }
-
-        // Start processing
-        this.isProcessing = true;
-        const btnId = type === 'حضور' ? 'checkInBtn' : 'checkOutBtn';
-        const btn = document.getElementById(btnId);
-
-        ui.showButtonLoading(btn, type === 'حضور' ? 'جاري تسجيل الحضور...' : 'جاري تسجيل الانصراف...');
-
-        try {
-            // Step 1: Recognize face (if camera available)
-            let recognizedFace = null;
-            if (faceRecognition.isCameraRunning()) {
-                try {
-                    recognizedFace = await faceRecognition.recognizeForAttendance();
-                    
-                    // Verify recognized face matches logged in user
-                    if (recognizedFace && recognizedFace.code !== auth.getUserCode()) {
-                        throw new Error('الوجه لا يتطابق مع المستخدم المسجل');
+        return `
+            <div class="employee-card ${statusClass}" data-code="${emp.code}">
+                <div class="employee-avatar">
+                    ${emp.profile_image_url 
+                        ? `<img src="${emp.profile_image_url}" alt="${emp.name}">`
+                        : `<i class="fas fa-user"></i>`
                     }
-                } catch (faceError) {
-                    console.warn('Face recognition failed, continuing...', faceError);
-                    // Continue without face recognition (optional based on requirements)
-                }
-            }
-
-            // Step 2: Get location
-            await this.getCurrentLocation();
-            const locationLink = this.getLocationLink();
-
-            // Step 3: Calculate hours worked (for check-out)
-            let hoursWorked = null;
-            let overtime = null;
-
-            if (type === 'انصراف' && this.lastCheckIn) {
-                const checkInTime = new Date(this.lastCheckIn.created_at);
-                const now = new Date();
-                const diff = Utils.calculateTimeDifference(checkInTime, now);
-                
-                hoursWorked = diff.totalHours.toFixed(2);
-                
-                // Calculate overtime
-                const overtimeCalc = Utils.calculateOvertime(
-                    parseFloat(hoursWorked),
-                    AppConfig.attendance.normalHours
-                );
-                
-                overtime = overtimeCalc.hasOvertime 
-                    ? `${overtimeCalc.overtimeHours} ساعة` 
-                    : 'لا يوجد';
-            }
-
-            // Step 4: Capture image (if camera available)
-            let imageUrl = null;
-            if (faceRecognition.currentVideoElement && faceRecognition.canvasElement) {
-                try {
-                    const photo = faceRecognition.capturePhoto(
-                        faceRecognition.currentVideoElement,
-                        faceRecognition.canvasElement
-                    );
-                    
-                    // Compress image
-                    const compressedImage = await Utils.compressImage(photo.base64, 640, 0.7);
-                    
-                    // Upload to storage
-                    imageUrl = await db.uploadFaceImage(compressedImage, `${auth.getUserCode()}_${type}`);
-                } catch (imgError) {
-                    console.warn('Image capture failed:', imgError);
-                }
-            }
-
-            // Step 5: Prepare attendance record
-            const attendanceData = {
-                employee_code: auth.getUserCode(),
-                employee_name: auth.getUserName(),
-                type: type,
-                locationLink: locationLink,
-                shift: selectedShift,
-                hoursWorked: hoursWorked,
-                overtime: overtime,
-                gpsAccuracy: this.currentLocation?.accuracy,
-                imageUrl: imageUrl
-            };
-
-            // Step 6: Save to database
-            const result = await db.recordAttendance(attendanceData);
-
-            if (result.success) {
-                // Success!
-                this.onAttendanceSuccess(type, result.record);
-                
-            } else {
-                throw new Error(result.error || 'فشل تسجيل الحضور');
-            }
-
-        } catch (error) {
-            console.error(`${type} error:`, error);
-            this.onAttendanceError(error, type);
-            
-        } finally {
-            this.isProcessing = false;
-            ui.hideButtonLoading(btn);
-            
-            // Set cooldown
-            this.lastActionTime = Date.now();
-        }
-    }
-
-    /**
-     * Handle successful attendance recording
-     * @param {string} type - Attendance type
-     * @param {object} record - Saved record
-     */
-    onAttendanceSuccess(type, record) {
-        // Play success feedback
-        ui.playSuccessFeedback();
-        
-        // Show success message
-        const message = type === 'حضور' 
-            ? SuccessMessages.CHECK_IN_SUCCESS 
-            : SuccessMessages.CHECK_OUT_SUCCESS;
-        
-        ui.showSuccess(message);
-
-        // Add to local records
-        this.todayRecords.push(record);
-        
-        // Update status
-        this.determineCurrentStatus();
-        this.updateTodaySummary();
-
-        // If check-out completed, show summary modal
-        if (type === 'انصراف') {
-            setTimeout(() => {
-                this.showCheckoutSummary(record);
-            }, 1000);
-        }
-    }
-
-    /**
-     * Handle attendance error
-     * @param {Error} error - Error object
-     * @param {string} type - Attempted type
-     */
-    onAttendanceError(error, type) {
-        ui.playErrorFeedback();
-        ui.showError(error.message || 'فشل في العملية');
-        
-        console.error(`Attendance ${type} error:`, error);
-    }
-
-    /**
-     * Show checkout summary modal
-     * @param {object} record - Checkout record
-     */
-    async showCheckoutSummary(record) {
-        const hours = parseFloat(record.hours_worked) || 0;
-        const overtimeInfo = Utils.calculateOvertime(hours);
-
-        await ui.showConfirmation({
-            title: '✅ ملخص اليوم',
-            message: `
-                <div style="text-align: center;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">⏰</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;">
-                        <div>
-                            <small style="color: var(--text-muted);">إجمالي الساعات</small>
-                            <h3 style="color: var(--primary-400);">${Utils.formatHoursWorked(hours)}</h3>
-                        </div>
-                        <div>
-                            <small style="color: var(--text-muted);">الأوفر تايم</small>
-                            <h3 style="color: ${overtimeInfo.hasOvertime ? 'var(--success-500)' : 'var(--text-muted)'}">
-                                ${overtimeInfo.overtimeFormatted}
-                            </h3>
-                        </div>
-                    </div>
-                    <p style="font-size: 14px; color: var(--text-secondary);">
-                        وقت الخروج: ${Utils.formatDate(record.created_at, 'time')}
-                    </p>
                 </div>
-            `,
-            confirmText: 'حسناً',
-            cancelText: '',
-            type: 'success',
-            icon: null
-        });
-    }
-
-    // ============================================
-    // 🔧 UTILITY METHODS
-    // ============================================
-
-    /**
-     * Get selected shift from form
-     * @returns {string|null} Selected shift ID or null
-     */
-    getSelectedShift() {
-        const checkedShift = document.querySelector('input[name="shift"]:checked');
-        return checkedShift?.value || null;
-    }
-
-    /**
-     * Check if action is on cooldown
-     * @returns {boolean} On cooldown status
-     */
-    isOnCooldown() {
-        const timeSinceLastAction = Date.now() - this.lastActionTime;
-        return timeSinceLastAction < AppConfig.attendance.cooldownPeriod;
+                <div class="employee-info">
+                    <h4>${Utils.truncate(emp.name, 25)}</h4>
+                    <p class="employee-code">${emp.code}</p>
+                    <p class="employee-email">${emp.email || 'لا يوجد بريد'}</p>
+                    <div class="employee-badges">
+                        ${adminBadge}
+                        ${firstLoginBadge}
+                        ${emp.is_deleted ? '<span class="badge badge-danger">محذوف</span>' : ''}
+                    </div>
+                </div>
+                <div class="employee-actions">
+                    <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); admin.viewEmployee('${emp.code}')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); admin.editEmployee('${emp.code}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </div>
+            </div>
+        `;
     }
 
     /**
-     * Get remaining cooldown time in seconds
-     * @returns {number} Remaining seconds
+     * Select an employee from the list
+     * @param {string} code - Employee code
      */
-    getRemainingCooldown() {
-        const timeSinceLastAction = Date.now() - this.lastActionTime;
-        const remaining = AppConfig.attendance.cooldownPeriod - timeSinceLastAction;
-        return Math.max(0, Math.ceil(remaining / 1000));
-    }
-
-    /**
-     * Format attendance record for display
-     * @param {object} record - Attendance record
-     * @returns {HTMLElement} Formatted row element
-     */
-    formatRecordForDisplay(record) {
-        return ui.formatAttendanceRow(record);
-    }
-
-    /**
-     * Reset daily state (call at midnight or new day)
-     */
-    resetDailyState() {
-        this.todayRecords = [];
-        this.currentStatus = 'out';
-        this.lastCheckIn = null;
-        this.lastCheckOut = null;
-        this.lastActionTime = 0;
+    selectEmployee(code) {
+        this.selectedEmployee = this.employees.find(emp => emp.code === code);
         
-        console.log('🔄 Daily attendance state reset');
+        // Highlight selected card
+        document.querySelectorAll('.employee-card').forEach(card => {
+            card.classList.toggle('selected', card.dataset.code === code);
+        });
+
+        // Show details panel
+        this.showEmployeeDetails(this.selectedEmployee);
     }
 
     /**
-     * Get attendance statistics for date range
+     * Show employee details panel
+     * @param {object} emp - Employee data
+     */
+    showEmployeeDetails(emp) {
+        if (!emp) return;
+
+        const panel = document.getElementById('employeeDetailsPanel');
+        if (!panel) return;
+
+        panel.innerHTML = `
+            <div class="details-header">
+                <h3>تفاصيل الموظف</h3>
+                <button class="icon-btn" onclick="admin.closeEmployeeDetails()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="details-content">
+                <div class="detail-avatar">
+                    ${emp.profile_image_url 
+                        ? `<img src="${emp.profile_image_url}" alt="${emp.name}">`
+                        : `<i class="fas fa-user"></i>`
+                    }
+                </div>
+                <h2>${emp.name}</h2>
+                <p class="code">${emp.code}</p>
+                
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <span class="label">البريد الإلكتروني</span>
+                        <span class="value">${emp.email || '-'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">تاريخ التسجيل</span>
+                        <span class="value">${Utils.formatDate(emp.created_at)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">آخر تحديث</span>
+                        <span class="value">${Utils.formatDate(emp.updated_at)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">الحالة</span>
+                        <span class="value">${emp.is_deleted ? 'محذوف' : 'نشط'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">نوع الحساب</span>
+                        <span class="value">${emp.is_admin ? 'أدمن' : 'موظف'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">تسجيل أولي</span>
+                        <span class="value">${emp.is_first_login ? 'نعم' : 'لا'}</span>
+                    </div>
+                </div>
+
+                <div class="details-actions">
+                    <button class="btn btn-primary" onclick="admin.editEmployee('${emp.code}')">
+                        <i class="fas fa-edit"></i> تعديل
+                    </button>
+                    <button class="btn btn-warning" onclick="admin.resetPassword('${emp.code}')">
+                        <i class="fas fa-key"></i> إعادة تعيين كلمة المرور
+                    </button>
+                    <button class="btn btn-danger" onclick="admin.deleteEmployee('${emp.code}')">
+                        <i class="fas fa-trash"></i> حذف
+                    </button>
+                </div>
+            </div>
+        `;
+
+        panel.classList.remove('hidden');
+    }
+
+    /**
+     * Close employee details panel
+     */
+    closeEmployeeDetails() {
+        const panel = document.getElementById('employeeDetailsPanel');
+        if (panel) {
+            panel.classList.add('hidden');
+        }
+        this.selectedEmployee = null;
+    }
+
+    // ============================================
+    // ✏️ EMPLOYEE CRUD OPERATIONS
+    // ============================================
+
+    /**
+     * Open add new employee modal
+     */
+    async addNewEmployee() {
+        const confirmed = await ui.showConfirmation({
+            title: '➕ إضافة موظف جديد',
+            message: 'سيتم فتح صفحة التسجيل للموظف الجديد',
+            confirmText: 'فتح صفحة التسجيل',
+            type: 'success'
+        });
+
+        if (confirmed) {
+            ui.navigateTo('registerPage');
+        }
+    }
+
+    /**
+     * Edit existing employee
+     * @param {string} code - Employee code
+     */
+    async editEmployee(code) {
+        const emp = this.employees.find(e => e.code === code);
+        if (!emp) return;
+
+        // For now, show a simple edit form modal
+        // In production, this would be a full form
+        const newName = prompt('الاسم الجديد:', emp.name);
+        
+        if (newName && newName !== emp.name && newName.trim()) {
+            const result = await db.updateEmployee(code, { name: newName.trim() });
+            
+            if (result.success) {
+                ui.showSuccess('تم تحديث بيانات الموظف');
+                await this.loadEmployees(); // Refresh list
+            } else {
+                ui.showError(result.error || 'فشل التحديث');
+            }
+        }
+    }
+
+    /**
+     * Delete employee (soft delete)
+     * @param {string} code - Employee code
+     */
+    async deleteEmployee(code) {
+        const emp = this.employees.find(e => e.code === code);
+        if (!emp) return;
+
+        // Prevent deleting ADMIN account
+        if (code === 'ADMIN') {
+            ui.showError('لا يمكن حذف حساب الأدمن الرئيسي');
+            return;
+        }
+
+        const confirmed = await ui.showConfirmation({
+            title: '⚠️ تأكيد الحذف',
+            message: `هل أنت متأكد من حذف الموظف "${emp.name}"؟\n\n⚠️ هذا الإجراء قابل للعكس.`,
+            confirmText: 'نعم، احذف',
+            cancelText: 'إلغاء',
+            type: 'danger'
+        });
+
+        if (confirmed) {
+            const result = await db.updateEmployee(code, { is_deleted: true });
+            
+            if (result.success) {
+                ui.showSuccess('تم حذف الموظف بنجاح');
+                this.closeEmployeeDetails();
+                await this.loadEmployees(); // Refresh list
+            } else {
+                ui.showError(result.error || 'فشل الحذف');
+            }
+        }
+    }
+
+    /**
+     * Reset employee password
+     * @param {string} code - Employee code
+     */
+    async resetPassword(code) {
+        const emp = this.employees.find(e => e.code === code);
+        if (!emp) return;
+
+        const confirmed = await ui.showConfirmation({
+            title: '🔑 إعادة تعيين كلمة المرور',
+            message: `سيتم إنشاء كلمة مرور جديدة لـ "${emp.name}" وإرسالها إلى بريده.`,
+            confirmText: 'نعم، أعد التعيين',
+            cancelText: 'إلغاء',
+            type: 'warning'
+        });
+
+        if (confirmed) {
+            ui.showInfo('جاري إرسال كلمة المرور الجديدة...');
+            
+            const result = await db.requestPasswordReset(code);
+            
+            if (result.success) {
+                ui.showSuccess('تم إرسال كلمة المرور الجديدة ✓');
+            } else {
+                ui.showError(result.error || 'فشل في إرسال كلمة المرور');
+            }
+        }
+    }
+
+    // ============================================
+    // 📈 REPORTS & ANALYTICS
+    // ============================================
+
+    /**
+     * Generate attendance report for all employees
      * @param {Date} startDate - Start date
      * @param {Date} endDate - End date
-     * @returns {Promise<object>} Statistics object
      */
-    async getStatistics(startDate, endDate) {
+    async generateCompanyReport(startDate, endDate) {
         try {
-            const userCode = auth.getUserCode();
-            const monthlyData = await db.getMonthlySummary(
-                userCode,
-                startDate.getMonth() + 1,
-                startDate.getFullYear()
-            );
+            ui.showElementLoading('#reportContent', 'جاري إنشاء التقرير...');
 
-            return monthlyData.summary;
+            // Get all attendance records in date range
+            const allRecords = [];
+            
+            for (const emp of this.employees) {
+                if (emp.is_deleted || emp.is_admin) continue;
+                
+                const records = await db.getAttendanceHistory(
+                    emp.code,
+                    startDate,
+                    endDate
+                );
+                
+                allRecords.push(...records.map(r => ({ ...r, employeeName: emp.name })));
+            }
+
+            // Sort by date
+            const sortedRecords = Utils.sortBy(allRecords, 'created_at', 'asc');
+
+            // Calculate statistics
+            const stats = {
+                totalRecords: sortedRecords.length,
+                totalCheckIns: sortedRecords.filter(r => r.type === 'حضور').length,
+                totalCheckOuts: sortedRecords.filter(r => r.type === 'انصراف').length,
+                uniqueEmployees: new Set(sortedRecords.map(r => r.employee_code)).size,
+                averageHours: 0
+            };
+
+            // Calculate average hours
+            const hoursArray = sortedRecords
+                .filter(r => r.hours_worked)
+                .map(r => parseFloat(r.hours_worked));
+            
+            if (hoursArray.length > 0) {
+                stats.averageHours = (
+                    hoursArray.reduce((a, b) => a + b, 0) / hoursArray.length
+                ).toFixed(2);
+            }
+
+            // Display report
+            this.displayReport(sortedRecords, stats);
+
+            ui.hideElementLoading('#reportContent');
 
         } catch (error) {
-            console.error('Get statistics error:', error);
-            return {};
+            console.error('Generate report error:', error);
+            ui.showError('فشل إنشاء التقرير');
+            ui.hideElementLoading('#reportContent');
         }
     }
 
     /**
-     * Export attendance data
-     * @param {string} format - Export format ('csv', 'json')
-     * @param {Array} records - Records to export
-     * @returns {void}
-     */
-    exportData(format, records) {
-        let content = '';
-        let filename = '';
-        let mimeType = '';
-
-        switch (format.toLowerCase()) {
-            case 'csv':
-                content = this.convertToCSV(records);
-                filename = `attendance_${new Date().toISOString().split('T')[0]}.csv`;
-                mimeType = 'text/csv';
-                break;
-                
-            case 'json':
-                content = JSON.stringify(records, null, 2);
-                filename = `attendance_${new Date().toISOString().split('T')[0]}.json`;
-                mimeType = 'application/json';
-                break;
-                
-            default:
-                throw new Error('Unsupported format');
-        }
-
-        Utils.downloadFile(content, filename, mimeType);
-        ui.showSuccess(SuccessMessages.DATA_EXPORTED);
-    }
-
-    /**
-     * Convert records to CSV format
+     * Display report data in UI
      * @param {Array} records - Attendance records
-     * @returns {string} CSV string
+     * @param {object} stats - Statistics object
      */
-    convertToCSV(records) {
-        if (!records.length) return '';
+    displayReport(records, stats) {
+        const container = document.getElementById('reportData');
+        if (!container) return;
 
-        const headers = ['التاريخ', 'الحالة', 'الوقت', 'الوردية', 'الساعات', 'الأوفر تايم'];
-        const rows = records.map(record => [
-            Utils.formatDate(record.created_at, 'short'),
-            record.type,
-            Utils.formatDate(record.created_at, 'time'),
-            record.shift,
-            record.hours_worked || '-',
-            record.overtime || '-'
-        ]);
+        // Update statistics cards
+        document.getElementById('reportTotalRecords') && 
+            (document.getElementById('reportTotalRecords').textContent = stats.totalRecords);
+        
+        document.getElementById('reportTotalEmployees') &&
+            (document.getElementById('reportTotalEmployees').textContent = stats.uniqueEmployees);
+        
+        document.getElementById('reportAverageHours') &&
+            (document.getElementById('reportAverageHours').textContent = `${stats.averageHours} ساعة`);
 
-        return [headers, ...rows]
-            .map(row => row.map(cell => `"${cell}"`).join(','))
-            .join('\n');
+        // Create table
+        const tableHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>الموظف</th>
+                        <th>الكود</th>
+                        <th>التاريخ</th>
+                        <th>الحالة</th>
+                        <th>الوردية</th>
+                        <th>الساعات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${records.map(record => `
+                        <tr>
+                            <td>${record.employee_name || '-'}</td>
+                            <td>${record.employee_code}</td>
+                            <td>${Utils.formatDate(record.created_at)}</td>
+                            <td>
+                                <span class="badge ${record.type === 'حضور' ? 'badge-in' : 'badge-out'}">
+                                    ${record.type}
+                                </span>
+                            </td>
+                            <td>${record.shift || '-'}</td>
+                            <td>${record.hours_worked || '-'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = tableHTML || '<p class="empty-state">لا توجد سجلات</p>';
+    }
+
+    // ============================================
+    // 🔔 NOTIFICATIONS & ALERTS
+    // ============================================
+
+    /**
+     * Show system notification to admin
+     * @param {string} title - Notification title
+     * @param {string} message - Notification message
+     * @param {string} type - Notification type
+     */
+    showNotification(title, message, type = 'info') {
+        const notificationsList = document.getElementById('notificationsList');
+        if (!notificationsList) return;
+
+        const notification = document.createElement('div');
+        notification.className = 'notification-item unread';
+        
+        const icons = {
+            success: 'fa-check-circle text-success',
+            error: 'fa-exclamation-circle text-danger',
+            warning: 'fa-exclamation-triangle text-warning',
+            info: 'fa-info-circle text-primary'
+        };
+
+        notification.innerHTML = `
+            <div class="icon"><i class="fas ${icons[type] || icons.info}"></i></div>
+            <div class="notification-content">
+                <h4>${title}</h4>
+                <p>${message}</p>
+                <small>${new Date().toLocaleTimeString('ar-EG')}</small>
+            </div>
+        `;
+
+        notificationsList.insertBefore(notification, notificationsList.firstChild);
+
+        // Update badge count
+        this.updateNotificationBadge();
+
+        // Auto-remove after some time (optional)
+        setTimeout(() => {
+            notification.classList.remove('unread');
+        }, 5000);
+    }
+
+    /**
+     * Update notification badge count
+     */
+    updateNotificationBadge() {
+        const badge = document.getElementById('notificationBadge');
+        const unreadCount = document.querySelectorAll('.notification-item.unread').length;
+
+        if (badge) {
+            badge.textContent = unreadCount;
+            badge.classList.toggle('hidden', unreadCount === 0);
+        }
+    }
+
+    /**
+     * Mark all notifications as read
+     */
+    markAllNotificationsRead() {
+        document.querySelectorAll('.notification-item.unread').forEach(item => {
+            item.classList.remove('unread');
+        });
+        
+        this.updateNotificationBadge();
+        ui.showSuccess('تم تعيين الكل كمقروء');
+    }
+
+    // ============================================
+    // 🛠️ UTILITY METHODS
+    // ============================================
+
+    /**
+     * Open admin panel
+     */
+    openAdminPanel() {
+        // This would open a full admin dashboard
+        // For now, we'll navigate to a simple admin view
+        console.log('Opening admin panel...');
+        
+        ui.showInfo('لوحة التحكم قيد التطوير');
+        
+        // Future: Navigate to dedicated admin page
+        // ui.navigateTo('adminPage');
+    }
+
+    /**
+     * Export data in various formats
+     * @param {string} format - Export format
+     * @param {Array} data - Data to export
+     */
+    exportData(format, data) {
+        attendance.exportData(format, data);
+    }
+
+    /**
+     * Search employees
+     * @param {string} query - Search query
+     */
+    searchEmployees(query) {
+        this.filters.search = query;
+        this.renderEmployeesList();
+    }
+
+    /**
+     * Sort employees by field
+     * @param {string} field - Field to sort by
+     */
+    sortEmployees(field) {
+        if (this.filters.sortBy === field) {
+            // Toggle sort order
+            this.filters.sortOrder = this.filters.sortOrder === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.filters.sortBy = field;
+            this.filters.sortOrder = 'asc';
+        }
+        
+        this.renderEmployeesList();
+    }
+
+    /**
+     * Get system health status
+     * @returns {Promise<object>} Health status
+     */
+    async getSystemHealth() {
+        return {
+            databaseConnected: db.isConnectedToSupabase(),
+            modelsLoaded: faceRecognition.areModelsLoaded(),
+            cameraActive: faceRecognition.isCameraRunning(),
+            knownFaces: faceRecognition.getKnownFacesCount(),
+            totalEmployees: this.employees.length,
+            timestamp: new Date().toISOString()
+        };
     }
 }
 
 // Create global instance
-const attendance = new AttendanceManager();
+const admin = new AdminManager();
 
 // Export for use in other modules
-window.AttendanceManager = AttendanceManager;
-window.attendance = attendance;
+window.AdminManager = AdminManager;
+window.admin = admin;
