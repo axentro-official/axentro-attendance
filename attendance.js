@@ -1,7 +1,8 @@
 /**
  * ============================================
- * ⏰ AXENTRO ATTENDANCE MANAGER v4.0
+ * ⏰ AXENTRO ATTENDANCE MANAGER v4.1 - ROBUST
  * ✅ Check-in/Check-out & Time Tracking
+ * 🚀 محسّن مع Error Handling قوي و Graceful Degradation
  * ============================================
  */
 
@@ -19,7 +20,7 @@ class AttendanceManager {
         // Location data
         this.currentLocation = null;
         
-        this.init();
+        console.log('⏰ Attendance Manager initialized');
     }
 
     // ============================================
@@ -30,7 +31,7 @@ class AttendanceManager {
      * Initialize attendance manager
      */
     init() {
-        console.log('⏰ Attendance Manager initialized');
+        console.log('✅ Attendance Manager ready');
     }
 
     // ============================================
@@ -38,38 +39,56 @@ class AttendanceManager {
     // ============================================
 
     /**
-     * Get current location
-     * @returns {Promise<object>} Location data
+     * Get current location with timeout and fallback
+     * @returns {Promise<object|null>} Location data
      */
     async getCurrentLocation() {
         try {
             const location = await Utils.getLocation({
                 enableHighAccuracy: true,
                 timeout: 10000,
-                maximumAge: 0
+                maximumAge: 60000 // Accept location from last minute
             });
-
+            
             this.currentLocation = location;
 
-            // Update UI
-            const statusEl = document.getElementById('locationStatus');
-            if (statusEl) {
-                statusEl.textContent = `📍 دقة: ${Math.round(location.accuracy)}م`;
-                statusEl.classList.add('text-success');
-            }
+            // Update UI status
+            this.updateLocationStatus(true, location.accuracy);
 
             return location;
 
         } catch (error) {
-            console.error('Location error:', error);
+            console.warn('⚠️ Location error:', error.message);
             
-            const statusEl = document.getElementById('locationStatus');
-            if (statusEl) {
-                statusEl.textContent = '❌ تعذر تحديد الموقع';
-                statusEl.classList.add('text-danger');
-            }
-
+            // Update UI to show warning (not error - don't block attendance)
+            this.updateLocationStatus(false);
+            
             return null;
+        }
+    }
+
+    /**
+     * Update location status in UI
+     * @param {boolean} success - Whether location was obtained
+     * @param {number} accuracy - GPS accuracy in meters
+     */
+    updateLocationStatus(success, accuracy = null) {
+        const statusEl = document.getElementById('locationStatus');
+        
+        if (!statusEl) return;
+
+        if (success && accuracy) {
+            statusEl.innerHTML = `
+                <i class="fas fa-map-marker-alt"></i>
+                دقة: ${Math.round(accuracy)}م
+            `;
+            statusEl.className = 'text-success';
+        } else {
+            statusEl.innerHTML = `
+                <i class="fas fa-exclamation-triangle"></i>
+                الموقع غير متوفر
+            `;
+            statusEl.className = 'text-warning';
         }
     }
 
@@ -79,7 +98,7 @@ class AttendanceManager {
      */
     getLocationLink() {
         if (!this.currentLocation) return null;
-
+        
         return Utils.getMapsLink(
             this.currentLocation.latitude,
             this.currentLocation.longitude
@@ -95,9 +114,18 @@ class AttendanceManager {
      */
     async loadTodayRecords() {
         try {
-            if (!auth.isAuthenticated()) return;
+            if (typeof auth === 'undefined' || !auth.isAuthenticated()) {
+                console.warn('⚠️ Cannot load records - not authenticated');
+                return;
+            }
 
             const userCode = auth.getUserCode();
+            
+            if (typeof db === 'undefined' || typeof db.getTodayAttendance !== 'function') {
+                console.warn('⚠️ Database module not available for loading records');
+                return;
+            }
+
             this.todayRecords = await db.getTodayAttendance(userCode);
 
             // Determine current status
@@ -109,12 +137,13 @@ class AttendanceManager {
             console.log(`📋 Loaded ${this.todayRecords.length} today's records`);
 
         } catch (error) {
-            console.error('Load today records error:', error);
+            console.error('❌ Load today records error:', error);
+            this.todayRecords = [];
         }
     }
 
     /**
-     * Determine current check-in/check-out status
+     * Determine current check-in/check-out status based on records
      */
     determineCurrentStatus() {
         if (this.todayRecords.length === 0) {
@@ -143,7 +172,7 @@ class AttendanceManager {
     }
 
     /**
-     * Update UI with today's summary
+     * Update UI with today's summary information
      */
     updateTodaySummary() {
         // Update times
@@ -172,7 +201,7 @@ class AttendanceManager {
             }
         });
 
-        // Update display
+        // Update display elements
         const totalHoursEl = document.getElementById('totalHoursToday');
         const overtimeEl = document.getElementById('overtimeToday');
         const todayHoursEl = document.getElementById('todayHours');
@@ -182,9 +211,9 @@ class AttendanceManager {
         }
 
         if (overtimeEl) {
-            overtimeEl.textContent = overtimeHours > 0 
-                ? `${overtimeHours.toFixed(1)} ساعة` 
-                : 'لا يوجد';
+            overtimeEl.textContent = overtimeHours > 0 ? 
+                `${overtimeHours.toFixed(1)} ساعة` : 
+                'لا يوجد';
         }
 
         if (todayHoursEl) {
@@ -211,9 +240,8 @@ class AttendanceManager {
             checkOutBtn.disabled = false;
             checkOutBtn.classList.remove('disabled');
             
-            checkInBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>✓ تم الحضور</span>';
+            checkInBtn.innerHTML = '<i class="fas fa-check"></i><span>تم الحضور</span>';
             checkOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span>انصراف</span>';
-
         } else {
             // User is checked out - show checkin button active
             checkInBtn.disabled = false;
@@ -222,7 +250,7 @@ class AttendanceManager {
             checkOutBtn.classList.add('disabled');
             
             checkInBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>حضور</span>';
-            checkOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span>✓ تم الانصراف</span>';
+            checkOutBtn.innerHTML = '<i class="fas fa-check"></i><span>تم الانصراف</span>';
         }
     }
 
@@ -231,14 +259,14 @@ class AttendanceManager {
     // ============================================
 
     /**
-     * Handle check-in action
+     * Handle check-in button click
      */
     async handleCheckIn() {
         await this.recordAttendance('حضور');
     }
 
     /**
-     * Handle check-out action
+     * Handle check-out button click
      */
     async handleCheckOut() {
         await this.recordAttendance('انصراف');
@@ -249,132 +277,170 @@ class AttendanceManager {
      * @param {string} type - 'حضور' or 'انصراف'
      */
     async recordAttendance(type) {
-        // Prevent double-clicks
+        // Prevent double-clicks / processing
         if (this.isProcessing) {
-            ui.showWarning('جاري المعالجة... يرجى الانتظار');
+            if (typeof ui !== 'undefined' && ui.showWarning) {
+                ui.showWarning('جاري المعالجة... يرجى الانتظار');
+            }
             return;
         }
 
-        // Check cooldown
+        // Check cooldown period
         if (this.isOnCooldown()) {
-            ui.showError(ErrorCodes.ATTENDANCE_COOLDOWN_ACTIVE.message);
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(ErrorCodes.ATTENDANCE_COOLDOWN_ACTIVE.message);
+            }
             return;
         }
 
         // Validate user is authenticated
-        if (!auth.isAuthenticated()) {
-            ui.showError(ErrorCodes.AUTH_SESSION_EXPIRED.message);
-            ui.navigateTo('loginPage');
+        if (typeof auth === 'undefined' || !auth.isAuthenticated()) {
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(ErrorCodes.AUTH_SESSION_EXPIRED.message);
+            }
+            if (typeof app !== 'undefined' && app.navigateTo) {
+                app.navigateTo('loginPage');
+            }
             return;
         }
 
         // Validate shift selection
         const selectedShift = this.getSelectedShift();
         if (!selectedShift) {
-            ui.showError(ErrorCodes.ATTENDANCE_NO_SHIFT_SELECTED.message);
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(ErrorCodes.ATTENDANCE_NO_SHIFT_SELECTED.message);
+            }
             return;
         }
 
         // Check if opposite action already exists
         if (type === 'حضور' && this.currentStatus === 'in') {
-            ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_IN.message);
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_IN.message);
+            }
             return;
         }
 
         if (type === 'انصراف' && this.currentStatus === 'out') {
-            ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_OUT.message);
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_OUT.message);
+            }
             return;
         }
 
         // Start processing
         this.isProcessing = true;
+        
         const btnId = type === 'حضور' ? 'checkInBtn' : 'checkOutBtn';
         const btn = document.getElementById(btnId);
+        
+        const loadingText = type === 'حضور' ? 
+            'جاري تسجيل الحضور...' : 
+            'جاري تسجيل الانصراف...';
 
-        ui.showButtonLoading(btn, type === 'حضور' ? 'جاري تسجيل الحضور...' : 'جاري تسجيل الانصراف...');
+        if (typeof ui !== 'undefined' && ui.showButtonLoading) {
+            ui.showButtonLoading(btn, loadingText);
+        }
 
         try {
-            // Step 1: Recognize face (if camera available)
+            // Step 1: Try face recognition (optional - non-critical)
             let recognizedFace = null;
-            if (faceRecognition.isCameraRunning()) {
+            
+            if (window.faceRecognitionAvailable !== false && 
+                typeof faceRecognition !== 'undefined' && 
+                faceRecognition.isCameraRunning?.()) {
+                
                 try {
                     recognizedFace = await faceRecognition.recognizeForAttendance();
                     
                     // Verify recognized face matches logged in user
-                    if (recognizedFace && recognizedFace.code !== auth.getUserCode()) {
+                    if (recognizedFace && auth.getUserCode() && 
+                        recognizedFace.code !== auth.getUserCode()) {
                         throw new Error('الوجه لا يتطابق مع المستخدم المسجل');
                     }
                 } catch (faceError) {
-                    console.warn('Face recognition failed, continuing...', faceError);
-                    // Continue without face recognition (optional based on requirements)
+                    console.warn('⚠️ Face recognition failed, continuing without it:', faceError.message);
+                    // Continue without face recognition - don't block the operation!
                 }
             }
 
-            // Step 2: Get location
+            // Step 2: Get location (non-blocking)
             await this.getCurrentLocation();
             const locationLink = this.getLocationLink();
 
-            // Step 3: Calculate hours worked (for check-out)
+            // Step 3: Calculate hours worked (for check-out only)
             let hoursWorked = null;
             let overtime = null;
 
             if (type === 'انصراف' && this.lastCheckIn) {
                 const checkInTime = new Date(this.lastCheckIn.created_at);
                 const now = new Date();
+                
                 const diff = Utils.calculateTimeDifference(checkInTime, now);
-                
                 hoursWorked = diff.totalHours.toFixed(2);
-                
+
                 // Calculate overtime
-                const overtimeCalc = Utils.calculateOvertime(
-                    parseFloat(hoursWorked),
-                    AppConfig.attendance.normalHours
-                );
+                const normalHours = AppConfig?.attendance?.normalHours || 9;
+                const overtimeCalc = Utils.calculateOvertime(parseFloat(hoursWorked), normalHours);
                 
-                overtime = overtimeCalc.hasOvertime 
-                    ? `${overtimeCalc.overtimeHours} ساعة` 
-                    : 'لا يوجد';
+                overtime = overtimeCalc.hasOvertime ? 
+                    `${overtimeCalc.overtimeHours} ساعة` : 
+                    'لا يوجد';
             }
 
-            // Step 4: Capture image (if camera available)
+            // Step 4: Capture image (if camera available - optional)
             let imageUrl = null;
-            if (faceRecognition.currentVideoElement && faceRecognition.canvasElement) {
+            
+            if (window.faceRecognitionAvailable !== false &&
+                typeof faceRecognition !== 'undefined' && 
+                faceRecognition.currentVideoElement && 
+                faceRecognition.canvasElement) {
+                
                 try {
                     const photo = faceRecognition.capturePhoto(
                         faceRecognition.currentVideoElement,
                         faceRecognition.canvasElement
                     );
                     
-                    // Compress image
+                    // Compress image for upload
                     const compressedImage = await Utils.compressImage(photo.base64, 640, 0.7);
                     
-                    // Upload to storage
-                    imageUrl = await db.uploadFaceImage(compressedImage, `${auth.getUserCode()}_${type}`);
+                    // Upload to storage if db supports it
+                    if (typeof db !== 'undefined' && typeof db.uploadFaceImage === 'function') {
+                        imageUrl = await db.uploadFaceImage(
+                            compressedImage, 
+                            `${auth.getUserCode()}_${type}`
+                        );
+                    }
                 } catch (imgError) {
-                    console.warn('Image capture failed:', imgError);
+                    console.warn('⚠️ Image capture failed:', imgError.message);
+                    // Continue without image - non-critical
                 }
             }
 
-            // Step 5: Prepare attendance record
+            // Step 5: Prepare attendance record data
             const attendanceData = {
                 employee_code: auth.getUserCode(),
                 employee_name: auth.getUserName(),
                 type: type,
-                locationLink: locationLink,
+                location_link: locationLink,
                 shift: selectedShift,
-                hoursWorked: hoursWorked,
+                hours_worked: hoursWorked,
                 overtime: overtime,
-                gpsAccuracy: this.currentLocation?.accuracy,
-                imageUrl: imageUrl
+                gps_accuracy: this.currentLocation?.accuracy,
+                image_url: imageUrl
             };
 
             // Step 6: Save to database
+            if (typeof db === 'undefined' || typeof db.recordAttendance !== 'function') {
+                throw new Error('Database module not available');
+            }
+
             const result = await db.recordAttendance(attendanceData);
 
             if (result.success) {
-                // Success!
+                // Success! Update UI and state
                 this.onAttendanceSuccess(type, result.record);
-                
             } else {
                 throw new Error(result.error || 'فشل تسجيل الحضور');
             }
@@ -382,12 +448,14 @@ class AttendanceManager {
         } catch (error) {
             console.error(`${type} error:`, error);
             this.onAttendanceError(error, type);
-            
         } finally {
             this.isProcessing = false;
-            ui.hideButtonLoading(btn);
             
-            // Set cooldown
+            if (typeof ui !== 'undefined' && ui.hideButtonLoading) {
+                ui.hideButtonLoading(btn);
+            }
+
+            // Set cooldown timestamp
             this.lastActionTime = Date.now();
         }
     }
@@ -395,219 +463,170 @@ class AttendanceManager {
     /**
      * Handle successful attendance recording
      * @param {string} type - Attendance type
-     * @param {object} record - Saved record
+     * @param {object} record - Saved record object
      */
     onAttendanceSuccess(type, record) {
         // Play success feedback
-        ui.playSuccessFeedback();
-        
-        // Show success message
-        const message = type === 'حضور' 
-            ? SuccessMessages.CHECK_IN_SUCCESS 
-            : SuccessMessages.CHECK_OUT_SUCCESS;
-        
-        ui.showSuccess(message);
+        if (typeof ui !== 'undefined' && ui.playSuccessFeedback) {
+            ui.playSuccessFeedback();
+        }
 
-        // Add to local records
-        this.todayRecords.push(record);
-        
-        // Update status
+        // Show success message
+        const message = type === 'حضور' ? 
+            SuccessMessages.CHECK_IN_SUCCESS : 
+            SuccessMessages.CHECK_OUT_SUCCESS;
+
+        if (typeof ui !== 'undefined' && ui.showSuccess) {
+            ui.showSuccess(message);
+        }
+
+        // Vibrate on success (haptic feedback)
+        Utils.vibrate([100, 50, 100]);
+
+        // Add to local records array
+        if (record) {
+            this.todayRecords.push(record);
+        }
+
+        // Update UI state
         this.determineCurrentStatus();
         this.updateTodaySummary();
 
-        // If check-out completed, show summary modal
-        if (type === 'انصراف') {
-            setTimeout(() => {
-                this.showCheckoutSummary(record);
-            }, 1000);
+        console.log(`✅ ${type} recorded successfully`);
+    }
+
+    /**
+     * Handle attendance recording error
+     * @param {Error} error - Error object
+     * @param {string} type - Attendance type that failed
+     */
+    onAttendanceError(error, type) {
+        console.error(`❌ ${type} recording failed:`, error.message);
+
+        // Play error feedback
+        if (typeof ui !== 'undefined' && ui.playErrorFeedback) {
+            ui.playErrorFeedback();
+        }
+
+        // Show user-friendly error message
+        if (typeof ui !== 'undefined' && ui.showError) {
+            ui.showError(error.message || `فشل تسجيل ${type}`);
         }
     }
 
-    /**
-     * Handle attendance error
-     * @param {Error} error - Error object
-     * @param {string} type - Attempted type
-     */
-    onAttendanceError(error, type) {
-        ui.playErrorFeedback();
-        ui.showError(error.message || 'فشل في العملية');
-        
-        console.error(`Attendance ${type} error:`, error);
-    }
-
-    /**
-     * Show checkout summary modal
-     * @param {object} record - Checkout record
-     */
-    async showCheckoutSummary(record) {
-        const hours = parseFloat(record.hours_worked) || 0;
-        const overtimeInfo = Utils.calculateOvertime(hours);
-
-        await ui.showConfirmation({
-            title: '✅ ملخص اليوم',
-            message: `
-                <div style="text-align: center;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">⏰</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;">
-                        <div>
-                            <small style="color: var(--text-muted);">إجمالي الساعات</small>
-                            <h3 style="color: var(--primary-400);">${Utils.formatHoursWorked(hours)}</h3>
-                        </div>
-                        <div>
-                            <small style="color: var(--text-muted);">الأوفر تايم</small>
-                            <h3 style="color: ${overtimeInfo.hasOvertime ? 'var(--success-500)' : 'var(--text-muted)'}">
-                                ${overtimeInfo.overtimeFormatted}
-                            </h3>
-                        </div>
-                    </div>
-                    <p style="font-size: 14px; color: var(--text-secondary);">
-                        وقت الخروج: ${Utils.formatDate(record.created_at, 'time')}
-                    </p>
-                </div>
-            `,
-            confirmText: 'حسناً',
-            cancelText: '',
-            type: 'success',
-            icon: null
-        });
-    }
-
     // ============================================
-    // 🔧 UTILITY METHODS
+    // 🎛️ SHIFT SELECTION
     // ============================================
 
     /**
-     * Get selected shift from form
+     * Get currently selected shift
      * @returns {string|null} Selected shift ID or null
      */
     getSelectedShift() {
-        const checkedShift = document.querySelector('input[name="shift"]:checked');
-        return checkedShift?.value || null;
+        const selectedRadio = document.querySelector('input[name="shift"]:checked');
+        return selectedRadio?.value || null;
     }
+
+    // ============================================
+    // ⏱️ COOLDOWN MANAGEMENT
+    // ============================================
 
     /**
      * Check if action is on cooldown
-     * @returns {boolean} On cooldown status
+     * @returns {boolean}
      */
     isOnCooldown() {
-        const timeSinceLastAction = Date.now() - this.lastActionTime;
-        return timeSinceLastAction < AppConfig.attendance.cooldownPeriod;
+        const cooldownPeriod = AppConfig?.attendance?.cooldownPeriod || 60000; // Default 1 minute
+        
+        if (Date.now() - this.lastActionTime < cooldownPeriod) {
+            return true;
+        }
+        return false;
     }
 
     /**
      * Get remaining cooldown time in seconds
-     * @returns {number} Remaining seconds
+     * @returns {number}
      */
     getRemainingCooldown() {
-        const timeSinceLastAction = Date.now() - this.lastActionTime;
-        const remaining = AppConfig.attendance.cooldownPeriod - timeSinceLastAction;
-        return Math.max(0, Math.ceil(remaining / 1000));
+        const cooldownPeriod = AppConfig?.attendance?.cooldownPeriod || 60000;
+        const elapsed = Date.now() - this.lastActionTime;
+        const remaining = Math.ceil((cooldownPeriod - elapsed) / 1000);
+        
+        return Math.max(0, remaining);
+    }
+
+    // ============================================
+    // 📈 STATISTICS & REPORTING HELPERS
+    // ============================================
+
+    /**
+     * Get today's statistics summary
+     * @returns {object} Today's stats
+     */
+    getTodayStats() {
+        const totalRecords = this.todayRecords.length;
+        const checkIns = this.todayRecords.filter(r => r.type === 'حضور').length;
+        const checkOuts = this.todayRecords.filter(r => r.type === 'انصراف').length;
+
+        let totalHours = 0;
+        let overtimeHours = 0;
+
+        this.todayRecords.forEach(record => {
+            const hours = parseFloat(record.hours_worked) || 0;
+            totalHours += hours;
+
+            const otMatch = record.overtime?.match(/[\d.]+/);
+            if (otMatch) {
+                overtimeHours += parseFloat(otMatch[0]);
+            }
+        });
+
+        return {
+            totalRecords,
+            checkIns,
+            checkOuts,
+            totalHours,
+            overtimeHours,
+            currentStatus: this.currentStatus,
+            firstCheckIn: this.lastCheckIn,
+            lastCheckOut: this.lastCheckOut
+        };
     }
 
     /**
      * Format attendance record for display
      * @param {object} record - Attendance record
-     * @returns {HTMLElement} Formatted row element
+     * @returns {object} Formatted record
      */
     formatRecordForDisplay(record) {
-        return ui.formatAttendanceRow(record);
-    }
-
-    /**
-     * Reset daily state (call at midnight or new day)
-     */
-    resetDailyState() {
-        this.todayRecords = [];
-        this.currentStatus = 'out';
-        this.lastCheckIn = null;
-        this.lastCheckOut = null;
-        this.lastActionTime = 0;
-        
-        console.log('🔄 Daily attendance state reset');
-    }
-
-    /**
-     * Get attendance statistics for date range
-     * @param {Date} startDate - Start date
-     * @param {Date} endDate - End date
-     * @returns {Promise<object>} Statistics object
-     */
-    async getStatistics(startDate, endDate) {
-        try {
-            const userCode = auth.getUserCode();
-            const monthlyData = await db.getMonthlySummary(
-                userCode,
-                startDate.getMonth() + 1,
-                startDate.getFullYear()
-            );
-
-            return monthlyData.summary;
-
-        } catch (error) {
-            console.error('Get statistics error:', error);
-            return {};
-        }
-    }
-
-    /**
-     * Export attendance data
-     * @param {string} format - Export format ('csv', 'json')
-     * @param {Array} records - Records to export
-     * @returns {void}
-     */
-    exportData(format, records) {
-        let content = '';
-        let filename = '';
-        let mimeType = '';
-
-        switch (format.toLowerCase()) {
-            case 'csv':
-                content = this.convertToCSV(records);
-                filename = `attendance_${new Date().toISOString().split('T')[0]}.csv`;
-                mimeType = 'text/csv';
-                break;
-                
-            case 'json':
-                content = JSON.stringify(records, null, 2);
-                filename = `attendance_${new Date().toISOString().split('T')[0]}.json`;
-                mimeType = 'application/json';
-                break;
-                
-            default:
-                throw new Error('Unsupported format');
-        }
-
-        Utils.downloadFile(content, filename, mimeType);
-        ui.showSuccess(SuccessMessages.DATA_EXPORTED);
-    }
-
-    /**
-     * Convert records to CSV format
-     * @param {Array} records - Attendance records
-     * @returns {string} CSV string
-     */
-    convertToCSV(records) {
-        if (!records.length) return '';
-
-        const headers = ['التاريخ', 'الحالة', 'الوقت', 'الوردية', 'الساعات', 'الأوفر تايم'];
-        const rows = records.map(record => [
-            Utils.formatDate(record.created_at, 'short'),
-            record.type,
-            Utils.formatDate(record.created_at, 'time'),
-            record.shift,
-            record.hours_worked || '-',
-            record.overtime || '-'
-        ]);
-
-        return [headers, ...rows]
-            .map(row => row.map(cell => `"${cell}"`).join(','))
-            .join('\n');
+        return {
+            date: Utils.formatDate(record.created_at, 'date'),
+            time: Utils.formatDate(record.created_at, 'time'),
+            type: record.type,
+            shift: record.shift || '-',
+            hours: record.hours_worked || '-',
+            overtime: record.overtime || 'لا يوجد',
+            location: record.location_link ? '📍' : '-'
+        };
     }
 }
 
-// Create global instance
-const attendance = new AttendanceManager();
+// ============================================
+// 🌍 GLOBAL INSTANCE
+// ============================================
 
-// Export for use in other modules
-window.AttendanceManager = AttendanceManager;
-window.attendance = attendance;
+/**
+ * Global attendance manager instance
+ */
+let attendance;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    attendance = new AttendanceManager();
+    attendance.init();
+    
+    console.log('⏰ Attendance module loaded');
+});
+
+console.log('✅ attendance.js v4.1 loaded successfully');
