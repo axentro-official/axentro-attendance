@@ -1,874 +1,711 @@
 /**
  * ============================================
- * 🛠️ AXENTRO UTILITIES v4.0
- * ✅ General Helper Functions
+ * ✅ AXENTRO VALIDATOR v4.0
+ * ✅ Comprehensive Input Validation System
  * ============================================
  */
 
-const Utils = {
-    // ============================================
-    // 📅 DATE & TIME UTILITIES
-    // ============================================
-    
-    /**
-     * Format date to Arabic locale
-     * @param {Date|string} date - Date to format
-     * @param {string} format - Format type ('full', 'short', 'time', 'datetime')
-     * @returns {string} Formatted date string
-     */
-    formatDate(date, format = 'full') {
-        const d = new Date(date);
-        
-        const formats = {
-            full: {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            },
-            short: {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            },
-            time: {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-            },
-            datetime: {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-            }
-        };
-        
-        return d.toLocaleDateString('ar-EG', formats[format] || formats.full);
-    },
-
-    /**
-     * Get current datetime in ISO format for API
-     * @returns {string} ISO datetime string
-     */
-    getCurrentDateTime() {
-        return new Date().toISOString();
-    },
-
-    /**
-     * Calculate difference between two dates
-     * @param {Date} start - Start date
-     * @param {Date} end - End date
-     * @returns {object} Object with hours, minutes, seconds
-     */
-    calculateTimeDifference(start, end) {
-        const diff = Math.abs(end - start);
-        
-        return {
-            hours: Math.floor(diff / (1000 * 60 * 60)),
-            minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
-            seconds: Math.floor((diff % (1000 * 60)) / 1000),
-            totalMilliseconds: diff,
-            totalMinutes: Math.floor(diff / (1000 * 60)),
-            totalHours: parseFloat((diff / (1000 * 60 * 60)).toFixed(2))
-        };
-    },
-
-    /**
-     * Format hours worked to display string
-     * @param {number} hours - Hours as decimal
-     * @returns {string} Formatted string like "8 ساعات و 30 دقيقة"
-     */
-    formatHoursWorked(hours) {
-        if (!hours || isNaN(hours)) return '0 ساعة';
-        
-        const h = Math.floor(hours);
-        const m = Math.round((hours - h) * 60);
-        
-        let result = '';
-        if (h > 0) result += `${h} ${h === 1 ? 'ساعة' : 'ساعات'}`;
-        if (m > 0) result += ` و ${m} دقيقة`;
-        
-        return result || 'أقل من دقيقة';
-    },
-
-    /**
-     * Calculate overtime from total hours
-     * @param {number} totalHours - Total hours worked
-     * @param {number} normalHours - Normal working hours (default from config)
-     * @returns {object} Overtime info
-     */
-    calculateOvertime(totalHours, normalHours = AppConfig.attendance.normalHours) {
-        const overtime = Math.max(0, totalHours - normalHours);
-        const normalHrs = Math.min(totalHours, normalHours);
-        
-        return {
-            hasOvertime: overtime > 0,
-            overtimeHours: parseFloat(overtime.toFixed(2)),
-            normalHours: parseFloat(normalHrs.toFixed(2)),
-            overtimeFormatted: this.formatHoursWorked(overtime),
-            totalFormatted: this.formatHoursWorked(totalHours)
-        };
-    },
+class Validator {
+    constructor() {
+        this.errors = [];
+        this.warnings = [];
+    }
 
     // ============================================
-    // 🧮 STRING & NUMBER UTILITIES
+    // 📋 CORE VALIDATION METHODS
     // ============================================
 
     /**
-     * Sanitize string input (remove HTML tags, trim)
-     * @param {string} str - Input string
-     * @param {string} defaultValue - Default value if empty
-     * @returns {string} Sanitized string
+     * Validate a single field
+     * @param {*} value - Value to validate
+     * @param {Array<Function|string>} rules - Validation rules
+     * @returns {object} Validation result
      */
-    sanitizeString(str, defaultValue = '') {
-        if (!str || typeof str !== 'string') return defaultValue;
-        
-        return str
-            .trim()
-            .replace(/[<>]/g, '')  // Remove dangerous HTML chars
-            .substring(0, AppConfig.security.password.maxLength); // Limit length
-    },
-
-    /**
-     * Validate and sanitize email
-     * @param {string} email - Email address
-     * @returns {string|null} Cleaned email or null if invalid
-     */
-    sanitizeEmail(email) {
-        if (!email || email === 'null' || email === 'undefined') return null;
-        
-        const cleaned = String(email).trim().toLowerCase();
-        
-        if (!Constants.regex.email.test(cleaned)) return null;
-        
-        return cleaned.substring(0, 100);
-    },
-
-    /**
-     * Generate random string
-     * @param {number} length - Length of string
-     * @param {string} type - Type: 'alpha', 'numeric', 'alphanumeric'
-     * @returns {string} Random string
-     */
-    generateRandomString(length = 10, type = 'alphanumeric') {
-        const chars = {
-            alpha: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
-            numeric: '0123456789',
-            alphanumeric: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-        };
-        
-        let result = '';
-        const charset = chars[type] || chars.alphanumeric;
-        const array = new Uint32Array(length);
-        crypto.getRandomValues(array);
-        
-        for (let i = 0; i < length; i++) {
-            result += charset[array[i] % charset.length];
-        }
-        
-        return result;
-    },
-
-    /**
-     * Generate secure password
-     * @param {number} length - Password length
-     * @returns {string} Random password
-     */
-    generatePassword(length = 10) {
-        const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-        const lowercase = 'abcdefghjkmnpqrstuvwxyz';
-        const numbers = '23456789';
-        const special = '!@#$%&*';
-        
-        let password = '';
-        // Ensure at least one of each type
-        password += uppercase[this.randomInt(0, uppercase.length - 1)];
-        password += lowercase[this.randomInt(0, lowercase.length - 1)];
-        password += numbers[this.randomInt(0, numbers.length - 1)];
-        password += special[this.randomInt(0, special.length - 1)];
-        
-        // Fill rest with random characters
-        const allChars = uppercase + lowercase + numbers + special;
-        for (let i = password.length; i < length; i++) {
-            password += allChars[this.randomInt(0, allChars.length - 1)];
-        }
-        
-        // Shuffle the password
-        return this.shuffleString(password);
-    },
-
-    /**
-     * Shuffle string characters
-     * @param {string} str - String to shuffle
-     * @returns {string} Shuffled string
-     */
-    shuffleString(str) {
-        const array = str.split('');
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = this.randomInt(0, i);
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array.join('');
-    },
-
-    /**
-     * Get random integer between min and max (inclusive)
-     * @param {number} min - Minimum value
-     * @param {number} max - Maximum value
-     * @returns {number} Random integer
-     */
-    randomInt(min, max) {
-        min = Math.ceil(min);
-        max = Math.floor(max);
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    },
-
-    /**
-     * Truncate text with ellipsis
-     * @param {string} text - Text to truncate
-     * @param {number} maxLength - Maximum length
-     * @returns {string} Truncated text
-     */
-    truncate(text, maxLength = 50) {
-        if (!text || text.length <= maxLength) return text;
-        return text.substring(0, maxLength - 3) + '...';
-    },
-
-    /**
-     * Capitalize first letter of each word
-     * @param {string} str - Input string
-     * @returns {string} Capitalized string
-     */
-    capitalizeWords(str) {
-        if (!str) return '';
-        return str.replace(/\b\w/g, char => char.toUpperCase());
-    },
-
-    // ============================================
-    // 💾 STORAGE UTILITIES
-    // ============================================
-
-    /**
-     * Save data to localStorage with error handling
-     * @param {string} key - Storage key
-     * @param {*} data - Data to store
-     * @returns {boolean} Success status
-     */
-    saveToStorage(key, data) {
-        try {
-            localStorage.setItem(key, JSON.stringify(data));
-            return true;
-        } catch (error) {
-            console.error('Storage save error:', error);
+    validateField(value, rules) {
+        for (const rule of rules) {
+            const result = typeof rule === 'function' 
+                ? rule(value) 
+                : this.applyRule(rule, value);
             
-            // If quota exceeded, try to clear old data
-            if (error.name === 'QuotaExceededError') {
-                this.clearOldCache();
-                try {
-                    localStorage.setItem(key, JSON.stringify(data));
-                    return true;
-                } catch (e) {
-                    console.error('Still cannot save after clearing cache:', e);
-                    return false;
-                }
-            }
-            return false;
-        }
-    },
-
-    /**
-     * Load data from localStorage
-     * @param {string} key - Storage key
-     * @param {*} defaultValue - Default value if not found
-     * @returns {*} Stored data or default value
-     */
-    loadFromStorage(key, defaultValue = null) {
-        try {
-            const item = localStorage.getItem(key);
-            return item ? JSON.parse(item) : defaultValue;
-        } catch (error) {
-            console.error('Storage load error:', error);
-            return defaultValue;
-        }
-    },
-
-    /**
-     * Remove item from localStorage
-     * @param {string} key - Storage key
-     */
-    removeFromStorage(key) {
-        try {
-            localStorage.removeItem(key);
-        } catch (error) {
-            console.error('Storage remove error:', error);
-        }
-    },
-
-    /**
-     * Clear old cache data
-     */
-    clearOldCache() {
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key.startsWith('axentro_cache_')) {
-                keysToRemove.push(key);
+            if (result && !result.valid) {
+                return result;
             }
         }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-    },
+        
+        return { valid: true };
+    }
 
     /**
-     * Save to sessionStorage
-     * @param {string} key - Storage key
-     * @param {*} data - Data to store
+     * Apply a predefined validation rule
+     * @param {string} ruleName - Rule name
+     * @param {*} value - Value to validate
+     * @returns {object} Validation result
      */
-    saveToSession(key, data) {
-        try {
-            sessionStorage.setItem(key, JSON.stringify(data));
-        } catch (error) {
-            console.error('Session storage error:', error);
-        }
-    },
-
-    /**
-     * Load from sessionStorage
-     * @param {string} key - Storage key
-     * @param {*} defaultValue - Default value
-     * @returns {*} Stored data or default
-     */
-    loadFromSession(key, defaultValue = null) {
-        try {
-            const item = sessionStorage.getItem(key);
-            return item ? JSON.parse(item) : defaultValue;
-        } catch (error) {
-            console.error('Session load error:', error);
-            return defaultValue;
-        }
-    },
-
-    // ============================================
-    // 🌐 NETWORK & CONNECTIVITY
-    // ============================================
-
-    /**
-     * Check if device is online
-     * @returns {boolean} Online status
-     */
-    isOnline() {
-        return navigator.onLine;
-    },
-
-    /**
-     * Get connection information
-     * @returns {object|null} Connection info or null if not supported
-     */
-    getConnectionInfo() {
-        if (navigator.connection) {
-            return {
-                effectiveType: navigator.connection.effectiveType,
-                downlink: navigator.connection.downlink,
-                rtt: navigator.connection.rtt,
-                saveData: navigator.connection.saveData
-            };
-        }
-        return null;
-    },
-
-    /**
-     * Retry function with exponential backoff
-     * @param {Function} fn - Async function to retry
-     * @param {object} options - Retry options
-     * @returns {Promise<*>} Function result
-     */
-    async retryWithBackoff(fn, options = {}) {
-        const {
-            maxAttempts = AppConfig.retry.maxAttempts,
-            baseDelay = AppConfig.retry.baseDelay,
-            maxDelay = AppConfig.retry.maxDelay,
-            multiplier = AppConfig.retry.backoffMultiplier
-        } = options;
-
-        let lastError;
-
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            try {
-                return await fn();
-            } catch (error) {
-                lastError = error;
-                
-                if (attempt === maxAttempts - 1) throw error;
-                
-                const delay = Math.min(baseDelay * Math.pow(multiplier, attempt), maxDelay);
-                console.log(`Retry ${attempt + 1}/${maxAttempts} in ${delay}ms`);
-                
-                await this.sleep(delay);
-            }
-        }
-
-        throw lastError;
-    },
-
-    /**
-     * Sleep/delay utility
-     * @param {number} ms - Milliseconds to sleep
-     * @returns {Promise<void>}
-     */
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    },
-
-    // ============================================
-    // 📍 LOCATION UTILITIES
-    // ============================================
-
-    /**
-     * Get current geolocation
-     * @param {object} options - Geolocation options
-     * @returns {Promise<object>} Position object
-     */
-    async getLocation(options = {}) {
-        const defaultOptions = {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
+    applyRule(ruleName, value) {
+        const [rule, ...params] = ruleName.split(':');
+        
+        const ruleMap = {
+            required: () => this.required(value),
+            email: () => this.email(value),
+            employeeCode: () => this.employeeCode(value),
+            password: () => this.password(value),
+            minLength: () => this.minLength(value, parseInt(params[0])),
+            maxLength: () => this.maxLength(value, parseInt(params[0])),
+            pattern: () => this.pattern(value, params[0]),
+            match: () => this.match(value, params[0]),
+            numeric: () => this.numeric(value),
+            phone: () => this.phone(value),
+            name: () => this.name(value),
+            date: () => this.date(value),
+            url: () => this.url(value),
+            inRange: () => this.inRange(value, parseFloat(params[0]), parseFloat(params[1]))
         };
 
-        const mergedOptions = { ...defaultOptions, ...options };
+        return ruleMap[rule] ? ruleMap[rule]() : { valid: true };
+    }
 
-        return new Promise((resolve, reject) => {
-            if (!navigator.geolocation) {
-                reject(new Error('Geolocation is not supported'));
-                return;
+    /**
+     * Validate entire form
+     * @param {HTMLElement} formElement - Form element
+     * @param {object} rules - Field rules mapping
+     * @returns {object} Validation result with errors per field
+     */
+    validateForm(formElement, rules) {
+        const result = {
+            isValid: true,
+            errors: {},
+            firstErrorField: null
+        };
+
+        for (const [fieldName, fieldRules] of Object.entries(rules)) {
+            const field = formElement.querySelector(`[name="${fieldName}"], #${fieldName}`);
+            if (!field) continue;
+
+            const value = field.value || field.textContent;
+            const validationResult = this.validateField(value, fieldRules);
+
+            if (!validationResult.valid) {
+                result.isValid = false;
+                result.errors[fieldName] = validationResult.message;
+                
+                if (!result.firstErrorField) {
+                    result.firstErrorField = fieldName;
+                }
+                
+                this.showFieldError(field, validationResult.message);
+            } else {
+                this.clearFieldError(field);
+                this.showFieldSuccess(field);
             }
+        }
 
-            navigator.geolocation.getCurrentPosition(
-                position => resolve({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy,
-                    timestamp: position.timestamp
-                }),
-                error => reject(error),
-                mergedOptions
+        if (result.firstErrorField) {
+            const firstErrorElement = formElement.querySelector(
+                `[name="${result.firstErrorField}"], #${result.firstErrorField}`
             );
-        });
-    },
-
-    /**
-     * Create Google Maps link from coordinates
-     * @param {number} lat - Latitude
-     * @param {number} lng - Longitude
-     * @returns {string} Google Maps URL
-     */
-    getMapsLink(lat, lng) {
-        return `https://www.google.com/maps?q=${lat},${lng}`;
-    },
-
-    // ============================================
-    // 🖼️ IMAGE UTILITIES
-    // ============================================
-
-    /**
-     * Convert canvas/image to base64
-     * @param {HTMLCanvasElement|HTMLImageElement} element - Canvas or image element
-     * @param {string} type - Image type (default jpeg)
-     * @param {number} quality - Image quality (0-1)
-     * @returns {string} Base64 string
-     */
-    imageToBase64(element, type = 'image/jpeg', quality = 0.8) {
-        if (element instanceof HTMLCanvasElement) {
-            return element.toDataURL(type, quality);
-        }
-        
-        // If it's an image, draw to canvas first
-        const canvas = document.createElement('canvas');
-        canvas.width = element.naturalWidth || element.width;
-        canvas.height = element.naturalHeight || element.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(element, 0, 0);
-        return canvas.toDataURL(type, quality);
-    },
-
-    /**
-     * Compress image before upload
-     * @param {string} base64 - Base64 image string
-     * @param {number} maxWidth - Maximum width
-     * @param {number} quality - JPEG quality
-     * @returns {Promise<string>} Compressed base64
-     */
-    async compressImage(base64, maxWidth = 640, quality = 0.7) {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                if (width > maxWidth) {
-                    height = (height * maxWidth) / width;
-                    width = maxWidth;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                resolve(canvas.toDataURL('image/jpeg', quality));
-            };
-            img.src = base64;
-        });
-    },
-
-    /**
-     * Get image file size from base64
-     * @param {string} base64 - Base64 string
-     * @returns {number} Size in bytes
-     */
-    getImageSize(base64) {
-        if (!base64) return 0;
-        const base64Length = base64.split(',')[1]?.length || base64.length;
-        return Math.ceil((base64Length * 3) / 4);
-    },
-
-    // ============================================
-    // 🔐 SECURITY UTILITIES
-    // ============================================
-
-    /**
-     * Generate CSRF token
-     * @returns {string} Random token
-     */
-    generateCSRFToken() {
-        const array = new Uint8Array(32);
-        crypto.getRandomValues(array);
-        return Array.from(array, byte => byte.toString(16).padStart(2, '')).join('');
-    },
-
-    /**
-     * Simple hash function (for non-sensitive data)
-     * @param {string} str - String to hash
-     * @returns {string} Hashed string
-     */
-    simpleHash(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32bit integer
-        }
-        return Math.abs(hash).toString(16);
-    },
-
-    /**
-     * Mask sensitive data for display
-     * @param {string} str - String to mask
-     * @param {number} visibleChars - Number of visible characters at start and end
-     * @returns {string} Masked string
-     */
-    maskSensitive(str, visibleChars = 2) {
-        if (!str || str.length <= visibleChars * 2) return str;
-        
-        const start = str.substring(0, visibleChars);
-        const end = str.substring(str.length - visibleChars);
-        const masked = '*'.repeat(Math.min(str.length - visibleChars * 2, 8));
-        
-        return `${start}${masked}${end}`;
-    },
-
-    // ============================================
-    // 📊 DATA TRANSFORMATION
-    // ============================================
-
-    /**
-     * Deep clone an object
-     * @param {*} obj - Object to clone
-     * @returns {*} Cloned object
-     */
-    deepClone(obj) {
-        if (obj === null || typeof obj !== 'object') return obj;
-        
-        if (Array.isArray(obj)) {
-            return obj.map(item => this.deepClone(item));
-        }
-        
-        const cloned = {};
-        for (const key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                cloned[key] = this.deepClone(obj[key]);
+            if (firstErrorElement) {
+                firstErrorElement.focus();
+                this.scrollToField(firstErrorElement);
             }
         }
-        
-        return cloned;
-    },
 
-    /**
-     * Debounce function
-     * @param {Function} func - Function to debounce
-     * @param {number} wait - Wait time in ms
-     * @returns {Function} Debounced function
-     */
-    debounce(func, wait = 300) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    },
-
-    /**
-     * Throttle function
-     * @param {Function} func - Function to throttle
-     * @param {number} limit - Time limit in ms
-     * @returns {Function} Throttled function
-     */
-    throttle(func, limit = 300) {
-        let inThrottle;
-        return function executedFunction(...args) {
-            if (!inThrottle) {
-                func.apply(this, args);
-                inThrottle = true;
-                setTimeout(() => inThrottle = false, limit);
-            }
-        };
-    },
-
-    /**
-     * Group array by key
-     * @param {Array} array - Array to group
-     * @param {string|Function} key - Key or function to group by
-     * @returns {object} Grouped object
-     */
-    groupBy(array, key) {
-        return array.reduce((result, item) => {
-            const groupKey = typeof key === 'function' ? key(item) : item[key];
-            (result[groupKey] = result[groupKey] || []).push(item);
-            return result;
-        }, {});
-    },
-
-    /**
-     * Sort array of objects by key
-     * @param {Array} array - Array to sort
-     * @param {string} key - Key to sort by
-     * @param {string} order - 'asc' or 'desc'
-     * @returns {Array} Sorted array
-     */
-    sortBy(array, key, order = 'asc') {
-        return [...array].sort((a, b) => {
-            const aVal = a[key];
-            const bVal = b[key];
-            
-            if (aVal < bVal) return order === 'asc' ? -1 : 1;
-            if (aVal > bVal) return order === 'asc' ? 1 : -1;
-            return 0;
-        });
-    },
+        return result;
+    }
 
     // ============================================
-    // 🎯 VALIDATION HELPERS
+    // 🎯 PREDEFINED VALIDATION RULES
     // ============================================
 
     /**
-     * Check if value is empty
+     * Required field validation
      * @param {*} value - Value to check
-     * @returns {boolean} True if empty
+     * @returns {object} Validation result
      */
-    isEmpty(value) {
-        return (
+    required(value) {
+        const isEmpty = (
             value === null ||
             value === undefined ||
             (typeof value === 'string' && value.trim() === '') ||
-            (Array.isArray(value) && value.length === 0) ||
-            (typeof value === 'object' && Object.keys(value).length === 0)
+            (Array.isArray(value) && value.length === 0)
         );
-    },
+
+        return {
+            valid: !isEmpty,
+            message: ErrorCodes.VALIDATION_REQUIRED_FIELD.message,
+            code: ErrorCodes.VALIDATION_REQUIRED_FIELD.code
+        };
+    }
 
     /**
-     * Validate employee code format
-     * @param {string} code - Employee code
-     * @returns {boolean} Valid or not
-     */
-    isValidEmployeeCode(code) {
-        return Constants.regex.employeeCode.test(code);
-    },
-
-    /**
-     * Validate email format
+     * Email validation
      * @param {string} email - Email address
-     * @returns {boolean} Valid or not
+     * @returns {object} Validation result
      */
-    isValidEmail(email) {
-        return Constants.regex.email.test(email);
-    },
-
-    /**
-     * Check password strength
-     * @param {string} password - Password to check
-     * @returns {object} Strength info
-     */
-    checkPasswordStrength(password) {
-        let score = 0;
-        const checks = {
-            length: password.length >= 8,
-            lowercase: /[a-z]/.test(password),
-            uppercase: /[A-Z]/.test(password),
-            numbers: /\d/.test(password),
-            special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
-        };
-
-        Object.values(checks).forEach(passed => {
-            if (passed) score++;
-        });
-
-        let level = 'weak';
-        if (score >= 4) level = 'strong';
-        else if (score >= 2) level = 'medium';
-
-        return {
-            score,
-            level,
-            checks,
-            percentage: Math.round((score / 5) * 100)
-        };
-    },
-
-    // ============================================
-    // 📱 DEVICE & BROWSER INFO
-    // ============================================
-
-    /**
-     * Get device information
-     * @returns {object} Device info
-     */
-    getDeviceInfo() {
-        return {
-            userAgent: navigator.userAgent,
-            platform: navigator.platform,
-            language: navigator.language,
-            cookieEnabled: navigator.cookieEnabled,
-            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
-            isIOS: /iPhone|iPad|iPod/i.test(navigator.userAgent),
-            isAndroid: /Android/i.test(navigator.userAgent),
-            screenWidth: screen.width,
-            screenHeight: screen.height,
-            viewportWidth: window.innerWidth,
-            viewportHeight: window.innerHeight,
-            pixelRatio: window.devicePixelRatio || 1,
-            touchSupport: 'ontouchstart' in window
-        };
-    },
-
-    /**
-     * Check if PWA is installed
-     * @returns {boolean} Is installed
-     */
-    isPWAInstalled() {
-        return window.matchMedia('(display-mode: standalone)').matches ||
-               window.navigator.standalone === true;
-    },
-
-    // ============================================
-    // 🎨 UI HELPERS
-    // ============================================
-
-    /**
-     * Scroll to element smoothly
-     * @param {string|HTMLElement} selectorOrElement - Element or selector
-     * @param {number} offset - Offset from top
-     */
-    scrollTo(selectorOrElement, offset = 20) {
-        const element = typeof selectorOrElement === 'string' 
-            ? document.querySelector(selectorOrElement)
-            : selectorOrElement;
-        
-        if (element) {
-            const top = element.getBoundingClientRect().top + window.pageYOffset - offset;
-            window.scrollTo({ top, behavior: 'smooth' });
+    email(email) {
+        if (!email || email.trim() === '') {
+            return { valid: true }; // Optional field
         }
-    },
+
+        const isValid = Constants.regex.email.test(email.trim());
+        return {
+            valid: isValid,
+            message: ErrorCodes.VALIDATION_INVALID_EMAIL.message,
+            code: ErrorCodes.VALIDATION_INVALID_EMAIL.code
+        };
+    }
 
     /**
-     * Copy text to clipboard
-     * @param {string} text - Text to copy
-     * @returns {Promise<boolean>} Success status
+     * Employee code validation
+     * @param {string} code - Employee code
+     * @returns {object} Validation result
      */
-    async copyToClipboard(text) {
-        try {
-            await navigator.clipboard.writeText(text);
-            return true;
-        } catch (error) {
-            console.error('Clipboard error:', error);
-            // Fallback for older browsers
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            const success = document.execCommand('copy');
-            document.body.removeChild(textarea);
-            return success;
+    employeeCode(code) {
+        if (!code) {
+            return this.required(code);
         }
-    },
+
+        const isValid = Constants.regex.employeeCode.test(code.toUpperCase().trim());
+        return {
+            valid: isValid,
+            message: ErrorCodes.VALIDATION_INVALID_CODE.message,
+            code: ErrorCodes.VALIDATION_INVALID_CODE.code
+        };
+    }
 
     /**
-     * Download data as file
-     * @param {string} content - File content
-     * @param {string} filename - File name
-     * @param {string} mimeType - MIME type
+     * Password validation
+     * @param {string} password - Password string
+     * @returns {object} Validation result
      */
-    downloadFile(content, filename, mimeType = 'text/plain') {
-        const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    },
+    password(password) {
+        if (!password) {
+            return this.required(password);
+        }
 
-    /**
-     * Print element or page
-     * @param {string} [selector] - Element selector to print (optional)
-     */
-    print(selector) {
-        if (selector) {
-            const element = document.querySelector(selector);
-            if (element) {
-                const printWindow = window.open('', '_blank');
-                printWindow.document.write(`
-                    <html>
-                        <head>
-                            <title>Print</title>
-                            <style>
-                                body { font-family: Arial, sans-serif; padding: 20px; direction: rtl; }
-                                table { width: 100%; border-collapse: collapse; }
-                                th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-                                th { background: #f5f5f5; }
-                            </style>
-                        </head>
-                        <body>${element.innerHTML}</body>
-                    </html>
-                `);
-                printWindow.document.close();
-                printWindow.print();
+        const config = AppConfig.security.password;
+        let isValid = true;
+        let message = '';
+
+        if (password.length < config.minLength) {
+            isValid = false;
+            message = `كلمة المرور يجب أن تكون ${config.minLength} أحرف على الأقل`;
+        } else if (password.length > config.maxLength) {
+            isValid = false;
+            message = `كلمة المرور يجب أن لا تتجاوز ${config.maxLength} حرف`;
+        }
+
+        // Check strength if needed
+        if (isValid) {
+            const strength = Utils.checkPasswordStrength(password);
+            if (strength.level === 'weak' && password.length < 6) {
+                message = 'كلمة مرور ضعيفة جداً - يرجى اختيار كلمة أقوى';
+                // Don't invalidate, just warn
+                this.warnings.push(message);
             }
-        } else {
-            window.print();
+        }
+
+        return {
+            valid: isValid,
+            message: message || ErrorCodes.VALIDATION_WEAK_PASSWORD.message,
+            code: ErrorCodes.VALIDATION_WEAK_PASSWORD.code
+        };
+    }
+
+    /**
+     * Minimum length validation
+     * @param {string} value - Value to check
+     * @param {number} min - Minimum length
+     * @returns {object} Validation result
+     */
+    minLength(value, min) {
+        if (!value) return { valid: true };
+
+        const isValid = String(value).length >= min;
+        return {
+            valid: isValid,
+            message: `يجب أن يكون ${min} أحرف على الأقل`
+        };
+    }
+
+    /**
+     * Maximum length validation
+     * @param {string} value - Value to check
+     * @param {number} max - Maximum length
+     * @returns {object} Validation result
+     */
+    maxLength(value, max) {
+        if (!value) return { valid: true };
+
+        const isValid = String(value).length <= max;
+        return {
+            valid: isValid,
+            message: `يجب أن لا يتجاوز ${max} حرف`
+        };
+    }
+
+    /**
+     * Pattern/Regex validation
+     * @param {string} value - Value to check
+     * @param {string} patternStr - Regex pattern string
+     * @returns {object} Validation result
+     */
+    pattern(value, patternStr) {
+        if (!value) return { valid: true };
+
+        try {
+            const regex = new RegExp(patternStr);
+            const isValid = regex.test(value);
+            return {
+                valid: isValid,
+                message: 'الصيغة غير صحيحة'
+            };
+        } catch (e) {
+            console.error('Invalid regex pattern:', e);
+            return { valid: true };
         }
     }
-};
 
-// Make Utils available globally
-window.Utils = Utils;
+    /**
+     * Match another field's value
+     * @param {string} value - Current value
+     * @param {string} otherFieldId - Other field ID
+     * @returns {object} Validation result
+     */
+    match(value, otherFieldId) {
+        const otherField = document.getElementById(otherFieldId);
+        if (!otherField) return { valid: true };
+
+        const otherValue = otherField.value;
+        const isValid = value === otherValue;
+
+        return {
+            valid: isValid,
+            message: ErrorCodes.VALIDATION_PASSWORD_MISMATCH.message,
+            code: ErrorCodes.VALIDATION_PASSWORD_MISMATCH.code
+        };
+    }
+
+    /**
+     * Numeric validation
+     * @param {*} value - Value to check
+     * @returns {object} Validation result
+     */
+    numeric(value) {
+        if (!value) return { valid: true };
+
+        const num = Number(value);
+        const isValid = !isNaN(num) && isFinite(num);
+
+        return {
+            valid: isValid,
+            message: 'يجب إدخال رقم صحيح'
+        };
+    }
+
+    /**
+     * Phone number validation
+     * @param {string} phone - Phone number
+     * @returns {object} Validation result
+     */
+    phone(phone) {
+        if (!phone) return { valid: true };
+
+        const isValid = Constants.regex.phone.test(phone.replace(/\s/g, ''));
+
+        return {
+            valid: isValid,
+            message: 'رقم الهاتف غير صالح'
+        };
+    }
+
+    /**
+     * Name validation (Arabic/English)
+     * @param {string} name - Name to validate
+     * @returns {object} Validation result
+     */
+    name(name) {
+        if (!name) return this.required(name);
+
+        const trimmed = name.trim();
+        const isValid = Constants.regex.name.test(trimmed);
+
+        return {
+            valid: isValid,
+            message: 'الاسم غير صحيح (3-100 حرف، عربي أو إنجليزي فقط)'
+        };
+    }
+
+    /**
+     * Date validation
+     * @param {string} dateStr - Date string
+     * @returns {object} Validation result
+     */
+    date(dateStr) {
+        if (!dateStr) return { valid: true };
+
+        const date = new Date(dateStr);
+        const isValid = !isNaN(date.getTime());
+
+        return {
+            valid: isValid,
+            message: 'التاريخ غير صحيح'
+        };
+    }
+
+    /**
+     * URL validation
+     * @param {string} url - URL to validate
+     * @returns {object} Validation result
+     */
+    url(url) {
+        if (!url) return { valid: true };
+
+        try {
+            new URL(url);
+            return { valid: true };
+        } catch {
+            return {
+                valid: false,
+                message: 'رابط URL غير صحيح'
+            };
+        }
+    }
+
+    /**
+     * Range validation
+     * @param {number} value - Numeric value
+     * @param {number} min - Minimum value
+     * @param {number} max - Maximum value
+     * @returns {object} Validation result
+     */
+    inRange(value, min, max) {
+        if (value === null || value === undefined) return { valid: true };
+
+        const num = Number(value);
+        const isValid = num >= min && num <= max;
+
+        return {
+            valid: isValid,
+            message: `يجب أن يكون بين ${min} و ${max}`
+        };
+    }
+
+    // ============================================
+    // 🎨 UI FEEDBACK METHODS
+    // ============================================
+
+    /**
+     * Show error on a field
+     * @param {HTMLElement} field - Form field element
+     * @param {string} message - Error message
+     */
+    showFieldError(field, message) {
+        // Add error class
+        field.classList.add('error');
+        field.classList.remove('success');
+
+        // Find or create error message element
+        let errorEl = field.parentElement.querySelector('.error-message');
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        // Add shake animation
+        field.style.animation = 'shake 0.5s ease';
+        setTimeout(() => {
+            field.style.animation = '';
+        }, 500);
+    }
+
+    /**
+     * Clear error from field
+     * @param {HTMLElement} field - Form field element
+     */
+    clearFieldError(field) {
+        field.classList.remove('error');
+
+        const errorEl = field.parentElement.querySelector('.error-message');
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.style.display = 'none';
+        }
+    }
+
+    /**
+     * Show success state on field
+     * @param {HTMLElement} field - Form field element
+     */
+    showFieldSuccess(field) {
+        field.classList.add('success');
+        field.classList.remove('error');
+    }
+
+    /**
+     * Scroll to field with error
+     * @param {HTMLElement} field - Field element
+     */
+    scrollToField(field) {
+        setTimeout(() => {
+            field.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+            field.focus();
+        }, 100);
+    }
+
+    /**
+     * Clear all validation states from form
+     * @param {HTMLElement} formElement - Form element
+     */
+    clearFormValidation(formElement) {
+        const fields = formElement.querySelectorAll('.error, .success');
+        fields.forEach(field => {
+            field.classList.remove('error', 'success');
+        });
+
+        const errorMessages = formElement.querySelectorAll('.error-message');
+        errorMessages.forEach(el => {
+            el.textContent = '';
+            el.style.display = 'none';
+        });
+    }
+
+    // ============================================
+    // 🔧 UTILITY METHODS
+    // ============================================
+
+    /**
+     * Reset validator state
+     */
+    reset() {
+        this.errors = [];
+        this.warnings = [];
+    }
+
+    /**
+     * Get all collected errors
+     * @returns {Array} Errors array
+     */
+    getErrors() {
+        return [...this.errors];
+    }
+
+    /**
+     * Get all warnings
+     * @returns {Array} Warnings array
+     */
+    getWarnings() {
+        return [...this.warnings];
+    }
+
+    /**
+     * Check if there are any errors
+     * @returns {boolean} Has errors
+     */
+    hasErrors() {
+        return this.errors.length > 0;
+    }
+
+    /**
+     * Sanitize and validate request data (for API calls)
+     * @param {object} data - Request data object
+     * @param {object} schema - Validation schema
+     * @returns {object} Validation result with sanitized data
+     */
+    validateAndSanitizeRequest(data, schema) {
+        const sanitized = {};
+        const errors = [];
+
+        for (const [field, rules] of Object.entries(schema)) {
+            const value = data[field];
+            
+            // Apply sanitization
+            sanitized[field] = this.sanitizeValue(value, field);
+            
+            // Apply validation
+            if (rules && rules.length > 0) {
+                const result = this.validateField(sanitized[field], rules);
+                if (!result.valid) {
+                    errors.push({
+                        field,
+                        message: result.message,
+                        code: result.code
+                    });
+                }
+            }
+        }
+
+        return {
+            isValid: errors.length === 0,
+            data: sanitized,
+            errors
+        };
+    }
+
+    /**
+     * Sanitize a value based on field type
+     * @param {*} value - Value to sanitize
+     * @param {string} field - Field name
+     * @returns {*} Sanitized value
+     */
+    sanitizeValue(value, field) {
+        if (value === null || value === undefined) return '';
+
+        const stringValue = String(value).trim();
+
+        // Field-specific sanitization
+        switch (field.toLowerCase()) {
+            case 'email':
+                return Utils.sanitizeEmail(stringValue) || '';
+            
+            case 'code':
+            case 'employee_code':
+                return stringValue.toUpperCase().substring(0, 10);
+            
+            case 'name':
+            case 'employee_name':
+                return Utils.sanitizeString(stringValue);
+            
+            case 'password':
+                return stringValue; // Don't trim passwords too much
+            
+            default:
+                return Utils.sanitizeString(stringValue);
+        }
+    }
+
+    // ============================================
+    // 📊 ADVANCED VALIDATION
+    // ============================================
+
+    /**
+     * Async validation (for API checks)
+     * @param {*} value - Value to validate
+     * @param {Function} asyncCheck - Async validation function
+     * @returns {Promise<object>} Validation result
+     */
+    async validateAsync(value, asyncCheck) {
+        try {
+            const result = await asyncCheck(value);
+            return result;
+        } catch (error) {
+            console.error('Async validation error:', error);
+            return {
+                valid: false,
+                message: 'خطأ في التحقق'
+            };
+        }
+    }
+
+    /**
+     * Validate attendance data before submission
+     * @param {object} attendanceData - Attendance record data
+     * @returns {object} Validation result
+     */
+    validateAttendanceData(attendanceData) {
+        const errors = [];
+        const requiredFields = ['employee_code', 'employee_name', 'type', 'shift'];
+
+        for (const field of requiredFields) {
+            if (!attendanceData[field] || String(attendanceData[field]).trim() === '') {
+                errors.push({
+                    field,
+                    message: `${field} مطلوب`
+                });
+            }
+        }
+
+        // Validate type
+        if (attendanceData.type && !['حضور', 'انصراف'].includes(attendanceData.type)) {
+            errors.push({
+                field: 'type',
+                message: 'نوع الحضور غير صالح (يجب أن يكون حضور أو انصراف)'
+            });
+        }
+
+        // Validate shift
+        const validShifts = AppConfig.attendance.shifts.map(s => s.id);
+        if (attendanceData.shift && !validShifts.includes(attendanceData.shift)) {
+            errors.push({
+                field: 'shift',
+                message: 'وردية العمل غير صالحة'
+            });
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors,
+            data: attendanceData
+        };
+    }
+
+    /**
+     * Validate user registration data
+     * @param {object} regData - Registration data
+     * @returns {object} Validation result
+     */
+    validateRegistration(regData) {
+        const schema = {
+            name: ['required', 'name'],
+            code: ['required', 'employeeCode'],
+            password: ['required', 'password']
+        };
+
+        // Optional fields
+        if (regData.email) {
+            schema.email = ['email'];
+        }
+
+        return this.validateAndSanitizeRequest(regData, schema);
+    }
+
+    /**
+     * Validate login credentials
+     * @param {object} loginData - Login data
+     * @returns {object} Validation result
+     */
+    validateLogin(loginData) {
+        const schema = {
+            code: ['required', 'employeeCode'],
+            password: ['required', 'password']
+        };
+
+        return this.validateAndSanitizeRequest(loginData, schema);
+    }
+}
+
+// Create global instance
+const validator = new Validator();
+
+// Export for use in other modules
+window.Validator = Validator;
+window.validator = validator;
+
+// Add shake animation CSS dynamically
+const shakeStyle = document.createElement('style');
+shakeStyle.textContent = `
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+        20%, 40%, 60%, 80% { transform: translateX(5px); }
+    }
+    
+    input.error, select.error {
+        border-color: var(--danger-500) !important;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+    }
+    
+    input.success {
+        border-color: var(--success-500) !important;
+    }
+    
+    .error-message {
+        color: var(--danger-500);
+        font-size: 12px;
+        margin-top: 4px;
+        display: none;
+    }
+`;
+document.head.appendChild(shakeStyle);
