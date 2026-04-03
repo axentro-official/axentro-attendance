@@ -1,7 +1,8 @@
 /**
  * ============================================
- * 📷 AXENTRO FACE RECOGNITION v4.0
+ * 📷 AXENTRO FACE RECOGNITION v4.1 - ROBUST EDITION
  * ✅ AI-Powered Face Detection & Recognition
+ * 🔥 مع تحسينات كبيرة لمنع الفشل في التحميل
  * ============================================
  */
 
@@ -21,7 +22,12 @@ class FaceRecognitionManager {
         // Configuration
         this.config = AppConfig.faceRecognition;
         
-        this.init();
+        // Loading state tracking
+        this.loadingAttempted = false;
+        this.loadError = null;
+        this.usedBackupCdn = false;
+
+        console.log('🎭 Face Recognition Manager initialized');
     }
 
     // ============================================
@@ -35,25 +41,34 @@ class FaceRecognitionManager {
         console.log('🎭 Initializing Face Recognition System...');
         
         try {
-            // Load face-api.js models
-            await this.loadModels();
-            
-            // Setup camera elements
+            // Setup camera elements first (doesn't require models)
             this.setupCameraElements();
+            
+            // Try to load models with timeout and fallback
+            await this.loadModelsWithSafetyNet();
             
             console.log('✅ Face Recognition System Ready');
             
         } catch (error) {
             console.error('❌ Face Recognition Init Error:', error);
-            ui.showError('فشل تحميل نظام التعرف على الوجوه');
+            this.loadError = error.message;
+            
+            // Don't throw - allow app to continue in basic mode
+            if (typeof ui !== 'undefined' && ui.showWarning) {
+                ui.showWarning('التعرف على الوجه غير متوفر - يمكنك استخدام الكود وكلمة المرور');
+            }
         }
     }
 
     /**
-     * Load required neural network models
+     * Load required neural network models with SAFETY NET
+     * 🔥 THE CRITICAL FIX - Prevents app from crashing
      */
     async loadModels() {
-        if (this.modelsLoaded) return;
+        if (this.modelsLoaded) {
+            console.log('✅ Models already loaded');
+            return true;
+        }
 
         const statusEl = document.getElementById('loadStatus');
         const progressEl = document.getElementById('loadProgress');
@@ -62,33 +77,152 @@ class FaceRecognitionManager {
             // Update status
             if (statusEl) statusEl.textContent = 'جاري تحميل نماذج الذكاء الاصطناعي...';
             
-            // Load models sequentially with progress updates
+            // Check if face-api library is available
+            if (typeof faceapi === 'undefined') {
+                throw new Error('face-api.js library not loaded. Please check your internet connection.');
+            }
+
+            // Models to load (in order of importance)
             const models = [
-                { name: 'tinyFaceDetector', url: this.config.models.tinyFaceDetector, progress: 20 },
-                { name: 'faceLandmark68Tiny', url: this.config.models.faceLandmark68Tiny, progress: 40 },
-                { name: 'faceRecognition', url: this.config.models.faceRecognition, progress: 70 },
-                { name: 'faceExpression', url: null, progress: 85 } // Optional
+                { 
+                    name: 'tinyFaceDetector', 
+                    url: this.config.models.tinyFaceDetector, 
+                    required: true,
+                    progress: 20 
+                },
+                { 
+                    name: 'faceLandmark68Tiny', 
+                    url: this.config.models.faceLandmark68Tiny, 
+                    required: true, 
+                    progress: 40 
+                },
+                { 
+                    name: 'faceRecognition', 
+                    url: this.config.models.faceRecognition, 
+                    required: true, 
+                    progress: 70 
+                },
+                { 
+                    name: 'faceExpression', 
+                    url: this.config.models.faceExpression || null, 
+                    required: false, // Optional model
+                    progress: 85 
+                }
             ];
 
+            let loadedCount = 0;
+
             for (const model of models) {
-                if (model.url && faceapi.nets[model.name]) {
-                    console.log(`Loading model: ${model.name}`);
-                    await faceapi.nets[model.name].loadFromUri(model.url);
+                // Skip optional models if not available
+                if (!model.url && !model.required) {
+                    console.log(`⏭️ Skipping optional model: ${model.name}`);
+                    continue;
+                }
+
+                // Check if model exists in face-api
+                if (!faceapi.nets[model.name]) {
+                    console.warn(`⚠️ Model ${model.name} not available in face-api`);
+                    if (model.required) {
+                        throw new Error(`Required model ${model.name} not available`);
+                    }
+                    continue;
+                }
+
+                console.log(`📥 Loading model: ${model.name}...`);
+                
+                try {
+                    // Set timeout for each model load
+                    const modelLoadPromise = faceapi.nets[model.name].loadFromUri(model.url);
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error(`Timeout loading ${model.name}`)), 10000)
+                    );
+
+                    await Promise.race([modelLoadPromise, timeoutPromise]);
+                    
+                    loadedCount++;
                     
                     if (progressEl) progressEl.style.width = `${model.progress}%`;
-                    await Utils.sleep(200); // Small delay for UI update
+                    console.log(`✅ Model loaded: ${model.name}`);
+                    
+                    // Small delay for UI update
+                    await this.sleep(200);
+
+                } catch (modelError) {
+                    console.error(`❌ Failed to load model ${model.name}:`, modelError.message);
+                    
+                    if (model.required) {
+                        // Try backup CDN before failing
+                        if (!this.usedBackupCdn && this.config.backupModels?.[model.name]) {
+                            console.log(`🔄 Trying backup CDN for ${model.name}...`);
+                            this.usedBackupCdn = true;
+                            
+                            try {
+                                await faceapi.nets[model.name].loadFromUri(this.config.backupModels[model.name]);
+                                loadedCount++;
+                                console.log(`✅ Model loaded from backup: ${model.name}`);
+                                continue;
+                            } catch (backupError) {
+                                console.error(`❌ Backup CDN also failed for ${model.name}`);
+                            }
+                        }
+                        
+                        // If we can't load a required model, throw error
+                        throw new Error(`Failed to load required model: ${model.name}`);
+                    }
+                    // If optional model fails, just continue
                 }
             }
 
-            this.modelsLoaded = true;
+            this.modelsLoaded = loadedCount > 0; // At least some models loaded
             
             if (progressEl) progressEl.style.width = '100%';
-            if (statusEl) statusEl.textContent = 'تم تحميل النماذج بنجاح ✓';
+            if (statusEl) statusEl.textContent = this.modelsLoaded ? 
+                'تم تحميل النماذج بنجاح ✓' : 
+                '⚠️ تم تحميل بعض النماذج فقط';
+
+            return this.modelsLoaded;
 
         } catch (error) {
-            console.error('Model loading error:', error);
-            throw new Error(ErrorCodes.FACE_MODEL_LOAD_FAILED.message);
+            console.error('❌ Model loading error:', error);
+            this.loadError = error.message;
+            throw error; // Re-throw to be caught by caller
         }
+    }
+
+    /**
+     * Enhanced model loading with safety net
+     * Prevents app crash on failure
+     */
+    async loadModelsWithSafetyNet() {
+        this.loadingAttempted = true;
+        
+        try {
+            // Set overall timeout
+            const timeoutMs = this.config.timeout?.modelLoad || 15000;
+            
+            const loadPromise = this.loadModels();
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('تجاوز وقت تحميل النماذج (15 ثانية)')), timeoutMs)
+            );
+
+            const result = await Promise.race([loadPromise, timeoutPromise]);
+            return result;
+
+        } catch (error) {
+            console.error('❌ Face recognition models failed to load:', error.message);
+            this.modelsLoaded = false;
+            this.loadError = error.message;
+            
+            // Return false instead of throwing - allows app to continue
+            return false;
+        }
+    }
+
+    /**
+     * Check if models are loaded
+     */
+    areModelsLoaded() {
+        return this.modelsLoaded;
     }
 
     /**
@@ -102,6 +236,8 @@ class FaceRecognitionManager {
         // Register page cameras
         this.registerVideo = document.getElementById('registerVideo');
         this.registerCanvas = document.getElementById('registerCanvas');
+
+        console.log('📹 Camera elements set up');
     }
 
     // ============================================
@@ -109,10 +245,10 @@ class FaceRecognitionManager {
     // ============================================
 
     /**
-     * Start camera stream
+     * Start camera stream with ENHANCED error handling
      * @param {HTMLVideoElement} videoElement - Video element to use
      * @param {object} options - Camera options
-     * @returns {Promise<MediaStream>} Camera stream
+     * @returns {Promise} Camera stream
      */
     async startCamera(videoElement, options = {}) {
         try {
@@ -135,13 +271,20 @@ class FaceRecognitionManager {
                 audio: false
             };
 
-            // Request permission and get stream
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            // Request permission with timeout
+            const timeoutMs = this.config.timeout?.cameraStart || 10000;
+            
+            const streamPromise = navigator.mediaDevices.getUserMedia(constraints);
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('تم رفض إذن الكاميرا أو تجاوز الوقت')), timeoutMs)
+            );
+
+            const stream = await Promise.race([streamPromise, timeoutPromise]);
             
             // Attach to video element
             if (videoElement) {
                 videoElement.srcObject = stream;
-                await videoElement.play();
+                await videoElement.play().catch(e => console.warn('Video play warning:', e));
                 
                 // Store reference
                 this.currentVideoElement = videoElement;
@@ -149,7 +292,7 @@ class FaceRecognitionManager {
 
             this.currentStream = stream;
             this.isCameraActive = true;
-
+            
             console.log('📹 Camera started successfully');
             return stream;
 
@@ -168,15 +311,22 @@ class FaceRecognitionManager {
             this.currentStream.getTracks().forEach(track => track.stop());
             this.currentStream = null;
         }
-
+        
         if (this.currentVideoElement) {
             this.currentVideoElement.srcObject = null;
         }
-
+        
         this.stopDetection();
         this.isCameraActive = false;
         
         console.log('📹 Camera stopped');
+    }
+
+    /**
+     * Check if camera is currently running
+     */
+    isCameraRunning() {
+        return this.isCameraActive;
     }
 
     /**
@@ -189,18 +339,20 @@ class FaceRecognitionManager {
         const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
 
         try {
-            ui.showInfo('جاري تبديل الكاميرا...');
+            if (typeof ui !== 'undefined' && ui.showInfo) {
+                ui.showInfo('جاري تبديل الكاميرا...');
+            }
             
-            await this.startCamera(this.currentVideoElement, { 
-                facingMode: newFacingMode 
-            });
-            
+            await this.startCamera(this.currentVideoElement, { facingMode: newFacingMode });
             this.lastFacingMode = newFacingMode;
             
-            ui.showSuccess('تم تبديل الكاميرا ✓');
-            
+            if (typeof ui !== 'undefined' && ui.showSuccess) {
+                ui.showSuccess('تم تبديل الكاميرا ✓');
+            }
         } catch (error) {
-            ui.showError('فشل تبديل الكاميرا');
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError('فشل تبديل الكاميرا');
+            }
         }
     }
 
@@ -210,32 +362,31 @@ class FaceRecognitionManager {
      */
     handleCameraError(error) {
         let userMessage = '';
-
+        
         switch (error.name) {
             case 'NotAllowedError':
             case 'PermissionDeniedError':
                 userMessage = ErrorCodes.FACE_CAMERA_PERMISSION_DENIED.message;
                 break;
-                
             case 'NotFoundError':
             case 'DevicesNotFoundError':
                 userMessage = ErrorCodes.FACE_NO_CAMERA.message;
                 break;
-                
             case 'NotReadableError':
             case 'TrackStartError':
                 userMessage = 'الكاميرا مستخدمة من قبل تطبيق آخر';
                 break;
-                
             case 'OverconstrainedError':
                 userMessage = 'الكاميرا لا تدعم الإعدادات المطلوبة';
                 break;
-                
             default:
-                userMessage = ErrorCodes.FACE_NO_CAMERA.message;
+                userMessage = error.message || ErrorCodes.FACE_NO_CAMERA.message;
         }
 
-        ui.showError(userMessage);
+        if (typeof ui !== 'undefined' && ui.showError) {
+            ui.showError(userMessage);
+        }
+        
         console.error('Camera error:', error.name, error.message);
     }
 
@@ -251,7 +402,10 @@ class FaceRecognitionManager {
      */
     async startDetection(video, canvas, onDetect) {
         if (!this.modelsLoaded) {
-            ui.showError(ErrorCodes.FACE_MODEL_LOAD_FAILED.message);
+            console.warn('⚠️ Cannot start detection - models not loaded');
+            if (typeof ui !== 'undefined' && ui.showWarning) {
+                ui.showWarning('نماذج التعرف غير محملة');
+            }
             return;
         }
 
@@ -265,11 +419,11 @@ class FaceRecognitionManager {
         }
 
         // Create display size for detection
-        const displaySize = {
-            width: video?.videoWidth || this.config.camera.width,
-            height: video?.videoHeight || this.config.camera.height
+        const displaySize = { 
+            width: video?.videoWidth || this.config.camera.width, 
+            height: video?.videoHeight || this.config.camera.height 
         };
-
+        
         faceapi.matchDimensions(canvas, displaySize);
 
         // Start detection loop
@@ -280,9 +434,9 @@ class FaceRecognitionManager {
                 if (detections.length > 0 && onDetect) {
                     onDetect(detections[0], canvas);
                 }
-                
             } catch (error) {
-                console.error('Detection error:', error);
+                console.error('Detection loop error:', error);
+                // Don't stop the loop on single error - continue trying
             }
         }, 200); // Detect every 200ms
 
@@ -303,10 +457,12 @@ class FaceRecognitionManager {
      * Detect faces in video frame
      * @param {HTMLVideoElement} video - Video element
      * @param {object} displaySize - Display dimensions
-     * @returns {Promise<Array>} Array of detections
+     * @returns {Promise} Array of detections
      */
     async detectFaces(video, displaySize) {
-        if (!video || !this.modelsLoaded) return [];
+        if (!video || !this.modelsLoaded || typeof faceapi === 'undefined') {
+            return [];
+        }
 
         try {
             const options = new faceapi.TinyFaceDetectorOptions({
@@ -320,7 +476,7 @@ class FaceRecognitionManager {
 
             // Resize detections to match display
             const resizedDetections = faceapi.resizeResults(detections, displaySize);
-
+            
             return resizedDetections;
 
         } catch (error) {
@@ -335,7 +491,7 @@ class FaceRecognitionManager {
      * @param {HTMLCanvasElement} canvas - Canvas element
      */
     drawDetections(detections, canvas) {
-        if (!canvas || !detections.length) return;
+        if (!canvas || !detections.length || typeof faceapi === 'undefined') return;
 
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -352,7 +508,7 @@ class FaceRecognitionManager {
             // Draw corners
             const cornerLength = 20;
             ctx.lineWidth = 4;
-            
+
             // Top-left corner
             ctx.beginPath();
             ctx.moveTo(box.x, box.y + cornerLength);
@@ -380,390 +536,181 @@ class FaceRecognitionManager {
             ctx.lineTo(box.x + box.width, box.y + box.height);
             ctx.lineTo(box.x + box.width, box.y + box.height - cornerLength);
             ctx.stroke();
+
+            // Draw landmarks if available
+            if (detection.landmarks) {
+                const landmarks = detection.landmarks;
+                const points = landmark.positions || [];
+                
+                ctx.fillStyle = '#10b981';
+                points.forEach(point => {
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+            }
         });
     }
 
     // ============================================
-    // 🎯 FACE RECOGNITION
+    // 🎯 FACE RECOGNITION (Matching)
     // ============================================
 
     /**
-     * Capture face descriptor from current video frame
-     * @param {HTMLVideoElement} video - Video element
-     * @returns {Promise<object|null>} Face descriptor or null
+     * Capture face descriptor from video/canvas
+     * @returns {Promise<Float32Array|null>} Face descriptor
      */
-    async captureFaceDescriptor(video) {
-        if (!video || !this.modelsLoaded) {
-            throw new Error(ErrorCodes.FACE_MODEL_LOAD_FAILED.message);
+    async captureFaceDescriptor() {
+        if (!this.modelsLoaded || !this.currentVideoElement) {
+            console.warn('Cannot capture descriptor - models or camera not ready');
+            return null;
         }
 
         try {
-            // Detect face with descriptor
             const detection = await faceapi
                 .detectSingleFace(
-                    video, 
-                    new faceapi.TinyFaceDetectorOptions({
-                        inputSize: this.config.detection.inputSize,
-                        scoreThreshold: this.config.detection.scoreThreshold
-                    })
+                    this.currentVideoElement, 
+                    new faceapi.TinyFaceDetectorOptions()
                 )
                 .withFaceLandmarks()
                 .withFaceDescriptor();
 
-            if (!detection) {
+            if (detection) {
+                return detection.descriptor;
+            }
+
+            return null;
+
+        } catch (error) {
+            console.error('Face descriptor capture error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Recognize face for attendance check-in/out
+     * @returns {Promise<object|null>} Recognized employee data
+     */
+    async recognizeForAttendance() {
+        if (!this.modelsLoaded || !this.isCameraActive) {
+            console.warn('Face recognition not available');
+            return null;
+        }
+
+        try {
+            // Capture current face descriptor
+            const descriptor = await this.captureFaceDescriptor();
+            
+            if (!descriptor) {
                 throw new Error(ErrorCodes.FACE_NO_FACE_DETECTED.message);
             }
 
-            // Extract descriptor as array
-            const descriptor = Array.from(detection.descriptor);
-
-            return {
-                descriptor,
-                detection: detection.detection,
-                landmarks: detection.landmarks,
-                confidence: detection.detection.score,
-                timestamp: Date.now()
-            };
-
-        } catch (error) {
-            console.error('Capture descriptor error:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Recognize face against known faces database
-     * @param {Array} descriptor - Face descriptor array
-     * @returns {Promise<object|null>} Recognition result or null
-     */
-    async recognizeFace(descriptor) {
-        if (!descriptor || this.knownFaces.size === 0) {
-            return null;
-        }
-
-        try {
+            // Find best match among known faces
             let bestMatch = null;
             let bestDistance = Infinity;
 
-            // Compare against all known faces
-            for (const [code, faceData] of this.knownFaces) {
-                const distance = faceapi.euclideanDistance(
-                    descriptor, 
-                    faceData.descriptor
-                );
-
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestMatch = {
-                        code: faceData.code,
-                        name: faceData.name,
-                        distance: distance,
-                        confidence: 1 - distance, // Convert distance to confidence
-                        imageData: faceData.imageData
-                    };
-                }
-            }
-
-            // Check if match is above threshold
-            if (bestMatch && bestMatch.distance <= this.config.recognition.labelDistance) {
-                const isHighConfidence = bestMatch.confidence >= this.config.recognition.threshold;
-                
-                return {
-                    ...bestMatch,
-                    recognized: isHighConfidence,
-                    message: isHighConfidence 
-                        ? `تم التعرف على: ${bestMatch.name}` 
-                        : `قد يكون: ${bestMatch.name} (ثقة منخفضة)`
-                };
-            }
-
-            return null;
-
-        } catch (error) {
-            console.error('Recognition error:', error);
-            return null;
-        }
-    }
-
-    /**
-     * Load known faces from database
-     */
-    async loadKnownFaces() {
-        try {
-            const employees = await db.getAllEmployees();
-            
-            this.knownFaces.clear();
-            
-            employees.forEach(emp => {
-                if (emp.face_descriptor && emp.code !== 'ADMIN') {
-                    this.knownFaces.set(emp.code, {
-                        code: emp.code,
-                        name: emp.name,
-                        descriptor: typeof emp.face_descriptor === 'string' 
-                            ? JSON.parse(emp.face_descriptor)
-                            : emp.face_descriptor,
-                        imageData: emp.profile_image_url
-                    });
+            this.knownFaces.forEach((employeeData, code) => {
+                if (employeeData.descriptor) {
+                    const distance = faceapi.euclideanDistance(descriptor, employeeData.descriptor);
+                    
+                    if (distance < bestDistance && distance < this.config.recognition.labelDistance) {
+                        bestDistance = distance;
+                        bestMatch = {
+                            code: code,
+                            name: employeeData.name,
+                            confidence: 1 - distance,
+                            distance: distance
+                        };
+                    }
                 }
             });
 
-            console.log(`✅ Loaded ${this.knownFaces.size} known faces`);
-
-        } catch (error) {
-            console.error('Load known faces error:', error);
-        }
-    }
-
-    /**
-     * Add face to known faces database
-     * @param {string} code - Employee code
-     * @param {string} name - Employee name
-     * @param {Array} descriptor - Face descriptor
-     * @param {string} [imageData] - Optional image data URL
-     */
-    addKnownFace(code, name, descriptor, imageData = null) {
-        this.knownFaces.set(code, {
-            code,
-            name,
-            descriptor,
-            imageData
-        });
-        
-        console.log(`➕ Added face: ${name} (${code})`);
-    }
-
-    /**
-     * Remove face from known faces
-     * @param {string} code - Employee code
-     */
-    removeKnownFace(code) {
-        this.knownFaces.delete(code);
-        console.log(`➖ Removed face: ${code}`);
-    }
-
-    // ============================================
-    // 📸 CAPTURE OPERATIONS
-    // ============================================
-
-    /**
-     * Capture photo from video
-     * @param {HTMLVideoElement} video - Video element
-     * @param {HTMLCanvasElement} canvas - Canvas element
-     * @returns {object} Captured image data
-     */
-    capturePhoto(video, canvas) {
-        if (!video || !canvas) {
-            throw new Error('Video or canvas element not found');
-        }
-
-        // Set canvas size to match video
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        // Draw current video frame to canvas
-        const ctx = canvas.getContext('2d');
-        
-        // Mirror the image (selfie mode)
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Reset transform
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-        // Get base64 image
-        const base64Image = canvas.toDataURL('image/jpeg', 0.8);
-
-        return {
-            base64: base64Image,
-            width: canvas.width,
-            height: canvas.height,
-            timestamp: Date.now()
-        };
-    }
-
-    /**
-     * Handle face capture for registration
-     * @param {Event} e - Click event
-     */
-    async handleRegistrationCapture(e) {
-        try {
-            if (!this.isCameraActive) {
-                ui.showWarning('يرجى تشغيل الكاميرا أولاً');
-                return;
-            }
-
-            ui.showButtonLoading(e.target, 'جاري التقاط الوجه...');
-
-            // Capture photo
-            const photo = this.capturePhoto(this.registerVideo, this.registerCanvas);
-            
-            // Get face descriptor
-            const faceData = await this.captureFaceDescriptor(this.registerVideo);
-
-            // Save to session for registration form submission
-            Utils.saveToSession(Constants.sessionKeys.TEMP_FACE_DESCRIPTOR, faceData.descriptor);
-
-            // Show preview
-            const previewImg = document.getElementById('capturedFacePreview');
-            const previewContainer = document.getElementById('facePreviewContainer');
-            const captureBtn = document.getElementById('captureFaceBtn');
-
-            if (previewImg) {
-                previewImg.src = photo.base64;
-            }
-            if (previewContainer) {
-                previewContainer.classList.remove('hidden');
-            }
-            if (captureBtn) {
-                captureBtn.classList.add('hidden');
-            }
-
-            // Update UI
-            ui.showSuccess(SuccessMessages.FACE_CAPTURED);
-            ui.playFaceSuccessFeedback();
-
-            // Stop camera after successful capture
-            setTimeout(() => {
-                this.stopCamera();
-                this.registerVideo.style.display = 'none';
-            }, 1000);
-
-        } catch (error) {
-            console.error('Registration capture error:', error);
-            ui.showError(error.message || ErrorCodes.FACE_NO_FACE_DETECTED.message);
-            ui.playFaceErrorFeedback();
-        } finally {
-            ui.hideButtonLoading(e.target);
-        }
-    }
-
-    /**
-     * Handle face recognition for attendance
-     * @returns {Promise<object>} Recognition result
-     */
-    async recognizeForAttendance() {
-        try {
-            if (!this.isCameraActive || !this.currentVideoElement) {
-                throw new Error(ErrorCodes.FACE_NO_CAMERA.message);
-            }
-
-            // Show recognition state
-            const overlay = document.getElementById('cameraOverlay');
-            const statusText = document.getElementById('cameraStatusText');
-            
-            if (overlay) overlay.innerHTML = '<div class="face-frame"><i class="fas fa-spinner fa-spin" style="font-size: 48px; color: #3b82f6;"></i><p>جاري التحليل...</p></div>';
-            if (statusText) statusText.textContent = 'جاري التحليل...';
-
-            // Capture descriptor
-            const faceData = await this.captureFaceDescriptor(this.currentVideoElement);
-
-            // Recognize face
-            const result = await this.recognizeFace(faceData.descriptor);
-
-            if (result && result.recognized) {
-                // Success!
-                this.recognizedFace = result;
-                
-                ui.playFaceSuccessFeedback();
-                
-                // Show recognition result
-                this.showRecognitionResult(result);
-                
-                return result;
-
-            } else if (result) {
-                // Low confidence match
-                ui.showWarning(result.message);
-                ui.playFaceErrorFeedback();
-                
-                return { 
-                    ...result, 
-                    recognized: false 
-                };
-
+            if (bestMatch) {
+                console.log(`✅ Face recognized: ${bestMatch.name} (${(bestMatch.confidence * 100).toFixed(1)}%)`);
+                this.recognizedFace = bestMatch;
+                return bestMatch;
             } else {
-                // No match found
-                throw new Error(ErrorCodes.FACE_RECOGNITION_FAILED.message);
+                throw new Error(ErrorCodes.FACE_MATCH_FAILED.message);
             }
 
         } catch (error) {
             console.error('Recognition error:', error);
-            
-            // Reset UI
-            const overlay = document.getElementById('cameraOverlay');
-            const statusText = document.getElementById('cameraStatusText');
-            
-            if (overlay) overlay.innerHTML = '<div class="face-frame"><i class="fas fa-user-circle"></i><p>ضع وجهك داخل الإطار</p></div>';
-            if (statusText) statusText.textContent = 'لم يتم التعرف على الوجه';
-
-            ui.showError(error.message || ErrorCodes.FACE_RECOGNITION_FAILED.message);
-            ui.playFaceErrorFeedback();
-            
+            this.recognizedFace = null;
             throw error;
         }
     }
 
     /**
-     * Display recognition result on screen
-     * @param {object} result - Recognition result
+     * Load known faces from database for matching
      */
-    showRecognitionResult(result) {
-        const resultContainer = document.getElementById('recognitionResult');
-        const recognizedName = document.getElementById('recognizedName');
-        const recognizedCode = document.getElementById('recognizedCode');
-        const confidenceFill = document.getElementById('confidenceFill');
-        const confidenceValue = document.getElementById('confidenceValue');
-        const recognizedFaceImg = document.getElementById('recognizedFace');
-
-        if (resultContainer) {
-            resultContainer.classList.remove('hidden');
+    async loadKnownFaces() {
+        if (!this.modelsLoaded || typeof db === 'undefined') {
+            console.warn('Cannot load known faces - prerequisites not met');
+            return;
         }
 
-        if (recognizedName) {
-            recognizedName.textContent = result.name;
-        }
+        try {
+            console.log('📥 Loading known faces from database...');
+            
+            const employees = await db.getAllEmployees();
+            
+            if (employees && employees.length > 0) {
+                employees.forEach(emp => {
+                    if (emp.face_descriptor && emp.code) {
+                        // Convert JSON descriptor back to Float32Array if needed
+                        let descriptor = emp.face_descriptor;
+                        if (typeof descriptor === 'object' && !(descriptor instanceof Float32Array)) {
+                            descriptor = new Float32Array(Object.values(descriptor));
+                        }
+                        
+                        this.knownFaces.set(emp.code, {
+                            name: emp.name,
+                            descriptor: descriptor
+                        });
+                    }
+                });
 
-        if (recognizedCode) {
-            recognizedCode.textContent = `CODE: ${result.code}`;
-        }
+                console.log(`✅ Loaded ${this.knownFaces.size} known faces`);
+            }
 
-        if (confidenceFill) {
-            confidenceFill.style.width = `${(result.confidence * 100)}%`;
-        }
-
-        if (confidenceValue) {
-            confidenceValue.textContent = `${Math.round(result.confidence * 100)}%`;
-        }
-
-        if (recognizedFaceImg && result.imageData) {
-            recognizedFaceImg.src = result.imageData;
-        }
-
-        // Hide camera overlay
-        const overlay = document.getElementById('cameraOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
+        } catch (error) {
+            console.error('Error loading known faces:', error);
         }
     }
 
+    // ============================================
+    // 📸 PHOTO CAPTURE
+    // ============================================
+
     /**
-     * Clear recognition result
+     * Capture photo from current video stream
+     * @param {HTMLVideoElement} video - Video element
+     * @param {HTMLCanvasElement} canvas - Canvas element
+     * @returns {object} Photo data with base64 and metadata
      */
-    clearRecognitionResult() {
-        const resultContainer = document.getElementById('recognitionResult');
-        const overlay = document.getElementById('cameraOverlay');
-        
-        if (resultContainer) {
-            resultContainer.classList.add('hidden');
-        }
-        
-        if (overlay) {
-            overlay.style.display = 'flex';
-            overlay.innerHTML = '<div class="face-frame"><i class="fas fa-user-circle"></i><p>ضع وجهك داخل الإطار</p></div>';
+    capturePhoto(video, canvas) {
+        if (!video || !canvas) {
+            throw new Error('Video or canvas element not provided');
         }
 
-        this.recognizedFace = null;
+        // Set canvas size to match video
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+
+        // Draw video frame to canvas
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convert to base64
+        const base64 = canvas.toDataURL('image/jpeg', 0.8);
+
+        return {
+            base64: base64,
+            width: canvas.width,
+            height: canvas.height,
+            timestamp: new Date().toISOString(),
+            format: 'jpeg'
+        };
     }
 
     // ============================================
@@ -771,44 +718,61 @@ class FaceRecognitionManager {
     // ============================================
 
     /**
-     * Check if models are loaded
-     * @returns {boolean} Models loaded status
+     * Sleep utility
+     * @param {number} ms - Milliseconds to sleep
      */
-    areModelsLoaded() {
-        return this.modelsLoaded;
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     /**
-     * Check if camera is active
-     * @returns {boolean} Camera active status
+     * Get current status/info about the recognition system
+     * @returns {object} Status object
      */
-    isCameraRunning() {
-        return this.isCameraActive;
+    getStatus() {
+        return {
+            modelsLoaded: this.modelsLoaded,
+            isCameraActive: this.isCameraActive,
+            knownFacesCount: this.knownFaces.size,
+            hasError: !!this.loadError,
+            errorMessage: this.loadError,
+            usedBackupCdn: this.usedBackupCdn
+        };
     }
 
     /**
-     * Get number of known faces
-     * @returns {number} Known faces count
+     * Reset recognition state
      */
-    getKnownFacesCount() {
-        return this.knownFaces.size;
-    }
-
-    /**
-     * Cleanup resources
-     */
-    destroy() {
+    reset() {
         this.stopCamera();
         this.stopDetection();
         this.knownFaces.clear();
+        this.recognizedFace = null;
         this.modelsLoaded = false;
-        console.log('🗑️ Face Recognition Manager destroyed');
+        this.loadError = null;
+        this.loadingAttempted = false;
+        this.usedBackupCdn = false;
+        
+        console.log('🔄 Face recognition state reset');
     }
 }
 
-// Create global instance
-const faceRecognition = new FaceRecognitionManager();
+// ============================================
+// 🌍 GLOBAL INSTANCE
+// ============================================
 
-// Export for use in other modules
-window.FaceRecognitionManager = FaceRecognitionManager;
-window.faceRecognition = faceRecognition;
+/**
+ * Global face recognition instance
+ * Created when script loads
+ */
+let faceRecognition;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    faceRecognition = new FaceRecognitionManager();
+    
+    // Don't auto-init here - let app.init() control initialization order
+    console.log('🎭 Face Recognition module loaded');
+});
+
+console.log('📷 face-recognition.js v4.1 loaded successfully');
