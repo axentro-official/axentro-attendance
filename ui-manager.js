@@ -1,711 +1,796 @@
 /**
  * ============================================
- * ✅ AXENTRO VALIDATOR v4.0
- * ✅ Comprehensive Input Validation System
+ * 🎨 AXENTRO UI MANAGER v4.0
+ * ✅ User Interface Management System
  * ============================================
  */
 
-class Validator {
+class UIManager {
     constructor() {
-        this.errors = [];
-        this.warnings = [];
-    }
-
-    // ============================================
-    // 📋 CORE VALIDATION METHODS
-    // ============================================
-
-    /**
-     * Validate a single field
-     * @param {*} value - Value to validate
-     * @param {Array<Function|string>} rules - Validation rules
-     * @returns {object} Validation result
-     */
-    validateField(value, rules) {
-        for (const rule of rules) {
-            const result = typeof rule === 'function' 
-                ? rule(value) 
-                : this.applyRule(rule, value);
-            
-            if (result && !result.valid) {
-                return result;
-            }
-        }
+        this.toastContainer = null;
+        this.loadingOverlay = null;
+        this.activeModals = [];
+        this.activePanels = [];
         
-        return { valid: true };
+        this.init();
+    }
+
+    // ============================================
+    // 🚀 INITIALIZATION
+    // ============================================
+
+    /**
+     * Initialize UI Manager
+     */
+    init() {
+        // Create toast container if not exists
+        this.toastContainer = document.getElementById('toastContainer');
+        if (!this.toastContainer) {
+            this.toastContainer = document.createElement('div');
+            this.toastContainer.id = 'toastContainer';
+            this.toastContainer.className = 'toast-container';
+            document.body.appendChild(this.toastContainer);
+        }
+
+        // Initialize loading screen manager
+        this.initLoadingScreen();
+
+        // Setup global event listeners
+        this.setupGlobalListeners();
     }
 
     /**
-     * Apply a predefined validation rule
-     * @param {string} ruleName - Rule name
-     * @param {*} value - Value to validate
-     * @returns {object} Validation result
+     * Initialize loading screen
      */
-    applyRule(ruleName, value) {
-        const [rule, ...params] = ruleName.split(':');
-        
-        const ruleMap = {
-            required: () => this.required(value),
-            email: () => this.email(value),
-            employeeCode: () => this.employeeCode(value),
-            password: () => this.password(value),
-            minLength: () => this.minLength(value, parseInt(params[0])),
-            maxLength: () => this.maxLength(value, parseInt(params[0])),
-            pattern: () => this.pattern(value, params[0]),
-            match: () => this.match(value, params[0]),
-            numeric: () => this.numeric(value),
-            phone: () => this.phone(value),
-            name: () => this.name(value),
-            date: () => this.date(value),
-            url: () => this.url(value),
-            inRange: () => this.inRange(value, parseFloat(params[0]), parseFloat(params[1]))
-        };
-
-        return ruleMap[rule] ? ruleMap[rule]() : { valid: true };
+    initLoadingScreen() {
+        this.loadingScreen = document.getElementById('loadingScreen');
+        this.loadProgress = document.getElementById('loadProgress');
+        this.loadStatus = document.getElementById('loadStatus');
     }
 
     /**
-     * Validate entire form
-     * @param {HTMLElement} formElement - Form element
-     * @param {object} rules - Field rules mapping
-     * @returns {object} Validation result with errors per field
+     * Setup global event listeners
      */
-    validateForm(formElement, rules) {
-        const result = {
-            isValid: true,
-            errors: {},
-            firstErrorField: null
-        };
-
-        for (const [fieldName, fieldRules] of Object.entries(rules)) {
-            const field = formElement.querySelector(`[name="${fieldName}"], #${fieldName}`);
-            if (!field) continue;
-
-            const value = field.value || field.textContent;
-            const validationResult = this.validateField(value, fieldRules);
-
-            if (!validationResult.valid) {
-                result.isValid = false;
-                result.errors[fieldName] = validationResult.message;
-                
-                if (!result.firstErrorField) {
-                    result.firstErrorField = fieldName;
-                }
-                
-                this.showFieldError(field, validationResult.message);
-            } else {
-                this.clearFieldError(field);
-                this.showFieldSuccess(field);
+    setupGlobalListeners() {
+        // Handle escape key for modals/panels
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeAllModals();
+                this.closeAllPanels();
             }
-        }
+        });
 
-        if (result.firstErrorField) {
-            const firstErrorElement = formElement.querySelector(
-                `[name="${result.firstErrorField}"], #${result.firstErrorField}`
-            );
-            if (firstErrorElement) {
-                firstErrorElement.focus();
-                this.scrollToField(firstErrorElement);
+        // Handle click outside to close panels
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                this.closeModal(e.target);
             }
-        }
-
-        return result;
+        });
     }
 
     // ============================================
-    // 🎯 PREDEFINED VALIDATION RULES
+    // 🍞 TOAST NOTIFICATIONS
     // ============================================
 
     /**
-     * Required field validation
-     * @param {*} value - Value to check
-     * @returns {object} Validation result
+     * Show toast notification
+     * @param {string} message - Toast message
+     * @param {string} type - Toast type: success, error, warning, info
+     * @param {object} options - Additional options
+     * @returns {HTMLElement} Toast element
      */
-    required(value) {
-        const isEmpty = (
-            value === null ||
-            value === undefined ||
-            (typeof value === 'string' && value.trim() === '') ||
-            (Array.isArray(value) && value.length === 0)
-        );
+    showToast(message, type = 'info', options = {}) {
+        const {
+            title = '',
+            duration = AppConfig.ui.toast.defaultDuration,
+            closable = true,
+            action = null,
+            icon = true
+        } = options;
 
-        return {
-            valid: !isEmpty,
-            message: ErrorCodes.VALIDATION_REQUIRED_FIELD.message,
-            code: ErrorCodes.VALIDATION_REQUIRED_FIELD.code
+        // Limit max visible toasts
+        const existingToasts = this.toastContainer.querySelectorAll('.toast:not(.removing)');
+        if (existingToasts.length >= AppConfig.ui.toast.maxVisible) {
+            this.removeToast(existingToasts[0]);
+        }
+
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+
+        // Icon mapping
+        const icons = {
+            success: 'fas fa-check-circle',
+            error: 'fas fa-exclamation-circle',
+            warning: 'fas fa-exclamation-triangle',
+            info: 'fas fa-info-circle'
         };
+
+        toast.innerHTML = `
+            ${icon ? `<i class="${icons[type] || icons.info}"></i>` : ''}
+            <div class="toast-content">
+                ${title ? `<div class="toast-title">${title}</div>` : ''}
+                <div class="toast-message">${message}</div>
+            </div>
+            ${action ? `<button class="btn btn-sm btn-primary toast-action">${action.text}</button>` : ''}
+            ${closable ? '<button class="toast-close"><i class="fas fa-times"></i></button>' : ''}
+        `;
+
+        // Add to container
+        this.toastContainer.appendChild(toast);
+
+        // Event listeners
+        const closeBtn = toast.querySelector('.toast-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.removeToast(toast));
+        }
+
+        const actionBtn = toast.querySelector('.toast-action');
+        if (actionBtn && action?.onClick) {
+            actionBtn.addEventListener('click', () => {
+                action.onClick();
+                this.removeToast(toast);
+            });
+        }
+
+        // Auto-remove after duration
+        if (duration > 0) {
+            setTimeout(() => this.removeToast(toast), duration);
+        }
+
+        return toast;
     }
 
     /**
-     * Email validation
-     * @param {string} email - Email address
-     * @returns {object} Validation result
+     * Remove toast with animation
+     * @param {HTMLElement} toast - Toast element
      */
-    email(email) {
-        if (!email || email.trim() === '') {
-            return { valid: true }; // Optional field
-        }
+    removeToast(toast) {
+        if (!toast || toast.classList.contains('removing')) return;
 
-        const isValid = Constants.regex.email.test(email.trim());
-        return {
-            valid: isValid,
-            message: ErrorCodes.VALIDATION_INVALID_EMAIL.message,
-            code: ErrorCodes.VALIDATION_INVALID_EMAIL.code
-        };
-    }
-
-    /**
-     * Employee code validation
-     * @param {string} code - Employee code
-     * @returns {object} Validation result
-     */
-    employeeCode(code) {
-        if (!code) {
-            return this.required(code);
-        }
-
-        const isValid = Constants.regex.employeeCode.test(code.toUpperCase().trim());
-        return {
-            valid: isValid,
-            message: ErrorCodes.VALIDATION_INVALID_CODE.message,
-            code: ErrorCodes.VALIDATION_INVALID_CODE.code
-        };
-    }
-
-    /**
-     * Password validation
-     * @param {string} password - Password string
-     * @returns {object} Validation result
-     */
-    password(password) {
-        if (!password) {
-            return this.required(password);
-        }
-
-        const config = AppConfig.security.password;
-        let isValid = true;
-        let message = '';
-
-        if (password.length < config.minLength) {
-            isValid = false;
-            message = `كلمة المرور يجب أن تكون ${config.minLength} أحرف على الأقل`;
-        } else if (password.length > config.maxLength) {
-            isValid = false;
-            message = `كلمة المرور يجب أن لا تتجاوز ${config.maxLength} حرف`;
-        }
-
-        // Check strength if needed
-        if (isValid) {
-            const strength = Utils.checkPasswordStrength(password);
-            if (strength.level === 'weak' && password.length < 6) {
-                message = 'كلمة مرور ضعيفة جداً - يرجى اختيار كلمة أقوى';
-                // Don't invalidate, just warn
-                this.warnings.push(message);
+        toast.classList.add('removing');
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
             }
-        }
-
-        return {
-            valid: isValid,
-            message: message || ErrorCodes.VALIDATION_WEAK_PASSWORD.message,
-            code: ErrorCodes.VALIDATION_WEAK_PASSWORD.code
-        };
+        }, 300);
     }
 
     /**
-     * Minimum length validation
-     * @param {string} value - Value to check
-     * @param {number} min - Minimum length
-     * @returns {object} Validation result
+     * Show success toast
+     * @param {string} message - Success message
      */
-    minLength(value, min) {
-        if (!value) return { valid: true };
-
-        const isValid = String(value).length >= min;
-        return {
-            valid: isValid,
-            message: `يجب أن يكون ${min} أحرف على الأقل`
-        };
+    showSuccess(message) {
+        return this.showToast(message, 'success', {
+            duration: AppConfig.ui.toast.successDuration
+        });
     }
 
     /**
-     * Maximum length validation
-     * @param {string} value - Value to check
-     * @param {number} max - Maximum length
-     * @returns {object} Validation result
-     */
-    maxLength(value, max) {
-        if (!value) return { valid: true };
-
-        const isValid = String(value).length <= max;
-        return {
-            valid: isValid,
-            message: `يجب أن لا يتجاوز ${max} حرف`
-        };
-    }
-
-    /**
-     * Pattern/Regex validation
-     * @param {string} value - Value to check
-     * @param {string} patternStr - Regex pattern string
-     * @returns {object} Validation result
-     */
-    pattern(value, patternStr) {
-        if (!value) return { valid: true };
-
-        try {
-            const regex = new RegExp(patternStr);
-            const isValid = regex.test(value);
-            return {
-                valid: isValid,
-                message: 'الصيغة غير صحيحة'
-            };
-        } catch (e) {
-            console.error('Invalid regex pattern:', e);
-            return { valid: true };
-        }
-    }
-
-    /**
-     * Match another field's value
-     * @param {string} value - Current value
-     * @param {string} otherFieldId - Other field ID
-     * @returns {object} Validation result
-     */
-    match(value, otherFieldId) {
-        const otherField = document.getElementById(otherFieldId);
-        if (!otherField) return { valid: true };
-
-        const otherValue = otherField.value;
-        const isValid = value === otherValue;
-
-        return {
-            valid: isValid,
-            message: ErrorCodes.VALIDATION_PASSWORD_MISMATCH.message,
-            code: ErrorCodes.VALIDATION_PASSWORD_MISMATCH.code
-        };
-    }
-
-    /**
-     * Numeric validation
-     * @param {*} value - Value to check
-     * @returns {object} Validation result
-     */
-    numeric(value) {
-        if (!value) return { valid: true };
-
-        const num = Number(value);
-        const isValid = !isNaN(num) && isFinite(num);
-
-        return {
-            valid: isValid,
-            message: 'يجب إدخال رقم صحيح'
-        };
-    }
-
-    /**
-     * Phone number validation
-     * @param {string} phone - Phone number
-     * @returns {object} Validation result
-     */
-    phone(phone) {
-        if (!phone) return { valid: true };
-
-        const isValid = Constants.regex.phone.test(phone.replace(/\s/g, ''));
-
-        return {
-            valid: isValid,
-            message: 'رقم الهاتف غير صالح'
-        };
-    }
-
-    /**
-     * Name validation (Arabic/English)
-     * @param {string} name - Name to validate
-     * @returns {object} Validation result
-     */
-    name(name) {
-        if (!name) return this.required(name);
-
-        const trimmed = name.trim();
-        const isValid = Constants.regex.name.test(trimmed);
-
-        return {
-            valid: isValid,
-            message: 'الاسم غير صحيح (3-100 حرف، عربي أو إنجليزي فقط)'
-        };
-    }
-
-    /**
-     * Date validation
-     * @param {string} dateStr - Date string
-     * @returns {object} Validation result
-     */
-    date(dateStr) {
-        if (!dateStr) return { valid: true };
-
-        const date = new Date(dateStr);
-        const isValid = !isNaN(date.getTime());
-
-        return {
-            valid: isValid,
-            message: 'التاريخ غير صحيح'
-        };
-    }
-
-    /**
-     * URL validation
-     * @param {string} url - URL to validate
-     * @returns {object} Validation result
-     */
-    url(url) {
-        if (!url) return { valid: true };
-
-        try {
-            new URL(url);
-            return { valid: true };
-        } catch {
-            return {
-                valid: false,
-                message: 'رابط URL غير صحيح'
-            };
-        }
-    }
-
-    /**
-     * Range validation
-     * @param {number} value - Numeric value
-     * @param {number} min - Minimum value
-     * @param {number} max - Maximum value
-     * @returns {object} Validation result
-     */
-    inRange(value, min, max) {
-        if (value === null || value === undefined) return { valid: true };
-
-        const num = Number(value);
-        const isValid = num >= min && num <= max;
-
-        return {
-            valid: isValid,
-            message: `يجب أن يكون بين ${min} و ${max}`
-        };
-    }
-
-    // ============================================
-    // 🎨 UI FEEDBACK METHODS
-    // ============================================
-
-    /**
-     * Show error on a field
-     * @param {HTMLElement} field - Form field element
+     * Show error toast
      * @param {string} message - Error message
      */
-    showFieldError(field, message) {
-        // Add error class
-        field.classList.add('error');
-        field.classList.remove('success');
-
-        // Find or create error message element
-        let errorEl = field.parentElement.querySelector('.error-message');
-        if (errorEl) {
-            errorEl.textContent = message;
-            errorEl.style.display = 'block';
-        }
-
-        // Add shake animation
-        field.style.animation = 'shake 0.5s ease';
-        setTimeout(() => {
-            field.style.animation = '';
-        }, 500);
-    }
-
-    /**
-     * Clear error from field
-     * @param {HTMLElement} field - Form field element
-     */
-    clearFieldError(field) {
-        field.classList.remove('error');
-
-        const errorEl = field.parentElement.querySelector('.error-message');
-        if (errorEl) {
-            errorEl.textContent = '';
-            errorEl.style.display = 'none';
-        }
-    }
-
-    /**
-     * Show success state on field
-     * @param {HTMLElement} field - Form field element
-     */
-    showFieldSuccess(field) {
-        field.classList.add('success');
-        field.classList.remove('error');
-    }
-
-    /**
-     * Scroll to field with error
-     * @param {HTMLElement} field - Field element
-     */
-    scrollToField(field) {
-        setTimeout(() => {
-            field.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center'
-            });
-            field.focus();
-        }, 100);
-    }
-
-    /**
-     * Clear all validation states from form
-     * @param {HTMLElement} formElement - Form element
-     */
-    clearFormValidation(formElement) {
-        const fields = formElement.querySelectorAll('.error, .success');
-        fields.forEach(field => {
-            field.classList.remove('error', 'success');
-        });
-
-        const errorMessages = formElement.querySelectorAll('.error-message');
-        errorMessages.forEach(el => {
-            el.textContent = '';
-            el.style.display = 'none';
+    showError(message) {
+        return this.showToast(message, 'error', {
+            duration: AppConfig.ui.toast.errorDuration
         });
     }
 
+    /**
+     * Show warning toast
+     * @param {string} message - Warning message
+     */
+    showWarning(message) {
+        return this.showToast(message, 'warning', {
+            duration: AppConfig.ui.toast.warningDuration
+        });
+    }
+
+    /**
+     * Show info toast
+     * @param {string} message - Info message
+     */
+    showInfo(message) {
+        return this.showToast(message, 'info');
+    }
+
+    /**
+     * Clear all toasts
+     */
+    clearAllToasts() {
+        const toasts = this.toastContainer.querySelectorAll('.toast');
+        toasts.forEach(toast => this.removeToast(toast));
+    }
+
     // ============================================
-    // 🔧 UTILITY METHODS
+    // ⏳ LOADING STATES
     // ============================================
 
     /**
-     * Reset validator state
+     * Update loading screen progress
+     * @param {number} percent - Progress percentage (0-100)
+     * @param {string} status - Status text
      */
-    reset() {
-        this.errors = [];
-        this.warnings = [];
-    }
-
-    /**
-     * Get all collected errors
-     * @returns {Array} Errors array
-     */
-    getErrors() {
-        return [...this.errors];
-    }
-
-    /**
-     * Get all warnings
-     * @returns {Array} Warnings array
-     */
-    getWarnings() {
-        return [...this.warnings];
-    }
-
-    /**
-     * Check if there are any errors
-     * @returns {boolean} Has errors
-     */
-    hasErrors() {
-        return this.errors.length > 0;
-    }
-
-    /**
-     * Sanitize and validate request data (for API calls)
-     * @param {object} data - Request data object
-     * @param {object} schema - Validation schema
-     * @returns {object} Validation result with sanitized data
-     */
-    validateAndSanitizeRequest(data, schema) {
-        const sanitized = {};
-        const errors = [];
-
-        for (const [field, rules] of Object.entries(schema)) {
-            const value = data[field];
-            
-            // Apply sanitization
-            sanitized[field] = this.sanitizeValue(value, field);
-            
-            // Apply validation
-            if (rules && rules.length > 0) {
-                const result = this.validateField(sanitized[field], rules);
-                if (!result.valid) {
-                    errors.push({
-                        field,
-                        message: result.message,
-                        code: result.code
-                    });
-                }
-            }
+    updateLoadingProgress(percent, status = '') {
+        if (this.loadProgress) {
+            this.loadProgress.style.width = `${Math.min(percent, 100)}%`;
         }
-
-        return {
-            isValid: errors.length === 0,
-            data: sanitized,
-            errors
-        };
-    }
-
-    /**
-     * Sanitize a value based on field type
-     * @param {*} value - Value to sanitize
-     * @param {string} field - Field name
-     * @returns {*} Sanitized value
-     */
-    sanitizeValue(value, field) {
-        if (value === null || value === undefined) return '';
-
-        const stringValue = String(value).trim();
-
-        // Field-specific sanitization
-        switch (field.toLowerCase()) {
-            case 'email':
-                return Utils.sanitizeEmail(stringValue) || '';
-            
-            case 'code':
-            case 'employee_code':
-                return stringValue.toUpperCase().substring(0, 10);
-            
-            case 'name':
-            case 'employee_name':
-                return Utils.sanitizeString(stringValue);
-            
-            case 'password':
-                return stringValue; // Don't trim passwords too much
-            
-            default:
-                return Utils.sanitizeString(stringValue);
+        if (this.loadStatus && status) {
+            this.loadStatus.textContent = status;
         }
     }
 
+    /**
+     * Hide loading screen with fade out
+     */
+    hideLoadingScreen() {
+        if (this.loadingScreen) {
+            this.loadingScreen.classList.add('fade-out');
+            setTimeout(() => {
+                this.loadingScreen.style.display = 'none';
+            }, 500);
+        }
+    }
+
+    /**
+     * Show loading overlay on an element
+     * @param {HTMLElement|string} element - Element or selector
+     * @param {string} message - Loading message
+     */
+    showElementLoading(element, message = 'جاري التحميل...') {
+        const el = typeof element === 'string' 
+            ? document.querySelector(element)
+            : element;
+        
+        if (!el) return;
+
+        el.dataset.originalContent = el.innerHTML;
+        el.innerHTML = `
+            <div class="element-loader">
+                <div class="spinner"></div>
+                <p>${message}</p>
+            </div>
+        `;
+        el.disabled = true;
+        el.classList.add('loading');
+    }
+
+    /**
+     * Hide loading overlay from element
+     * @param {HTMLElement|string} element - Element or selector
+     */
+    hideElementLoading(element) {
+        const el = typeof element === 'string'
+            ? document.querySelector(element)
+            : element;
+        
+        if (!el || !el.dataset.originalContent) return;
+
+        el.innerHTML = el.dataset.originalContent;
+        delete el.dataset.originalContent;
+        el.disabled = false;
+        el.classList.remove('loading');
+    }
+
+    /**
+     * Show button loading state
+     * @param {HTMLButtonElement} btn - Button element
+     * @param {string} loadingText - Text while loading
+     */
+    showButtonLoading(btn, loadingText = '') {
+        if (!btn) return;
+
+        const originalText = btn.querySelector('span:not(.btn-loader))')?.textContent || btn.textContent;
+        btn.dataset.originalText = originalText;
+        btn.disabled = true;
+
+        const textSpan = btn.querySelector('span:not(.btn-loader)');
+        const loaderSpan = btn.querySelector('.btn-loader');
+
+        if (textSpan && loadingText) {
+            textSpan.textContent = loadingText;
+        }
+        if (loaderSpan) {
+            loaderSpan.classList.remove('hidden');
+        }
+    }
+
+    /**
+     * Hide button loading state
+     * @param {HTMLButtonElement} btn - Button element
+     */
+    hideButtonLoading(btn) {
+        if (!btn) return;
+
+        btn.disabled = false;
+        const textSpan = btn.querySelector('span:not(.btn-loader)');
+        const loaderSpan = btn.querySelector('.btn-loader');
+
+        if (textSpan && btn.dataset.originalText) {
+            textSpan.textContent = btn.dataset.originalText;
+        }
+        if (loaderSpan) {
+            loaderSpan.classList.add('hidden');
+        }
+    }
+
     // ============================================
-    // 📊 ADVANCED VALIDATION
+    // 🪟 MODALS
     // ============================================
 
     /**
-     * Async validation (for API checks)
-     * @param {*} value - Value to validate
-     * @param {Function} asyncCheck - Async validation function
-     * @returns {Promise<object>} Validation result
+     * Open modal
+     * @param {string} modalId - Modal ID or selector
      */
-    async validateAsync(value, asyncCheck) {
-        try {
-            const result = await asyncCheck(value);
-            return result;
-        } catch (error) {
-            console.error('Async validation error:', error);
-            return {
-                valid: false,
-                message: 'خطأ في التحقق'
+    openModal(modalId) {
+        let modal;
+        
+        if (typeof modalId === 'string') {
+            modal = document.getElementById(modalId) || 
+                    document.querySelector(modalId);
+        } else {
+            modal = modalId;
+        }
+
+        if (!modal) {
+            console.error(`Modal not found: ${modalId}`);
+            return;
+        }
+
+        modal.classList.remove('hidden');
+        this.activeModals.push(modal);
+        
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+
+        // Focus trap
+        this.setupFocusTrap(modal);
+
+        // Animation
+        requestAnimationFrame(() => {
+            modal.style.opacity = '1';
+        });
+    }
+
+    /**
+     * Close modal
+     * @param {HTMLElement|string} modal - Modal element or ID
+     */
+    closeModal(modal) {
+        if (typeof modal === 'string') {
+            modal = document.getElementById(modal);
+        }
+
+        if (!modal) return;
+
+        modal.classList.add('hidden');
+        this.activeModals = this.activeModals.filter(m => m !== modal);
+
+        // Restore body scroll if no more modals
+        if (this.activeModals.length === 0) {
+            document.body.style.overflow = '';
+        }
+    }
+
+    /**
+     * Close all open modals
+     */
+    closeAllModals() {
+        [...this.activeModals].forEach(modal => this.closeModal(modal));
+    }
+
+    /**
+     * Setup focus trap for accessibility
+     * @param {HTMLElement} modal - Modal element
+     */
+    setupFocusTrap(modal) {
+        const focusableElements = modal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        
+        if (focusableElements.length > 0) {
+            focusableElements[0].focus();
+        }
+    }
+
+    /**
+     * Show confirmation dialog
+     * @param {object} options - Dialog options
+     * @returns {Promise<boolean>} User's choice
+     */
+    async showConfirmation(options = {}) {
+        const {
+            title = 'تأكيد',
+            message = 'هل أنت متأكد؟',
+            confirmText = 'نعم',
+            cancelText = 'إلغاء',
+            type = 'warning', // success, warning, danger, info
+            icon = null
+        } = options;
+
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            
+            const icons = {
+                success: 'fas fa-check-circle text-success',
+                warning: 'fas fa-exclamation-triangle text-warning',
+                danger: 'fas fa-exclamation-circle text-danger',
+                info: 'fas fa-info-circle text-primary'
             };
+
+            overlay.innerHTML = `
+                <div class="modal" style="max-width: 400px;">
+                    <div class="modal-header">
+                        ${icon ? `<i class="${icon}" style="font-size: 24px;"></i>` : ''}
+                        <h3>${title}</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p>${message}</p>
+                        <div style="display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end;">
+                            <button class="btn btn-secondary" id="confirmCancel">${cancelText}</button>
+                            <button class="btn btn-${type}" id="confirmOk">${confirmText}</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            // Event listeners
+            overlay.querySelector('#confirmCancel').addEventListener('click', () => {
+                overlay.remove();
+                resolve(false);
+            });
+
+            overlay.querySelector('#confirmOk').addEventListener('click', () => {
+                overlay.remove();
+                resolve(true);
+            });
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.remove();
+                    resolve(false);
+                }
+            });
+        });
+    }
+
+    // ============================================
+    // 📋 PANELS (Side Panels)
+    // ============================================
+
+    /**
+     * Open side panel
+     * @param {string} panelId - Panel ID
+     */
+    openPanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        panel.classList.remove('hidden');
+        this.activePanels.push(panel);
+        document.body.style.overflow = 'hidden';
+    }
+
+    /**
+     * Close side panel
+     * @param {string} panelId - Panel ID
+     */
+    closePanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        panel.classList.add('hidden');
+        this.activePanels = this.activePanels.filter(p => p !== panel);
+
+        if (this.activePanels.length === 0) {
+            document.body.style.overflow = '';
         }
     }
 
     /**
-     * Validate attendance data before submission
-     * @param {object} attendanceData - Attendance record data
-     * @returns {object} Validation result
+     * Close all panels
      */
-    validateAttendanceData(attendanceData) {
-        const errors = [];
-        const requiredFields = ['employee_code', 'employee_name', 'type', 'shift'];
+    closeAllPanels() {
+        [...this.activePanels].forEach(panel => this.closePanel(panel.id));
+    }
 
-        for (const field of requiredFields) {
-            if (!attendanceData[field] || String(attendanceData[field]).trim() === '') {
-                errors.push({
-                    field,
-                    message: `${field} مطلوب`
-                });
+    // ============================================
+    // 📄 PAGE NAVIGATION
+    // ============================================
+
+    /**
+     * Navigate to a page with animation
+     * @param {string} pageId - Target page ID
+     */
+    navigateTo(pageId) {
+        // Hide all pages
+        const pages = document.querySelectorAll('.page');
+        pages.forEach(page => {
+            page.classList.remove('active');
+        });
+
+        // Show target page
+        const targetPage = document.getElementById(pageId);
+        if (targetPage) {
+            targetPage.classList.add('active');
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // Update nav buttons
+            this.updateNavigation(pageId);
+        }
+    }
+
+    /**
+     * Update bottom navigation active state
+     * @param {string} pageId - Current page ID
+     */
+    updateNavigation(pageId) {
+        const navBtns = document.querySelectorAll('.nav-btn');
+        navBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.page === pageId);
+        });
+    }
+
+    // ============================================
+    // 🔊 AUDIO & HAPTICS
+    // ============================================
+
+    /**
+     * Play sound effect
+     * @param {string} soundId - Audio element ID
+     * @param {number} volume - Volume level (0-1)
+     */
+    playSound(soundId, volume = 0.5) {
+        // Check if sounds are enabled in settings
+        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
+        if (settings.soundEnabled === false) return;
+
+        const audio = document.getElementById(soundId);
+        if (audio) {
+            audio.volume = volume;
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log('Audio play failed:', e));
+        }
+    }
+
+    /**
+     * Trigger device vibration
+     * @param {number|Array} pattern - Vibration pattern
+     */
+    vibrate(pattern = 100) {
+        // Check if vibration is enabled
+        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
+        if (settings.vibrationEnabled === false) return;
+
+        if ('vibrate' in navigator) {
+            navigator.vibrate(pattern);
+        }
+    }
+
+    /**
+     * Play success feedback (sound + vibration)
+     */
+    playSuccessFeedback() {
+        this.playSound('successSound', 0.6);
+        this.vibrate([50, 50, 50]);
+    }
+
+    /**
+     * Play error feedback
+     */
+    playErrorFeedback() {
+        this.playSound('errorSound', 0.6);
+        this.vibrate(200);
+    }
+
+    /**
+     * Play face recognition success feedback
+     */
+    playFaceSuccessFeedback() {
+        this.playSound('faceSuccessSound', 0.7);
+        this.vibrate([100, 50, 100]);
+    }
+
+    /**
+     * Play face recognition error feedback
+     */
+    playFaceErrorFeedback() {
+        this.playSound('faceErrorSound', 0.7);
+        this.vibrate([100, 100, 100]);
+    }
+
+    // ============================================
+    // 🎯 FORM HELPERS
+    // ============================================
+
+    /**
+     * Toggle password visibility
+     * @param {Event} e - Click event
+     */
+    togglePasswordVisibility(e) {
+        const btn = e.currentTarget;
+        const inputId = btn.dataset.target;
+        const input = document.getElementById(inputId);
+        const icon = btn.querySelector('i');
+
+        if (input) {
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            
+            if (icon) {
+                icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
             }
         }
+    }
 
-        // Validate type
-        if (attendanceData.type && !['حضور', 'انصراف'].includes(attendanceData.type)) {
-            errors.push({
-                field: 'type',
-                message: 'نوع الحضور غير صالح (يجب أن يكون حضور أو انصراف)'
-            });
-        }
+    /**
+     * Update password strength indicator
+     * @param {string} password - Password value
+     * @param {string} containerId - Strength container ID
+     */
+    updatePasswordStrength(password, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
 
-        // Validate shift
-        const validShifts = AppConfig.attendance.shifts.map(s => s.id);
-        if (attendanceData.shift && !validShifts.includes(attendanceData.shift)) {
-            errors.push({
-                field: 'shift',
-                message: 'وردية العمل غير صالحة'
-            });
-        }
+        const strength = Utils.checkPasswordStrength(password);
+        
+        container.innerHTML = `
+            <div class="strength-bar ${strength.level}">
+                <div class="fill"></div>
+            </div>
+            <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">
+                ${strength.level === 'weak' ? '🔴 ضعيفة' : 
+                  strength.level === 'medium' ? '🟡 متوسطة' : '🟢 قوية'}
+                (${strength.percentage}%)
+            </small>
+        `;
+    }
 
-        return {
-            isValid: errors.length === 0,
-            errors,
-            data: attendanceData
+    // ============================================
+    // 📊 DATA DISPLAY HELPERS
+    // ============================================
+
+    /**
+     * Format and display attendance record
+     * @param {object} record - Attendance record
+     * @returns {HTMLElement} Formatted row element
+     */
+    formatAttendanceRow(record) {
+        const tr = document.createElement('tr');
+        
+        const typeClass = record.type === 'حضور' ? 'badge-in' : 'badge-out';
+        const typeBgColor = record.type === 'حضور' ? '#dcfce7' : '#fee2e2';
+        const typeTextColor = record.type === 'حضور' ? '#166534' : '#991b1b';
+
+        tr.innerHTML = `
+            <td>${Utils.formatDate(record.created_at, 'short')}</td>
+            <td>
+                <span style="
+                    background: ${typeBgColor};
+                    color: ${typeTextColor};
+                    padding: 4px 12px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: bold;
+                ">
+                    ${record.type}
+                </span>
+            </td>
+            <td>${Utils.formatDate(record.created_at, 'time')}</td>
+            <td>${record.shift || '-'}</td>
+            <td style="color: var(--primary-400); font-weight: bold;">
+                ${record.hours_worked || '-'}
+            </td>
+            <td>${record.overtime || 'لا يوجد'}</td>
+        `;
+
+        return tr;
+    }
+
+    /**
+     * Display empty state for lists/tables
+     * @param {HTMLElement} container - Container element
+     * @param {string} message - Empty message
+     * @param {string} icon - Font Awesome icon class
+     */
+    showEmptyState(container, message = 'لا توجد بيانات', icon = 'fas fa-inbox') {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="${icon}"></i>
+                <p>${message}</p>
+            </div>
+        `;
+    }
+
+    /**
+     * Update stat card value with animation
+     * @param {string} elementId - Element ID
+     * @param {*} value - New value
+     */
+    animateStatValue(elementId, value) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+
+        const currentValue = parseInt(el.textContent) || 0;
+        const newValue = parseInt(value) || 0;
+        const diff = newValue - currentValue;
+        const duration = 500;
+        const steps = 30;
+        const stepValue = diff / steps;
+        let step = 0;
+
+        const animate = setInterval(() => {
+            step++;
+            el.textContent = Math.round(currentValue + (stepValue * step));
+            
+            if (step >= steps) {
+                clearInterval(animate);
+                el.textContent = newValue;
+            }
+        }, duration / steps);
+    }
+
+    // ============================================
+    // 🛠️ UTILITY METHODS
+    // ============================================
+
+    /**
+     * Debounce function calls
+     * @param {Function} func - Function to debounce
+     * @param {number} wait - Wait time
+     * @returns {Function} Debounced function
+     */
+    debounce(func, wait = 300) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
         };
     }
 
     /**
-     * Validate user registration data
-     * @param {object} regData - Registration data
-     * @returns {object} Validation result
+     * Get current timestamp formatted
+     * @returns {string} Formatted timestamp
      */
-    validateRegistration(regData) {
-        const schema = {
-            name: ['required', 'name'],
-            code: ['required', 'employeeCode'],
-            password: ['required', 'password']
-        };
-
-        // Optional fields
-        if (regData.email) {
-            schema.email = ['email'];
-        }
-
-        return this.validateAndSanitizeRequest(regData, schema);
+    getTimestamp() {
+        return new Date().toLocaleTimeString('ar-EG', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
     }
 
     /**
-     * Validate login credentials
-     * @param {object} loginData - Login data
-     * @returns {object} Validation result
+     * Show network offline indicator
      */
-    validateLogin(loginData) {
-        const schema = {
-            code: ['required', 'employeeCode'],
-            password: ['required', 'password']
-        };
+    showOfflineIndicator() {
+        this.showWarning('أنت غير متصل بالإنترنت - سيتم حفظ البيانات محلياً');
+        
+        // Add offline class to body
+        document.body.classList.add('offline');
+    }
 
-        return this.validateAndSanitizeRequest(loginData, schema);
+    /**
+     * Hide network offline indicator
+     */
+    hideOfflineIndicator() {
+        document.body.classList.remove('offline');
+        this.showSuccess('تم استعادة الاتصال بالإنترنت ✓');
     }
 }
 
 // Create global instance
-const validator = new Validator();
+const ui = new UIManager();
 
 // Export for use in other modules
-window.Validator = Validator;
-window.validator = validator;
-
-// Add shake animation CSS dynamically
-const shakeStyle = document.createElement('style');
-shakeStyle.textContent = `
-    @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-        20%, 40%, 60%, 80% { transform: translateX(5px); }
-    }
-    
-    input.error, select.error {
-        border-color: var(--danger-500) !important;
-        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
-    }
-    
-    input.success {
-        border-color: var(--success-500) !important;
-    }
-    
-    .error-message {
-        color: var(--danger-500);
-        font-size: 12px;
-        margin-top: 4px;
-        display: none;
-    }
-`;
-document.head.appendChild(shakeStyle);
+window.UIManager = UIManager;
+window.ui = ui;
