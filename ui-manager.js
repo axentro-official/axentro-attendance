@@ -1,18 +1,18 @@
 /**
  * ============================================
- * 🎨 AXENTRO UI MANAGER v4.0
- * ✅ User Interface Management System
+ * 🎨 AXENTRO UI MANAGER v4.1 - ENHANCED
+ * ✅ User Interface Management & Animations
+ * 🔥 محسّن مع Toast Notifications و Modal System
  * ============================================
  */
 
 class UIManager {
     constructor() {
         this.toastContainer = null;
-        this.loadingOverlay = null;
-        this.activeModals = [];
-        this.activePanels = [];
+        this.activeToasts = 0;
+        this.maxVisibleToasts = AppConfig?.ui?.toast?.maxVisible || 3;
         
-        this.init();
+        console.log('🎨 UI Manager initialized');
     }
 
     // ============================================
@@ -20,378 +20,206 @@ class UIManager {
     // ============================================
 
     /**
-     * Initialize UI Manager
+     * Initialize UI manager
      */
     init() {
         // Create toast container if not exists
+        this.ensureToastContainer();
+        
+        // Setup global UI event listeners
+        this.setupGlobalListeners();
+        
+        console.log('✅ UI Manager ready');
+    }
+
+    /**
+     * Ensure toast container exists in DOM
+     */
+    ensureToastContainer() {
         this.toastContainer = document.getElementById('toastContainer');
+        
         if (!this.toastContainer) {
             this.toastContainer = document.createElement('div');
             this.toastContainer.id = 'toastContainer';
             this.toastContainer.className = 'toast-container';
             document.body.appendChild(this.toastContainer);
         }
-
-        // Initialize loading screen manager
-        this.initLoadingScreen();
-
-        // Setup global event listeners
-        this.setupGlobalListeners();
     }
 
     /**
-     * Initialize loading screen
-     */
-    initLoadingScreen() {
-        this.loadingScreen = document.getElementById('loadingScreen');
-        this.loadProgress = document.getElementById('loadProgress');
-        this.loadStatus = document.getElementById('loadStatus');
-    }
-
-    /**
-     * Setup global event listeners
+     * Setup global UI event listeners
      */
     setupGlobalListeners() {
-        // Handle escape key for modals/panels
+        // Close modals on escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.closeAllModals();
-                this.closeAllPanels();
             }
         });
 
-        // Handle click outside to close panels
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal-overlay')) {
-                this.closeModal(e.target);
-            }
+        // Handle form input animations
+        document.querySelectorAll('.input-group input').forEach(input => {
+            input.addEventListener('focus', () => {
+                input.parentElement.classList.add('focused');
+            });
+            
+            input.addEventListener('blur', () => {
+                input.parentElement.classList.remove('focused');
+                if (input.value) {
+                    input.parentElement.classList.add('filled');
+                } else {
+                    input.parentElement.classList.remove('filled');
+                }
+            });
+        });
+
+        // Toggle password visibility
+        document.querySelectorAll('.toggle-password').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.dataset.target;
+                const input = document.getElementById(targetId);
+                
+                if (input) {
+                    const isPassword = input.type === 'password';
+                    input.type = isPassword ? 'text' : 'password';
+                    
+                    const icon = btn.querySelector('i');
+                    if (icon) {
+                        icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+                    }
+                }
+            });
         });
     }
 
     // ============================================
-    // 🍞 TOAST NOTIFICATIONS
+    // 📢 TOAST NOTIFICATIONS
     // ============================================
 
     /**
      * Show toast notification
      * @param {string} message - Toast message
-     * @param {string} type - Toast type: success, error, warning, info
-     * @param {object} options - Additional options
-     * @returns {HTMLElement} Toast element
+     * @param {string} type - Type: success, error, warning, info
+     * @param {number} duration - Duration in ms
      */
-    showToast(message, type = 'info', options = {}) {
-        const {
-            title = '',
-            duration = AppConfig.ui.toast.defaultDuration,
-            closable = true,
-            action = null,
-            icon = true
-        } = options;
+    showToast(message, type = 'info', duration = null) {
+        // Ensure container exists
+        this.ensureToastContainer();
 
-        // Limit max visible toasts
-        const existingToasts = this.toastContainer.querySelectorAll('.toast:not(.removing)');
-        if (existingToasts.length >= AppConfig.ui.toast.maxVisible) {
-            this.removeToast(existingToasts[0]);
+        // Check max visible toasts
+        if (this.activeToasts >= this.maxVisibleToasts) {
+            // Remove oldest toast
+            const oldestToast = this.toastContainer.querySelector('.toast');
+            if (oldestToast) {
+                this.removeToast(oldestToast);
+            }
         }
+
+        // Determine duration based on type or use default
+        const durations = {
+            success: AppConfig?.ui?.toast?.successDuration || 3000,
+            error: AppConfig?.ui?.toast?.errorDuration || 5000,
+            warning: AppConfig?.ui?.toast?.warningDuration || 4000,
+            info: AppConfig?.ui?.toast?.defaultDuration || 4000
+        };
+
+        const toastDuration = duration !== null ? duration : (durations[type] || durations.info);
 
         // Create toast element
         const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-
+        toast.className = `toast toast-${type}`;
+        
         // Icon mapping
         const icons = {
             success: 'fas fa-check-circle',
-            error: 'fas fa-exclamation-circle',
+            error: 'fas fa-times-circle',
             warning: 'fas fa-exclamation-triangle',
             info: 'fas fa-info-circle'
         };
 
         toast.innerHTML = `
-            ${icon ? `<i class="${icons[type] || icons.info}"></i>` : ''}
-            <div class="toast-content">
-                ${title ? `<div class="toast-title">${title}</div>` : ''}
-                <div class="toast-message">${message}</div>
+            <div class="toast-icon">
+                <i class="${icons[type] || icons.info}"></i>
             </div>
-            ${action ? `<button class="btn btn-sm btn-primary toast-action">${action.text}</button>` : ''}
-            ${closable ? '<button class="toast-close"><i class="fas fa-times"></i></button>' : ''}
+            <div class="toast-content">
+                <p>${Utils.sanitizeHTML(message)}</p>
+            </div>
+            <button class="toast-close" onclick="this.parentElement.remove(); ui.activeToasts--;">
+                <i class="fas fa-times"></i>
+            </button>
         `;
 
-        // Add to container
+        // Add to container with animation
         this.toastContainer.appendChild(toast);
+        
+        // Trigger animation
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
 
-        // Event listeners
-        const closeBtn = toast.querySelector('.toast-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.removeToast(toast));
-        }
-
-        const actionBtn = toast.querySelector('.toast-action');
-        if (actionBtn && action?.onClick) {
-            actionBtn.addEventListener('click', () => {
-                action.onClick();
-                this.removeToast(toast);
-            });
-        }
+        this.activeToasts++;
 
         // Auto-remove after duration
-        if (duration > 0) {
-            setTimeout(() => this.removeToast(toast), duration);
-        }
+        setTimeout(() => {
+            this.removeToast(toast);
+        }, toastDuration);
 
         return toast;
     }
 
     /**
-     * Remove toast with animation
-     * @param {HTMLElement} toast - Toast element
+     * Remove toast element with animation
+     * @param {HTMLElement} toast - Toast element to remove
      */
     removeToast(toast) {
-        if (!toast || toast.classList.contains('removing')) return;
+        if (!toast || !toast.parentElement) return;
 
-        toast.classList.add('removing');
+        toast.classList.remove('show');
+        toast.classList.add('hide');
+
         setTimeout(() => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
+            if (toast.parentElement) {
+                toast.parentElement.removeChild(toast);
+                this.activeToasts = Math.max(0, this.activeToasts - 1);
             }
         }, 300);
     }
 
     /**
-     * Show success toast
-     * @param {string} message - Success message
+     * Show success toast (shorthand)
+     * @param {string} message 
      */
     showSuccess(message) {
-        return this.showToast(message, 'success', {
-            duration: AppConfig.ui.toast.successDuration
-        });
+        return this.showToast(message, 'success');
     }
 
     /**
-     * Show error toast
-     * @param {string} message - Error message
+     * Show error toast (shorthand)
+     * @param {string} message 
      */
     showError(message) {
-        return this.showToast(message, 'error', {
-            duration: AppConfig.ui.toast.errorDuration
-        });
+        return this.showToast(message, 'error');
     }
 
     /**
-     * Show warning toast
-     * @param {string} message - Warning message
+     * Show warning toast (shorthand)
+     * @param {string} message 
      */
     showWarning(message) {
-        return this.showToast(message, 'warning', {
-            duration: AppConfig.ui.toast.warningDuration
-        });
+        return this.showToast(message, 'warning');
     }
 
     /**
-     * Show info toast
-     * @param {string} message - Info message
+     * Show info toast (shorthand)
+     * @param {string} message 
      */
     showInfo(message) {
         return this.showToast(message, 'info');
     }
 
-    /**
-     * Clear all toasts
-     */
-    clearAllToasts() {
-        const toasts = this.toastContainer.querySelectorAll('.toast');
-        toasts.forEach(toast => this.removeToast(toast));
-    }
-
     // ============================================
-    // ⏳ LOADING STATES
+    // 💬 CONFIRMATION DIALOGS
     // ============================================
-
-    /**
-     * Update loading screen progress
-     * @param {number} percent - Progress percentage (0-100)
-     * @param {string} status - Status text
-     */
-    updateLoadingProgress(percent, status = '') {
-        if (this.loadProgress) {
-            this.loadProgress.style.width = `${Math.min(percent, 100)}%`;
-        }
-        if (this.loadStatus && status) {
-            this.loadStatus.textContent = status;
-        }
-    }
-
-    /**
-     * Hide loading screen with fade out
-     */
-    hideLoadingScreen() {
-        if (this.loadingScreen) {
-            this.loadingScreen.classList.add('fade-out');
-            setTimeout(() => {
-                this.loadingScreen.style.display = 'none';
-            }, 500);
-        }
-    }
-
-    /**
-     * Show loading overlay on an element
-     * @param {HTMLElement|string} element - Element or selector
-     * @param {string} message - Loading message
-     */
-    showElementLoading(element, message = 'جاري التحميل...') {
-        const el = typeof element === 'string' 
-            ? document.querySelector(element)
-            : element;
-        
-        if (!el) return;
-
-        el.dataset.originalContent = el.innerHTML;
-        el.innerHTML = `
-            <div class="element-loader">
-                <div class="spinner"></div>
-                <p>${message}</p>
-            </div>
-        `;
-        el.disabled = true;
-        el.classList.add('loading');
-    }
-
-    /**
-     * Hide loading overlay from element
-     * @param {HTMLElement|string} element - Element or selector
-     */
-    hideElementLoading(element) {
-        const el = typeof element === 'string'
-            ? document.querySelector(element)
-            : element;
-        
-        if (!el || !el.dataset.originalContent) return;
-
-        el.innerHTML = el.dataset.originalContent;
-        delete el.dataset.originalContent;
-        el.disabled = false;
-        el.classList.remove('loading');
-    }
-
-    /**
-     * Show button loading state
-     * @param {HTMLButtonElement} btn - Button element
-     * @param {string} loadingText - Text while loading
-     */
-    showButtonLoading(btn, loadingText = '') {
-        if (!btn) return;
-
-        const originalText = btn.querySelector('span:not(.btn-loader))')?.textContent || btn.textContent;
-        btn.dataset.originalText = originalText;
-        btn.disabled = true;
-
-        const textSpan = btn.querySelector('span:not(.btn-loader)');
-        const loaderSpan = btn.querySelector('.btn-loader');
-
-        if (textSpan && loadingText) {
-            textSpan.textContent = loadingText;
-        }
-        if (loaderSpan) {
-            loaderSpan.classList.remove('hidden');
-        }
-    }
-
-    /**
-     * Hide button loading state
-     * @param {HTMLButtonElement} btn - Button element
-     */
-    hideButtonLoading(btn) {
-        if (!btn) return;
-
-        btn.disabled = false;
-        const textSpan = btn.querySelector('span:not(.btn-loader)');
-        const loaderSpan = btn.querySelector('.btn-loader');
-
-        if (textSpan && btn.dataset.originalText) {
-            textSpan.textContent = btn.dataset.originalText;
-        }
-        if (loaderSpan) {
-            loaderSpan.classList.add('hidden');
-        }
-    }
-
-    // ============================================
-    // 🪟 MODALS
-    // ============================================
-
-    /**
-     * Open modal
-     * @param {string} modalId - Modal ID or selector
-     */
-    openModal(modalId) {
-        let modal;
-        
-        if (typeof modalId === 'string') {
-            modal = document.getElementById(modalId) || 
-                    document.querySelector(modalId);
-        } else {
-            modal = modalId;
-        }
-
-        if (!modal) {
-            console.error(`Modal not found: ${modalId}`);
-            return;
-        }
-
-        modal.classList.remove('hidden');
-        this.activeModals.push(modal);
-        
-        // Prevent body scroll
-        document.body.style.overflow = 'hidden';
-
-        // Focus trap
-        this.setupFocusTrap(modal);
-
-        // Animation
-        requestAnimationFrame(() => {
-            modal.style.opacity = '1';
-        });
-    }
-
-    /**
-     * Close modal
-     * @param {HTMLElement|string} modal - Modal element or ID
-     */
-    closeModal(modal) {
-        if (typeof modal === 'string') {
-            modal = document.getElementById(modal);
-        }
-
-        if (!modal) return;
-
-        modal.classList.add('hidden');
-        this.activeModals = this.activeModals.filter(m => m !== modal);
-
-        // Restore body scroll if no more modals
-        if (this.activeModals.length === 0) {
-            document.body.style.overflow = '';
-        }
-    }
-
-    /**
-     * Close all open modals
-     */
-    closeAllModals() {
-        [...this.activeModals].forEach(modal => this.closeModal(modal));
-    }
-
-    /**
-     * Setup focus trap for accessibility
-     * @param {HTMLElement} modal - Modal element
-     */
-    setupFocusTrap(modal) {
-        const focusableElements = modal.querySelectorAll(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        
-        if (focusableElements.length > 0) {
-            focusableElements[0].focus();
-        }
-    }
 
     /**
      * Show confirmation dialog
@@ -404,97 +232,130 @@ class UIManager {
             message = 'هل أنت متأكد؟',
             confirmText = 'نعم',
             cancelText = 'إلغاء',
-            type = 'warning', // success, warning, danger, info
-            icon = null
+            type = 'info' // info, warning, danger
         } = options;
 
         return new Promise((resolve) => {
+            // Create modal overlay
             const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay';
+            overlay.className = 'modal-overlay confirmation-modal';
             
-            const icons = {
-                success: 'fas fa-check-circle text-success',
-                warning: 'fas fa-exclamation-triangle text-warning',
-                danger: 'fas fa-exclamation-circle text-danger',
-                info: 'fas fa-info-circle text-primary'
-            };
-
             overlay.innerHTML = `
-                <div class="modal" style="max-width: 400px;">
-                    <div class="modal-header">
-                        ${icon ? `<i class="${icon}" style="font-size: 24px;"></i>` : ''}
-                        <h3>${title}</h3>
+                <div class="modal-content confirmation-content">
+                    <div class="confirmation-header">
+                        <h3>${this.getConfirmationIcon(type)} ${title}</h3>
                     </div>
-                    <div class="modal-body">
+                    <div class="confirmation-body">
                         <p>${message}</p>
-                        <div style="display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end;">
-                            <button class="btn btn-secondary" id="confirmCancel">${cancelText}</button>
-                            <button class="btn btn-${type}" id="confirmOk">${confirmText}</button>
-                        </div>
+                    </div>
+                    <div class="confirmation-actions">
+                        <button class="btn btn-outline" id="confirmCancel">
+                            ${cancelText}
+                        </button>
+                        <button class="btn btn-${type === 'danger' ? 'danger' : 'primary'}" id="confirmOk">
+                            ${confirmText}
+                        </button>
                     </div>
                 </div>
             `;
 
+            // Add to DOM
             document.body.appendChild(overlay);
 
-            // Event listeners
-            overlay.querySelector('#confirmCancel').addEventListener('click', () => {
-                overlay.remove();
-                resolve(false);
+            // Animate in
+            requestAnimationFrame(() => {
+                overlay.classList.add('show');
             });
 
-            overlay.querySelector('#confirmOk').addEventListener('click', () => {
-                overlay.remove();
+            // Event handlers
+            const handleConfirm = () => {
+                cleanup();
                 resolve(true);
-            });
+            };
 
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+
+            const cleanup = () => {
+                overlay.classList.remove('show');
+                setTimeout(() => {
+                    if (overlay.parentElement) {
+                        overlay.parentElement.removeChild(overlay);
+                    }
+                }, 300);
+            };
+
+            overlay.querySelector('#confirmOk').addEventListener('click', handleConfirm);
+            overlay.querySelector('#confirmCancel').addEventListener('click', handleCancel);
             overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    overlay.remove();
-                    resolve(false);
-                }
+                if (e.target === overlay) handleCancel();
             });
         });
     }
 
-    // ============================================
-    // 📋 PANELS (Side Panels)
-    // ============================================
-
     /**
-     * Open side panel
-     * @param {string} panelId - Panel ID
+     * Get icon for confirmation dialog based on type
+     * @param {string} type - Dialog type
+     * @returns {string} Icon HTML
      */
-    openPanel(panelId) {
-        const panel = document.getElementById(panelId);
-        if (!panel) return;
-
-        panel.classList.remove('hidden');
-        this.activePanels.push(panel);
-        document.body.style.overflow = 'hidden';
+    getConfirmationIcon(type) {
+        const icons = {
+            info: '<i class="fas fa-info-circle" style="color: #3b82f6;"></i>',
+            warning: '<i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>',
+            danger: '<i class="fas fa-exclamation-circle" style="color: #ef4444;"></i>',
+            success: '<i class="fas fa-check-circle" style="color: #10b981;"></i>'
+        };
+        return icons[type] || icons.info;
     }
 
+    // ============================================
+    // 🪟 MODAL MANAGEMENT
+    // ============================================
+
     /**
-     * Close side panel
-     * @param {string} panelId - Panel ID
+     * Open modal by ID
+     * @param {string} modalId - Modal element ID
      */
-    closePanel(panelId) {
-        const panel = document.getElementById(panelId);
-        if (!panel) return;
-
-        panel.classList.add('hidden');
-        this.activePanels = this.activePanels.filter(p => p !== panel);
-
-        if (this.activePanels.length === 0) {
-            document.body.style.overflow = '';
+    openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        
+        if (!modal) {
+            console.warn(`⚠️ Modal not found: ${modalId}`);
+            return;
         }
+
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+
+        console.log(`📂 Modal opened: ${modalId}`);
     }
 
     /**
-     * Close all panels
+     * Close modal by ID
+     * @param {string} modalId - Modal element ID
      */
-    closeAllPanels() {
-        [...this.activePanels].forEach(panel => this.closePanel(panel.id));
+    closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        
+        if (!modal) return;
+
+        modal.classList.remove('active');
+        document.body.style.overflow = ''; // Restore scrolling
+
+        console.log(`📕 Modal closed: ${modalId}`);
+    }
+
+    /**
+     * Close all open modals
+     */
+    closeAllModals() {
+        document.querySelectorAll('.modal.active').forEach(modal => {
+            modal.classList.remove('active');
+        });
+        
+        document.body.style.overflow = '';
     }
 
     // ============================================
@@ -502,295 +363,317 @@ class UIManager {
     // ============================================
 
     /**
-     * Navigate to a page with animation
+     * Navigate to page by ID
      * @param {string} pageId - Target page ID
      */
     navigateTo(pageId) {
         // Hide all pages
-        const pages = document.querySelectorAll('.page');
-        pages.forEach(page => {
+        document.querySelectorAll('.page').forEach(page => {
             page.classList.remove('active');
         });
 
         // Show target page
         const targetPage = document.getElementById(pageId);
+        
         if (targetPage) {
             targetPage.classList.add('active');
             
-            // Scroll to top
+            // Scroll to top of new page
             window.scrollTo({ top: 0, behavior: 'smooth' });
 
-            // Update nav buttons
-            this.updateNavigation(pageId);
+            console.log(`📍 Navigated to: ${pageId}`);
+        } else {
+            console.warn(`⚠️ Page not found: ${pageId}`);
         }
-    }
-
-    /**
-     * Update bottom navigation active state
-     * @param {string} pageId - Current page ID
-     */
-    updateNavigation(pageId) {
-        const navBtns = document.querySelectorAll('.nav-btn');
-        navBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.page === pageId);
-        });
     }
 
     // ============================================
-    // 🔊 AUDIO & HAPTICS
+    // 🎛️ LOADING STATES
     // ============================================
 
     /**
-     * Play sound effect
-     * @param {string} soundId - Audio element ID
-     * @param {number} volume - Volume level (0-1)
+     * Update loading progress bar
+     * @param {number} percent - Progress percentage (0-100)
+     * @param {string} statusText - Status text to display
      */
-    playSound(soundId, volume = 0.5) {
-        // Check if sounds are enabled in settings
-        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
-        if (settings.soundEnabled === false) return;
+    updateLoadingProgress(percent, statusText) {
+        const progressBar = document.getElementById('loadProgress');
+        const statusEl = document.getElementById('loadStatus');
 
-        const audio = document.getElementById(soundId);
-        if (audio) {
-            audio.volume = volume;
-            audio.currentTime = 0;
-            audio.play().catch(e => console.log('Audio play failed:', e));
+        if (progressBar) {
+            progressBar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+            progressBar.setAttribute('aria-valuenow', percent);
+        }
+
+        if (statusEl) {
+            statusEl.textContent = statusText;
         }
     }
 
     /**
-     * Trigger device vibration
-     * @param {number|Array} pattern - Vibration pattern
+     * Hide loading screen
      */
-    vibrate(pattern = 100) {
-        // Check if vibration is enabled
-        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
-        if (settings.vibrationEnabled === false) return;
-
-        if ('vibrate' in navigator) {
-            navigator.vibrate(pattern);
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loadingScreen');
+        
+        if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            loadingScreen.style.transition = 'opacity 0.5s ease';
+            
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+                
+                const appContainer = document.getElementById('app');
+                if (appContainer) {
+                    appContainer.classList.remove('hidden');
+                }
+            }, 500);
         }
     }
+
+    /**
+     * Show button loading state
+     * @param {HTMLElement} button - Button element
+     * @param {string} text - Loading text
+     */
+    showButtonLoading(button, text = 'جاري التحميل...') {
+        if (!button) return;
+
+        button.disabled = true;
+        button.dataset.originalText = button.innerHTML;
+        
+        const loaderSpan = button.querySelector('.btn-loader') || 
+                           document.createElement('span');
+        loaderSpan.className = 'btn-loader';
+        loaderSpan.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        if (!button.querySelector('.btn-loader')) {
+            button.appendChild(loaderSpan);
+        }
+
+        const textSpan = button.querySelector('span:not(.btn-loader)');
+        if (textSpan) {
+            textSpan.textContent = text;
+        }
+
+        button.classList.add('loading');
+    }
+
+    /**
+     * Hide button loading state
+     * @param {HTMLElement} button - Button element
+     */
+    hideButtonLoading(button) {
+        if (!button) return;
+
+        button.disabled = false;
+        button.classList.remove('loading');
+
+        // Restore original text
+        if (button.dataset.originalText) {
+            button.innerHTML = button.dataset.originalText;
+            delete button.dataset.originalText;
+        }
+
+        // Remove loader
+        const loader = button.querySelector('.btn-loader');
+        if (loader) {
+            loader.remove();
+        }
+    }
+
+    // ============================================
+    // 🎵 FEEDBACK & ANIMATIONS
+    // ============================================
 
     /**
      * Play success feedback (sound + vibration)
      */
     playSuccessFeedback() {
-        this.playSound('successSound', 0.6);
-        this.vibrate([50, 50, 50]);
+        Utils.playSound('loginSuccess', 0.7);
+        Utils.vibrate([100, 50, 100]);
     }
 
     /**
-     * Play error feedback
+     * Play error feedback (sound + vibration)
      */
     playErrorFeedback() {
-        this.playSound('errorSound', 0.6);
-        this.vibrate(200);
+        Utils.playSound('loginError', 0.7);
+        Utils.vibrate([200]);
     }
 
     /**
-     * Play face recognition success feedback
+     * Play sound effect
+     * @param {string} soundId - Sound element ID
+     * @param {number} volume - Volume level (0-1)
      */
-    playFaceSuccessFeedback() {
-        this.playSound('faceSuccessSound', 0.7);
-        this.vibrate([100, 50, 100]);
+    playSound(soundId, volume = 0.7) {
+        Utils.playSound(soundId, volume);
     }
 
     /**
-     * Play face recognition error feedback
+     * Shake element animation (for errors)
+     * @param {HTMLElement|string} element - Element or selector
      */
-    playFaceErrorFeedback() {
-        this.playSound('faceErrorSound', 0.7);
-        this.vibrate([100, 100, 100]);
-    }
-
-    // ============================================
-    // 🎯 FORM HELPERS
-    // ============================================
-
-    /**
-     * Toggle password visibility
-     * @param {Event} e - Click event
-     */
-    togglePasswordVisibility(e) {
-        const btn = e.currentTarget;
-        const inputId = btn.dataset.target;
-        const input = document.getElementById(inputId);
-        const icon = btn.querySelector('i');
-
-        if (input) {
-            const isPassword = input.type === 'password';
-            input.type = isPassword ? 'text' : 'password';
-            
-            if (icon) {
-                icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
-            }
+    shakeElement(element) {
+        const el = typeof element === 'string' ? document.querySelector(element) : element;
+        
+        if (el) {
+            el.style.animation = 'shake 0.5s ease';
+            setTimeout(() => el.style.animation = '', 500);
         }
     }
 
     /**
-     * Update password strength indicator
-     * @param {string} password - Password value
-     * @param {string} containerId - Strength container ID
+     * Pulse element animation (for attention)
+     * @param {HTMLElement|string} element - Element or selector
      */
-    updatePasswordStrength(password, containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        const strength = Utils.checkPasswordStrength(password);
+    pulseElement(element) {
+        const el = typeof element === 'string' ? document.querySelector(element) : element;
         
-        container.innerHTML = `
-            <div class="strength-bar ${strength.level}">
-                <div class="fill"></div>
-            </div>
-            <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">
-                ${strength.level === 'weak' ? '🔴 ضعيفة' : 
-                  strength.level === 'medium' ? '🟡 متوسطة' : '🟢 قوية'}
-                (${strength.percentage}%)
-            </small>
-        `;
+        if (el) {
+            el.classList.add('pulse');
+            setTimeout(() => el.classList.remove('pulse'), 1000);
+        }
     }
 
     // ============================================
-    // 📊 DATA DISPLAY HELPERS
+    // 📊 FORM HELPERS
     // ============================================
 
     /**
-     * Format and display attendance record
-     * @param {object} record - Attendance record
-     * @returns {HTMLElement} Formatted row element
+     * Clear all form validation errors
+     * @param {HTMLFormElement} form - Form element
      */
-    formatAttendanceRow(record) {
-        const tr = document.createElement('tr');
-        
-        const typeClass = record.type === 'حضور' ? 'badge-in' : 'badge-out';
-        const typeBgColor = record.type === 'حضور' ? '#dcfce7' : '#fee2e2';
-        const typeTextColor = record.type === 'حضور' ? '#166534' : '#991b1b';
+    clearFormErrors(form) {
+        if (!form) return;
 
-        tr.innerHTML = `
-            <td>${Utils.formatDate(record.created_at, 'short')}</td>
-            <td>
-                <span style="
-                    background: ${typeBgColor};
-                    color: ${typeTextColor};
-                    padding: 4px 12px;
-                    border-radius: 20px;
-                    font-size: 12px;
-                    font-weight: bold;
-                ">
-                    ${record.type}
-                </span>
-            </td>
-            <td>${Utils.formatDate(record.created_at, 'time')}</td>
-            <td>${record.shift || '-'}</td>
-            <td style="color: var(--primary-400); font-weight: bold;">
-                ${record.hours_worked || '-'}
-            </td>
-            <td>${record.overtime || 'لا يوجد'}</td>
-        `;
+        form.querySelectorAll('.error-message').forEach(errorEl => {
+            errorEl.textContent = '';
+            errorEl.style.display = 'none';
+        });
 
-        return tr;
-    }
-
-    /**
-     * Display empty state for lists/tables
-     * @param {HTMLElement} container - Container element
-     * @param {string} message - Empty message
-     * @param {string} icon - Font Awesome icon class
-     */
-    showEmptyState(container, message = 'لا توجد بيانات', icon = 'fas fa-inbox') {
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="${icon}"></i>
-                <p>${message}</p>
-            </div>
-        `;
-    }
-
-    /**
-     * Update stat card value with animation
-     * @param {string} elementId - Element ID
-     * @param {*} value - New value
-     */
-    animateStatValue(elementId, value) {
-        const el = document.getElementById(elementId);
-        if (!el) return;
-
-        const currentValue = parseInt(el.textContent) || 0;
-        const newValue = parseInt(value) || 0;
-        const diff = newValue - currentValue;
-        const duration = 500;
-        const steps = 30;
-        const stepValue = diff / steps;
-        let step = 0;
-
-        const animate = setInterval(() => {
-            step++;
-            el.textContent = Math.round(currentValue + (stepValue * step));
-            
-            if (step >= steps) {
-                clearInterval(animate);
-                el.textContent = newValue;
-            }
-        }, duration / steps);
-    }
-
-    // ============================================
-    // 🛠️ UTILITY METHODS
-    // ============================================
-
-    /**
-     * Debounce function calls
-     * @param {Function} func - Function to debounce
-     * @param {number} wait - Wait time
-     * @returns {Function} Debounced function
-     */
-    debounce(func, wait = 300) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    /**
-     * Get current timestamp formatted
-     * @returns {string} Formatted timestamp
-     */
-    getTimestamp() {
-        return new Date().toLocaleTimeString('ar-EG', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
+        form.querySelectorAll('.input-group').forEach(group => {
+            group.classList.remove('error', 'success');
         });
     }
 
     /**
-     * Show network offline indicator
+     * Show field error
+     * @param {string} fieldId - Field ID
+     * @param {string} message - Error message
      */
-    showOfflineIndicator() {
-        this.showWarning('أنت غير متصل بالإنترنت - سيتم حفظ البيانات محلياً');
-        
-        // Add offline class to body
-        document.body.classList.add('offline');
+    showFieldError(fieldId, message) {
+        const field = document.getElementById(fieldId);
+        const errorEl = document.getElementById(`${fieldId}Error`);
+
+        if (field) {
+            field.classList.add('error');
+            field.parentElement?.classList.add('error');
+        }
+
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
     }
 
     /**
-     * Hide network offline indicator
+     * Show field success
+     * @param {string} fieldId - Field ID
      */
-    hideOfflineIndicator() {
-        document.body.classList.remove('offline');
-        this.showSuccess('تم استعادة الاتصال بالإنترنت ✓');
+    showFieldSuccess(fieldId) {
+        const field = document.getElementById(fieldId);
+        
+        if (field) {
+            field.classList.add('success');
+            field.parentElement?.classList.add('success');
+        }
+
+        // Hide error if exists
+        const errorEl = document.getElementById(`${fieldId}Error`);
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.style.display = 'none';
+        }
+    }
+
+    // ============================================
+    // 🔄 UTILITY METHODS
+    // ============================================
+
+    /**
+     * Animate number counter
+     * @param {string} elementId - Target element ID
+     * @param {number} targetValue - Final value
+     * @param {number} duration - Animation duration in ms
+     */
+    animateStatValue(elementId, targetValue, duration = 1000) {
+        const el = document.getElementById(elementId);
+        
+        if (!el) return;
+
+        const startValue = parseInt(el.textContent) || 0;
+        const increment = (targetValue - startValue) / (duration / 16); // 60fps
+        
+        let currentValue = startValue;
+        
+        const animate = () => {
+            currentValue += increment;
+            
+            if ((increment > 0 && currentValue >= targetValue) ||
+                (increment < 0 && currentValue <= targetValue)) {
+                el.textContent = targetValue;
+                return;
+            }
+            
+            el.textContent = Math.round(currentValue);
+            requestAnimationFrame(animate);
+        };
+
+        requestAnimationFrame(animate);
+    }
+
+    /**
+     * Set default dates for report date range picker
+     */
+    setDefaultDates() {
+        const startDateInput = document.getElementById('reportStartDate');
+        const endDateInput = document.getElementById('reportEndDate');
+
+        if (startDateInput && endDateInput) {
+            const today = new Date();
+            const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+            startDateInput.value = firstOfMonth.toISOString().split('T')[0];
+            endDateInput.value = today.toISOString().split('T')[0];
+        }
+    }
+
+    /**
+     * Get current timestamp formatted for display
+     * @returns {string}
+     */
+    getCurrentTimestamp() {
+        return Utils.formatDate(new Date(), 'datetime');
     }
 }
 
-// Create global instance
-const ui = new UIManager();
+// ============================================
+// 🌍 GLOBAL INSTANCE
+// ============================================
 
-// Export for use in other modules
-window.UIManager = UIManager;
-window.ui = ui;
+/**
+ * Global UI manager instance
+ */
+let ui;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    ui = new UIManager();
+    ui.init();
+    
+    console.log('🎨 UI Manager module loaded');
+});
+
+console.log('✅ ui-manager.js v4.1 loaded successfully');
