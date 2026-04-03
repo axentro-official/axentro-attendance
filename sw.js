@@ -1,872 +1,514 @@
 /**
  * ============================================
- * 🎯 AXENTRO APPLICATION v4.0
- * ✅ Main Application Controller
+ * 🔄 AXENTRO SERVICE WORKER v4.0
+ * ✅ Offline Support & Caching Strategy
  * ============================================
  */
 
-class App {
-    constructor() {
-        this.isInitialized = false;
-        this.currentPage = 'loginPage';
-        
-        // Module references
-        this.modules = {
-            ui: null,
-            auth: null,
-            db: null,
-            faceRecognition: null,
-            attendance: null,
-            admin: null,
-            reports: null
-        };
-        
-        // Bind methods
-        this.init = this.init.bind(this);
-        this.handleOnlineStatus = this.handleOnlineStatus.bind(this);
+const CACHE_NAME = 'axentro-v4';
+const STATIC_CACHE = 'axentro-static-v4';
+const DYNAMIC_CACHE = 'axentro-dynamic-v4';
+
+// ============================================
+// 📦 FILES TO PRECACHE (App Shell)
+// ============================================
+const APP_SHELL_FILES = [
+    './',
+    './index.html',
+    './manifest.json',
+    './icon-192.png',
+    ./icon-512.png',
+    './qr-links.png',
+    
+    // CSS
+    './css/styles.css',
+    
+    // JavaScript Modules (order matters!)
+    './js/config.js',
+    './js/utils.js',
+    './js/validator.js',
+    './js/ui-manager.js',
+    './js/supabase-client.js',
+    './js/auth.js',
+    './js/face-recognition.js',
+    './js/attendance.js',
+    './js/admin.js',
+    './js/reports.js',
+    './js/app.js',
+    
+    // Audio files
+    './login-success.mp3',
+    './login-error.mp3',
+    './faceid-success.mp3',
+    './faceid-error.mp3',
+    './logout-success.mp3'
+];
+
+// External resources to cache
+const EXTERNAL_RESOURCES = [
+    {
+        url: 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+        cacheName: 'fonts-css'
+    },
+    {
+        url: 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js',
+        cacheName: 'face-api-js'
     }
+];
 
-    // ============================================
-    // 🚀 APPLICATION INITIALIZATION
-    // ============================================
+// Face recognition model files (heavy, cache separately)
+const FACE_MODEL_URLS = [
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/tiny_face_detector_model-weights_manifest.json',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/tiny_face_detector_model-shard1',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/face_landmark_68_tiny_model-weights_manifest.json',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/face_landmark_68_tiny_model-shard1',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/ssd_mobilenetv1_model-weights_manifest.json',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/ssd_mobilenetv1_model-shard1',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/ssd_mobilenetv1_model-shard2',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/face_landmark_68_model-weights_manifest.json',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/face_landmark_68_model-shard1',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/face_recognition_model-weights_manifest.json',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/face_recognition_model-shard1',
+    'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/face_recognition_model-shard2'
+];
 
-    /**
-     * Initialize the entire application
-     */
-    async init() {
-        console.log('🚀 Starting Axentro Application v' + AppConfig.app.version);
-        
-        try {
-            // Step 1: Update loading progress
-            ui.updateLoadingProgress(10, 'تهيئة الواجهة...');
+// API endpoints that should NOT be cached
+const NO_CACHE_URLS = [
+    /script\.google\.com/,  // Google Apps Script
+    /supabase\.co\/rest/,   // Supabase REST API
+    /supabase\.co\/auth/,   // Supabase Auth
+    /api\./                 // Generic APIs
+];
+
+// ============================================
+// 🚀 INSTALL EVENT
+// ============================================
+self.addEventListener('install', event => {
+    console.log('🔧 SW: Installing...');
+    
+    event.waitUntil(
+        Promise.all([
+            // Cache app shell
+            caches.open(STATIC_CACHE).then(cache => {
+                console.log('📦 Caching app shell');
+                return cache.addAll(APP_SHELL_FILES).catch(err => {
+                    console.warn('⚠️ Some app shell files failed to cache:', err);
+                });
+            }),
             
-            // Step 2: Initialize UI Manager (already created globally)
-            await Utils.sleep(100);
+            // Cache external resources
+            ...EXTERNAL_RESOURCES.map(resource => 
+                caches.open(STATIC_CACHE).then(cache => 
+                    cache.add(resource.url).catch(err => {
+                        console.warn(`⚠️ Failed to cache: ${resource.url}`, err);
+                    })
+                )
+            ),
             
-            // Step 3: Setup global event listeners
-            this.setupGlobalEventListeners();
-            ui.updateLoadingProgress(20, 'إعداد المستمعين...');
+            // Pre-cache face models in background
+            caches.open('face-models').then(cache => {
+                console.log('🤖 Caching face recognition models...');
+                return Promise.allSettled(
+                    FACE_MODEL_URLS.map(url => 
+                        cache.add(url).catch(err => {
+                            console.warn(`⚠️ Failed to cache model: ${url}`, err);
+                        })
+                    )
+                );
+            })
+        ]).then(() => {
+            console.log('✅ SW: Installation complete');
+            return self.skipWaiting(); // Activate immediately
+        })
+    );
+});
+
+// ============================================
+// ✅ ACTIVATE EVENT
+// ============================================
+self.addEventListener('activate', event => {
+    console.log('✅ SW: Activating...');
+    
+    event.waitUntil(
+        Promise.all([
+            // Clean up old caches
+            caches.keys().then(cacheNames => {
+                return Promise.all(
+                    cacheNames
+                        .filter(name => name !== STATIC_CACHE && 
+                                     name !== DYNAMIC_CACHE && 
+                                     name !== 'face-models')
+                        .map(name => {
+                            console.log('🗑️ Deleting old cache:', name);
+                            return caches.delete(name);
+                        })
+                );
+            }),
             
-            // Step 4: Initialize database client
-            ui.updateLoadingProgress(30, 'الاتصال بقاعدة البيانات...');
-            if (!db.isConnectedToSupabase()) {
-                throw new Error('فشل الاتصال بقاعدة البيانات');
-            }
+            // Take control of all pages immediately
+            self.clients.claim()
+        ]).then(() => {
+            console.log('✅ SW: Activation complete - Ready to serve!');
             
-            // Step 5: Load face recognition models
-            ui.updateLoadingProgress(50, 'تحميل نماذج الذكاء الاصطناعي...');
-            if (!faceRecognition.areModelsLoaded()) {
-                await faceRecognition.loadModels();
-            }
-            
-            // Step 6: Check for existing session
-            ui.updateLoadingProgress(70, 'التحقق من الجلسة...');
-            const hasSession = await auth.checkExistingSession();
-            
-            // Step 7: Load user settings
-            ui.updateLoadingProgress(80, 'تحميل الإعدادات...');
-            this.loadUserSettings();
-            
-            // Step 8: Setup PWA features
-            ui.updateLoadingProgress(90, 'إعداد التطبيق...');
-            this.setupPWAFeatures();
-            
-            // Step 9: Final initialization
-            ui.updateLoadingProgress(100, 'جاهز! ✓');
-            
-            // Hide loading screen after a short delay
-            setTimeout(() => {
-                ui.hideLoadingScreen();
-                
-                // Navigate to appropriate page
-                if (hasSession && auth.isAuthenticated()) {
-                    this.navigateTo('dashboardPage');
-                    this.initializeDashboard();
-                } else {
-                    this.navigateTo('loginPage');
-                }
-                
-                this.isInitialized = true;
-                console.log('✅ Application initialized successfully!');
-                
-            }, 800);
-
-        } catch (error) {
-            console.error('❌ Application initialization failed:', error);
-            ui.updateLoadingProgress(0, 'حدث خطأ في التحميل');
-            
-            // Show error and retry option
-            setTimeout(() => {
-                ui.hideLoadingScreen();
-                ui.showError('فشل تحميل التطبيق - يرجى تحديث الصفحة');
-                
-                // Add retry button
-                const retryBtn = document.createElement('button');
-                retryBtn.className = 'btn btn-primary btn-block';
-                retryBtn.innerHTML = '<i class="fas fa-redo"></i> إعادة المحاولة';
-                retryBtn.onclick = () => window.location.reload();
-                
-                document.getElementById('loginPage')?.querySelector('.auth-form')?.appendChild(retryBtn);
-                
-            }, 1500);
-        }
-    }
-
-    /**
-     * Setup global event listeners
-     */
-    setupGlobalEventListeners() {
-        // ============================================
-        // NAVIGATION EVENTS
-        // ============================================
-        
-        // Bottom navigation buttons
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const targetPage = btn.dataset.page;
-                if (targetPage) {
-                    this.navigateTo(targetPage);
-                    
-                    // Page-specific initialization
-                    switch (targetPage) {
-                        case 'dashboardPage':
-                            this.initializeDashboard();
-                            break;
-                        case 'reportsPage':
-                            reports.setDefaultDates();
-                            break;
-                        case 'changePasswordPage':
-                            // Nothing special needed
-                            break;
-                    }
-                }
-            });
-        });
-
-        // ============================================
-        // AUTH FORMS
-        // ============================================
-        
-        // Login form
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => auth.handleLogin(e));
-        }
-
-        // Register form
-        const registerForm = document.getElementById('registerForm');
-        if (registerForm) {
-            registerForm.addEventListener('submit', (e) => auth.handleRegister(e));
-        }
-
-        // Forgot password form
-        const forgotPasswordForm = document.getElementById('forgotPasswordForm');
-        if (forgotPasswordForm) {
-            forgotPasswordForm.addEventListener('submit', (e) => auth.handleForgotPassword(e));
-        }
-
-        // Change password form
-        const changePasswordForm = document.getElementById('changePasswordForm');
-        if (changePasswordForm) {
-            changePasswordForm.addEventListener('submit', (e) => auth.handleChangePassword(e));
-        }
-
-        // Force password change form
-        const forcePasswordForm = document.getElementById('forcePasswordForm');
-        if (forcePasswordForm) {
-            forcePasswordForm.addEventListener('submit', (e) => auth.handleForcePasswordChange(e));
-        }
-
-        // ============================================
-        // AUTH LINKS & BUTTONS
-        // ============================================
-        
-        // Show registration link
-        const showRegisterLink = document.getElementById('showRegisterLink');
-        if (showRegisterLink) {
-            showRegisterLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.navigateTo('registerPage');
-            });
-        }
-
-        // Show forgot password link
-        const showForgotLink = document.getElementById('showForgotPasswordLink');
-        if (showForgotLink) {
-            showForgotLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.navigateTo('forgotPasswordPage');
-            });
-        }
-
-        // Back buttons
-        document.querySelectorAll('.back-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.navigateTo('loginPage');
-            });
-        });
-
-        const backToLoginBtn = document.getElementById('backToLoginBtn');
-        if (backToLoginBtn) {
-            backToLoginBtn.addEventListener('click', () => {
-                this.navigateTo('loginPage');
-            });
-        }
-
-        const backToLoginFromRegister = document.getElementById('backToLoginFromRegister');
-        if (backToLoginFromRegister) {
-            backToLoginFromRegister.addEventListener('click', () => {
-                this.navigateTo('loginPage');
-            });
-        }
-
-        const backToLoginFromForgot = document.getElementById('backToLoginFromForgot');
-        if (backToLoginFromForgot) {
-            backToLoginFromForgot.addEventListener('click', () => {
-                this.navigateTo('loginPage');
-            });
-        }
-
-        // Biometric login button
-        const biometricLoginBtn = document.getElementById('biometricLoginBtn');
-        if (biometricLoginBtn) {
-            biometricLoginBtn.addEventListener('click', () => auth.attemptBiometricAuth());
-        }
-
-        // ============================================
-        // DASHBOARD ACTIONS
-        // ============================================
-        
-        // Logout button
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => auth.logout());
-        }
-
-        // Check-in button
-        const checkInBtn = document.getElementById('checkInBtn');
-        if (checkInBtn) {
-            checkInBtn.addEventListener('click', () => attendance.handleCheckIn());
-        }
-
-        // Check-out button
-        const checkOutBtn = document.getElementById('checkOutBtn');
-        if (checkOutBtn) {
-            checkOutBtn.addEventListener('click', () => attendance.handleCheckOut());
-        }
-
-        // Switch camera button
-        const switchCameraBtn = document.getElementById('switchCameraBtn');
-        if (switchCameraBtn) {
-            switchCameraBtn.addEventListener('click', () => faceRecognition.switchCamera());
-        }
-
-        // Face capture for registration
-        const startFaceCaptureBtn = document.getElementById('startFaceCaptureBtn');
-        if (startFaceCaptureBtn) {
-            startFaceCaptureBtn.addEventListener('click', async () => {
-                try {
-                    ui.showButtonLoading(startFaceCaptureBtn, 'جاري تشغيل الكاميرا...');
-                    
-                    await faceRecognition.startCamera(
-                        faceRecognition.registerVideo,
-                        { facingMode: 'user' }
-                    );
-                    
-                    // Show capture button
-                    const captureBtn = document.getElementById('captureFaceBtn');
-                    if (captureBtn) captureBtn.classList.remove('hidden');
-                    
-                    // Hide overlay when camera starts
-                    const overlay = document.getElementById('registerOverlay');
-                    if (overlay) overlay.style.display = 'none';
-                    
-                    ui.showSuccess('تم تشغيل الكاميرا ✓');
-                    
-                    // Setup capture button event
-                    const captureFaceBtn = document.getElementById('captureFaceBtn');
-                    if (captureFaceBtn && !captureFaceBtn.dataset.listenerAttached) {
-                        captureFaceBtn.addEventListener('click', (e) => 
-                            faceRecognition.handleRegistrationCapture(e)
-                        );
-                        captureFaceBtn.dataset.listenerAttached = 'true';
-                    }
-                    
-                } catch (error) {
-                    ui.showError(error.message || 'فشل تشغيل الكاميرا');
-                } finally {
-                    ui.hideButtonLoading(startFaceCaptureBtn);
-                }
-            });
-        }
-
-        // ============================================
-        // SETTINGS & PANELS
-        // ============================================
-        
-        // Notifications panel
-        const notificationsBtn = document.getElementById('notificationsBtn');
-        if (notificationsBtn) {
-            notificationsBtn.addEventListener('click', () => {
-                ui.openPanel('notificationsPanel');
-            });
-        }
-
-        const closeNotificationsBtn = document.getElementById('closeNotificationsBtn');
-        if (closeNotificationsBtn) {
-            closeNotificationsBtn.addEventListener('click', () => {
-                ui.closePanel('notificationsPanel');
-            });
-        }
-
-        const markAllReadBtn = document.getElementById('markAllReadBtn');
-        if (markAllReadBtn) {
-            markAllReadBtn.addEventListener('click', () => admin.markAllNotificationsRead());
-        }
-
-        // Settings panel
-        const settingsBtn = document.getElementById('settingsBtn');
-        if (settingsBtn) {
-            settingsBtn.addEventListener('click', () => {
-                ui.openPanel('settingsPanel');
-            });
-        }
-
-        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-        if (closeSettingsBtn) {
-            closeSettingsBtn.addEventListener('click', () => {
-                ui.closePanel('settingsPanel');
-            });
-        }
-
-        // Settings toggles
-        document.querySelectorAll('#settingsPanel input[type="checkbox"]').forEach(toggle => {
-            toggle.addEventListener('change', (e) => {
-                this.saveSetting(e.target.id, e.target.checked);
-            });
-        });
-
-        // ============================================
-        // PASSWORD VISIBILITY TOGGLES
-        // ============================================
-        
-        document.querySelectorAll('.toggle-password').forEach(btn => {
-            btn.addEventListener('click', (e) => ui.togglePasswordVisibility(e));
-        });
-
-        // ============================================
-        // PASSWORD STRENGTH INDICATORS
-        // ============================================
-        
-        const regPassword = document.getElementById('regPassword');
-        if (regPassword) {
-            regPassword.addEventListener('input', (e) => {
-                ui.updatePasswordStrength(e.target.value, 'passwordStrength');
-            });
-        }
-
-        const newPassword = document.getElementById('newPassword');
-        if (newPassword) {
-            newPassword.addEventListener('input', (e) => {
-                ui.updatePasswordStrength(e.target.value, 'newPasswordStrength');
-            });
-        }
-
-        const forceNewPassword = document.getElementById('forceNewPassword');
-        if (forceNewPassword) {
-            forceNewPassword.addEventListener('input', (e) => {
-                ui.updatePasswordStrength(e.target.value, 'forcePasswordStrength');
-            });
-        }
-
-        // ============================================
-        // NETWORK STATUS
-        // ============================================
-        
-        window.addEventListener('online', this.handleOnlineStatus);
-        window.addEventListener('offline', this.handleOnlineStatus);
-
-        // ============================================
-        // KEYBOARD SHORTCUTS
-        // ============================================
-        
-        document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + L to focus on location bar (prevent default)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
-                e.preventDefault();
-            }
-        });
-
-        // Prevent zoom on double tap (mobile)
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', (e) => {
-            const now = Date.now();
-            if (now - lastTouchEnd <= 300) {
-                e.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
-    }
-
-    // ============================================
-    // 📱 PAGE NAVIGATION
-    // ============================================
-
-    /**
-     * Navigate to a specific page
-     * @param {string} pageId - Target page ID
-     */
-    navigateTo(pageId) {
-        // Validate user is authenticated for protected pages
-        const protectedPages = ['dashboardPage', 'reportsPage', 'changePasswordPage'];
-        
-        if (protectedPages.includes(pageId) && !auth.isAuthenticated()) {
-            ui.showWarning('يجب تسجيل الدخول أولاً');
-            this.navigateTo('loginPage');
-            return;
-        }
-
-        // Navigate using UI Manager
-        ui.navigateTo(pageId);
-        this.currentPage = pageId;
-
-        // Page-specific actions
-        this.onPageEnter(pageId);
-    }
-
-    /**
-     * Handle page enter events
-     * @param {string} pageId - Entered page ID
-     */
-    onPageEnter(pageId) {
-        switch (pageId) {
-            case 'dashboardPage':
-                this.initializeDashboard();
-                break;
-                
-            case 'reportsPage':
-                reports.setDefaultDates();
-                break;
-                
-            case 'loginPage':
-                // Stop camera if running on other pages
-                if (faceRecognition.isCameraRunning()) {
-                    faceRecognition.stopCamera();
-                }
-                break;
-        }
-    }
-
-    // ============================================
-    // 🏠 DASHBOARD INITIALIZATION
-    // ============================================
-
-    /**
-     * Initialize dashboard with user data
-     */
-    async initializeDashboard() {
-        try {
-            if (!auth.isAuthenticated()) return;
-
-            const user = auth.getCurrentUser();
-
-            // Update user info in header
-            const userNameEl = document.getElementById('userName');
-            const userCodeEl = document.getElementById('userCodeDisplay');
-
-            if (userNameEl) userNameEl.textContent = `مرحباً، ${user.name}`;
-            if (userCodeEl) userCodeEl.textContent = `CODE: ${user.code}`;
-
-            // Load dashboard stats
-            const totalEmployees = await db.getEmployeesCount();
-            ui.animateStatValue('totalEmployeesStat', totalEmployees);
-
-            // Load today's attendance records
-            await attendance.loadTodayRecords();
-
-            // Start camera for face recognition
-            this.startDashboardCamera();
-
-            // Load known faces for recognition
-            await faceRecognition.loadKnownFaces();
-
-            // If user is admin, enable admin features
-            if (auth.isAdmin()) {
-                admin.setupAdminFeatures();
-            }
-
-            console.log('📊 Dashboard initialized');
-
-        } catch (error) {
-            console.error('Dashboard init error:', error);
-        }
-    }
-
-    /**
-     * Start dashboard camera for face recognition
-     */
-    async startDashboardCamera() {
-        try {
-            const videoEl = document.getElementById('dashboardVideo');
-            const canvasEl = document.getElementById('dashboardCanvas');
-            
-            if (!videoEl || !canvasEl) return;
-
-            // Start camera
-            await faceRecognition.startCamera(videoEl, { facingMode: 'user' });
-
-            // Optional: Start continuous detection (can be resource-intensive)
-            // For now, we'll detect on demand when user clicks check-in/out
-
-            console.log('📹 Dashboard camera ready');
-
-        } catch (error) {
-            console.warn('Dashboard camera not available:', error.message);
-            
-            // Show manual entry option or message
-            const cameraContainer = document.getElementById('recognitionArea');
-            if (cameraContainer) {
-                cameraContainer.innerHTML += `
-                    <div style="text-align: center; padding: 20px; color: var(--text-muted);">
-                        <i class="fas fa-camera-slash" style="font-size: 48px; margin-bottom: 10px;"></i>
-                        <p>الكاميرا غير متاحة - يمكنك الاستمرار بدون التعرف على الوجه</p>
-                    </div>
-                `;
-            }
-        }
-    }
-
-    // ============================================
-    // ⚙️ SETTINGS MANAGEMENT
-    // ============================================
-
-    /**
-     * Load user settings from storage
-     */
-    loadUserSettings() {
-        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {
-            soundEnabled: true,
-            vibrationEnabled: true,
-            dataSaverMode: false
-        });
-
-        // Apply settings to UI
-        Object.entries(settings).forEach(([key, value]) => {
-            const toggle = document.getElementById(key);
-            if (toggle) {
-                toggle.checked = value;
-            }
-        });
-    }
-
-    /**
-     * Save a setting
-     * @param {string} key - Setting key
-     * @param {*} value - Setting value
-     */
-    saveSetting(key, value) {
-        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
-        settings[key] = value;
-        Utils.saveToStorage(Constants.storageKeys.SETTINGS, settings);
-        
-        console.log(`⚙️ Setting saved: ${key} = ${value}`);
-    }
-
-    // ============================================
-    // 📱 PWA FEATURES
-    // ============================================
-
-    /**
-     * Setup Progressive Web App features
-     */
-    setupPWAFeatures() {
-        // Register service worker (if not already registered)
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.ready.then(registration => {
-                console.log('✅ Service Worker active:', registration.scope);
-            }).catch(error => {
-                console.warn('⚠️ SW registration pending:', error);
-            });
-        }
-
-        // Handle install prompt (for "Add to Home Screen")
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            this.deferredInstallPrompt = e;
-            
-            // Optionally show custom install button
-            console.log('📲 Install prompt available');
-        });
-
-        // Handle successful installation
-        window.addEventListener('appinstalled', () => {
-            console.log('✅ App installed successfully');
-            ui.showSuccess('تم تثبيت التطبيق بنجاح! 🎉');
-            this.deferredInstallPrompt = null;
-        });
-
-        // Check if running as installed PWA
-        if (Utils.isPWAInstalled()) {
-            console.log('📱 Running as installed PWA');
-        }
-    }
-
-    /**
-     * Prompt user to install PWA (call from custom button)
-     */
-    async promptInstall() {
-        if (!this.deferredInstallPrompt) {
-            ui.showInfo('يمكنك تثبيت التطبيق من قائمة المتصفح');
-            return;
-        }
-
-        try {
-            const result = await this.deferredInstallPrompt.prompt();
-            
-            if (result.outcome === 'accepted') {
-                console.log('User accepted install prompt');
-            } else {
-                console.log('User dismissed install prompt');
-            }
-            
-            this.deferredInstallPrompt = null;
-
-        } catch (error) {
-            console.error('Install prompt error:', error);
-        }
-    }
-
-    // ============================================
-    // 🌐 NETWORK HANDLING
-    // ============================================
-
-    /**
-     * Handle online/offline status changes
-     * @param {Event} event - Online/offline event
-     */
-    handleOnlineStatus(event) {
-        if (event.type === 'online') {
-            ui.hideOfflineIndicator();
-            
-            // Process any queued offline operations
-            this.processOfflineQueue();
-            
-        } else if (event.type === 'offline') {
-            ui.showOfflineIndicator();
-        }
-    }
-
-    /**
-     * Process operations that were queued while offline
-     */
-    async processOfflineQueue() {
-        const queue = Utils.loadFromStorage(Constants.storageKeys.OFFLINE_QUEUE, []);
-        
-        if (queue.length === 0) return;
-
-        ui.showInfo(`جاري مزامنة ${queue.length} عملية محفوظة...`);
-
-        const remaining = [];
-
-        for (const operation of queue) {
-            try {
-                // Retry the operation
-                switch (operation.type) {
-                    case 'attendance':
-                        await db.recordAttendance(operation.data);
-                        break;
-                    // Add more operation types as needed
-                }
-                
-                console.log(`✅ Synced offline operation: ${operation.id}`);
-                
-            } catch (error) {
-                console.error(`Failed to sync: ${operation.id}`, error);
-                operation.retries = (operation.retries || 0) + 1;
-                
-                if (operation.retries < 3) {
-                    remaining.push(operation);
-                }
-            }
-        }
-
-        // Save remaining operations
-        Utils.saveToStorage(Constants.storageKeys.OFFLINE_QUEUE, remaining);
-
-        if (remaining.length === 0) {
-            ui.showSuccess('تمت المزامنة بنجاح ✓');
-        } else {
-            ui.showWarning(`بعض العمليات فشلت (${remaining.length} متبقية)`);
-        }
-    }
-
-    // ============================================
-    // 🔔 NOTIFICATIONS
-    // ============================================
-
-    /**
-     * Request notification permission (for push notifications)
-     */
-    async requestNotificationPermission() {
-        if (!('Notification' in window)) {
-            console.warn('This browser does not support notifications');
-            return false;
-        }
-
-        if (Notification.permission === 'granted') {
-            return true;
-        }
-
-        if (Notification.permission !== 'denied') {
-            const permission = await Notification.requestPermission();
-            return permission === 'granted';
-        }
-
-        return false;
-    }
-
-    /**
-     * Show browser notification
-     * @param {string} title - Notification title
-     * @param {object} options - Notification options
-     */
-    showBrowserNotification(title, options = {}) {
-        if (Notification.permission !== 'granted') return;
-
-        const notification = new Notification(title, {
-            icon: 'icon-192.png',
-            badge: 'icon-192.png',
-            dir: 'rtl',
-            lang: 'ar',
-            ...options
-        });
-
-        notification.onclick = () => {
-            window.focus();
-            notification.close();
-        };
-
-        // Auto-close after 5 seconds
-        setTimeout(() => notification.close(), 5000);
-    }
-
-    // ============================================
-    // 🛠️ UTILITY METHODS
-    // ============================================
-
-    /**
-     * Get current application state
-     * @returns {object} Application state
-     */
-    getState() {
-        return {
-            isInitialized: this.isInitialized,
-            currentPage: this.currentPage,
-            isAuthenticated: auth.isAuthenticated(),
-            currentUser: auth.getCurrentUser(),
-            isOnline: Utils.isOnline(),
-            isPWAInstalled: Utils.isPWAInstalled()
-        };
-    }
-
-    /**
-     * Log application state (for debugging)
-     */
-    logState() {
-        console.table(this.getState());
-    }
-
-    /**
-     * Force refresh/reload application
-     */
-    forceRefresh() {
-        if ('caches' in window) {
-            caches.keys().then(names => {
-                names.forEach(name => {
-                    caches.delete(name);
+            // Notify clients about update
+            self.clients.matchAll().then(clients => {
+                clients.forEach(client => {
+                    client.postMessage({
+                        type: 'SW_UPDATED',
+                        message: 'Service Worker updated!'
+                    });
                 });
             });
-        }
-        
-        window.location.reload(true);
+        })
+    );
+});
+
+// ============================================
+// 🌐 FETCH EVENT (Network Strategy)
+// ============================================
+self.addEventListener('fetch', event => {
+    const requestUrl = new URL(event.request.url);
+    
+    // ============================================
+    // 🚫 SKIP: Non-GET requests
+    // ============================================
+    if (event.request.method !== 'GET') {
+        return;
     }
+    
+    // ============================================
+    // 🚫 SKIP: Google Apps Script & API calls
+    // ============================================
+    const shouldNotCache = NO_CACHE_URLS.some(pattern => pattern.test(requestUrl.href));
+    if (shouldNotCache) {
+        event.respondWith(
+            fetch(event.request)
+                .catch(() => {
+                    // Return offline response for API calls
+                    return new Response(JSON.stringify({
+                        success: false,
+                        error: 'أنت غير متصل بالإنترنت',
+                        offline: true
+                    }), {
+                        headers: { 'Content-Type': 'application/json' },
+                        status: 503,
+                        statusText: 'Service Unavailable'
+                    });
+                })
+        );
+        return;
+    }
+    
+    // ============================================
+    // 🎯 STRATEGY: Cache First for Static Assets
+    // ============================================
+    if (isStaticAsset(requestUrl)) {
+        event.respondWith(
+            caches.open(STATIC_CACHE).then(cache => {
+                return cache.match(event.request).then(cachedResponse => {
+                    if (cachedResponse) {
+                        // Return cached version and update in background
+                        fetchAndUpdateCache(event.request, cache);
+                        return cachedResponse;
+                    }
+                    
+                    // Not in cache - fetch from network
+                    return fetch(event.request).then(networkResponse => {
+                        if (networkResponse.ok) {
+                            cache.put(event.request, networkResponse.clone());
+                        }
+                        return networkResponse;
+                    }).catch(() => {
+                        // Return fallback for specific assets
+                        return getStaticFallback(requestUrl);
+                    });
+                });
+            })
+        );
+        return;
+    }
+    
+    // ============================================
+    // 🎯 STRATEGY: Network First for HTML Pages
+    // ============================================
+    if (isHTMLPage(requestUrl)) {
+        event.respondWith(
+            fetch(event.request)
+                .then(networkResponse => {
+                    // Cache successful responses
+                    if (networkResponse.ok) {
+                        const responseClone = networkResponse.clone();
+                        caches.open(DYNAMIC_CACHE).then(cache => {
+                            cache.put(event.request, responseClone);
+                        });
+                    }
+                    return networkResponse;
+                })
+                .catch(() => {
+                    // Try cache as fallback
+                    return caches.match(event.request).then(cachedResponse => {
+                        if (cachedResponse) {
+                            return cachedResponse;
+                        }
+                        
+                        // Return offline page for navigation requests
+                        if (event.request.mode === 'navigate') {
+                            return caches.match('./index.html');
+                        }
+                        
+                        return new Response('Offline', { status: 503 });
+                    });
+                })
+        );
+        return;
+    }
+    
+    // ============================================
+    // 🎯 DEFAULT: Stale While Revalidate
+    // ============================================
+    event.respondWith(
+        caches.open(DYNAMIC_CACHE).then(cache => {
+            return cache.match(event.request).then(cachedResponse => {
+                const fetchedPromise = fetch(event.request)
+                    .then(networkResponse => {
+                        if (networkResponse.ok) {
+                            cache.put(event.request, networkResponse.clone());
+                        }
+                        return networkResponse;
+                    })
+                    .catch(() => cachedResponse); // Fallback to cache
+                
+                return cachedResponse || fetchedPromise;
+            });
+        })
+    );
+});
 
-    /**
-     * Clear all application data and reset
-     */
-    async clearAllData() {
-        const confirmed = await ui.showConfirmation({
-            title: '⚠️ مسح جميع البيانات',
-            message: 'سيتم حذف جميع البيانات المحلية والإعدادات. هذا الإجراء لا يمكن التراجع عنه!',
-            confirmText: 'نعم، امسح الكل',
-            cancelText: 'إلغاء',
-            type: 'danger'
-        });
+// ============================================
+// 🛠️ HELPER FUNCTIONS
+// ============================================
 
-        if (confirmed) {
-            // Clear storages
-            localStorage.clear();
-            sessionStorage.clear();
+/**
+ * Check if request is for a static asset
+ * @param {URL} url - Request URL
+ * @returns {boolean} Is static asset
+ */
+function isStaticAsset(url) {
+    const staticExtensions = [
+        '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico',
+        '.woff', '.woff2', '.ttf', '.eot', '.mp3', '.wav', '.webp'
+    ];
+    
+    return staticExtensions.some(ext => url.pathname.endsWith(ext));
+}
 
-            // Clear caches
-            if ('caches' in window) {
-                const cacheNames = await caches.keys();
-                await Promise.all(cacheNames.map(name => caches.delete(name)));
-            }
+/**
+ * Check if request is for an HTML page
+ * @param {URL} url - Request URL
+ * @returns {boolean} Is HTML page
+ */
+function isHTMLPage(url) {
+    return url.pathname.endsWith('.html') || 
+           url.pathname.endsWith('/') ||
+           !url.pathname.includes('.');
+}
 
-            // Reload
-            window.location.reload();
+/**
+ * Fetch resource and update cache in background
+ * @param {Request} request - Original request
+ * @param {Cache} cache - Cache instance
+ */
+async function fetchAndUpdateCache(request, cache) {
+    try {
+        const response = await fetch(request);
+        if (response.ok) {
+            await cache.put(request, response);
         }
+    } catch (error) {
+        console.warn('Background update failed:', error.message);
     }
 }
 
-// ============================================
-// 🎯 APPLICATION ENTRY POINT
-// ============================================
-
-// Create global application instance
-const app = new App();
-
-// Export for use in other modules
-window.App = App;
-window.app = app;
-
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('🌟 DOM Ready - Starting Axentro System v' + AppConfig.app.version);
-    
-    // Start application initialization
-    app.init().catch(error => {
-        console.error('Fatal error during initialization:', error);
-    });
-});
-
-// Handle unhandled errors globally
-window.onerror = function(msg, url, lineNo, columnNo, error) {
-    console.error('🚨 Global Error:', { msg, url, lineNo, columnNo, error });
-    
-    // Don't show toast for every error (too noisy)
-    // But log it for debugging
-    
-    return false;
-};
-
-window.onunhandledrejection = function(event) {
-    console.error('🚨 Unhandled Promise Rejection:', event.reason);
-    
-    // Show user-friendly message for network errors
-    if (event.reason?.message?.includes('fetch')) {
-        ui.showError('خطأ في الاتصال بالخادم');
+/**
+ * Get fallback response for static assets
+ * @param {URL} url - Request URL
+ * @returns {Response} Fallback response
+ */
+function getStaticFallback(url) {
+    // Return appropriate fallback based on asset type
+    if (url.pathname.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i)) {
+        // Return placeholder image or transparent pixel
+        return new Response('', {
+            status: 200,
+            headers: { 'Content-Type': 'image/svg+xml' }
+        });
     }
     
-    event.preventDefault();
-};
+    if (url.pathname.match(/\.css$/i)) {
+        // Return empty CSS
+        return new Response('{}', {
+            status: 200,
+            headers: { 'Content-Type': 'text/css' }
+        });
+    }
+    
+    if (url.pathname.match(/\.js$/i)) {
+        // Return empty JS module
+        return new Response('// Offline', {
+            status: 200,
+            headers: { 'Content-Type': 'application/javascript' }
+        });
+    }
+    
+    // Default fallback
+    return new Response('Resource not available offline', { status: 503 });
+}
 
-// Log app version
-console.log(`
-%c┌─────────────────────────────────────┐
-│  AXENTRO ATTENDANCE SYSTEM v${AppConfig.app.version}  │
-│  © ${new Date().getFullYear()} Axentro Team              │
-│  Build: ${new Date().toISOString().split('T')[0]}       │
-└─────────────────────────────────────┘
-`, 'color: #3b82f6; font-weight: bold; font-size: 14px;');
+// ============================================
+// 📨 MESSAGE HANDLING
+// ============================================
+self.addEventListener('message', event => {
+    if (!event.data) return;
+
+    switch (event.data.type) {
+        case 'SKIP_WAITING':
+            self.skipWaiting();
+            break;
+            
+        case 'CLEAR_CACHE':
+            clearAllCaches().then(() => {
+                event.source.postMessage({ type: 'CACHE_CLEARED' });
+            });
+            break;
+            
+        case 'GET_VERSION':
+            event.source.postMessage({
+                type: 'VERSION',
+                version: CACHE_NAME,
+                timestamp: Date.now()
+            });
+            break;
+            
+        case 'PRECACHE_URLS':
+            if (event.data.urls) {
+                precacheUrls(event.data.urls);
+            }
+            break;
+            
+        default:
+            console.log('Unknown message type:', event.data.type);
+    }
+});
+
+/**
+ * Clear all caches
+ */
+async function clearAllCaches() {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map(name => caches.delete(name)));
+    console.log('🗑️ All caches cleared');
+}
+
+/**
+ * Precache specific URLs
+ * @param {Array<string>} urls - URLs to cache
+ */
+async function precacheUrls(urls) {
+    const cache = await caches.open(DYNAMIC_CACHE);
+    await Promise.all(
+        urls.map(url => 
+            fetch(url)
+                .then(response => {
+                    if (response.ok) {
+                        cache.put(url, response);
+                    }
+                })
+                .catch(err => console.warn('Failed to precache:', url, err))
+        )
+    );
+}
+
+// ============================================
+// 📊 BACKGROUND SYNC (for future use)
+// ============================================
+self.addEventListener('sync', event => {
+    console.log('🔄 Background sync:', event.tag);
+    
+    if (event.tag === 'sync-attendance') {
+        event.waitUntil(syncAttendanceData());
+    }
+});
+
+/**
+ * Sync attendance data when back online
+ */
+async function syncAttendanceData() {
+    // This would sync queued offline operations
+    console.log('Syncing attendance data...');
+}
+
+// ============================================
+// 🔔 PUSH NOTIFICATIONS (for future use)
+// ============================================
+self.addEventListener('push', event => {
+    console.log('📲 Push notification received');
+    
+    let data = {
+        title: 'Axentro',
+        body: 'إشعار جديد',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        dir: 'rtl',
+        lang: 'ar'
+    };
+    
+    if (event.data) {
+        try {
+            data = { ...data, ...event.data.json() };
+        } catch (e) {
+            data.body = event.data.text();
+        }
+    }
+    
+    event.waitUntil(
+        self.registration.showNotification(data.title, data)
+    );
+});
+
+self.addEventListener('notificationclick', event => {
+    console.log('🔔 Notification clicked');
+    
+    event.notification.close();
+    
+    event.waitUntil(
+        clients.openWindow(AppConfig.app.urls.login)
+    );
+});
+
+// ============================================
+// 📈 PERFORMANCE MONITORING
+// ============================================
+// Log performance metrics (optional, can be removed in production)
+self.addEventListener('fetch', event => {
+    if (event.request.method !== 'GET') return;
+    
+    const startTime = Date.now();
+    
+    event.waitUntil(
+        fetch(event.request.clone()).then(response => {
+            const duration = Date.now() - startTime;
+            
+            // Only log slow requests (> 1 second)
+            if (duration > 1000) {
+                console.warn(`⏱️ Slow request (${duration}ms):`, event.request.url);
+            }
+            
+            return response;
+        }).catch(error => {
+            const duration = Date.now() - startTime;
+            console.error(`❌ Failed request (${duration}ms):`, event.request.url, error);
+        })
+    );
+});
+
+console.log('🔄 Service Worker v4 loaded');
