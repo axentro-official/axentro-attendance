@@ -1,431 +1,409 @@
 /**
  * ============================================
- * ✅ AXENTRO VALIDATOR v4.0
- * ✅ Comprehensive Input Validation System
+ * ✅ AXENTRO VALIDATOR v4.1 - ENHANCED
+ * ✅ Form Validation & Sanitization
+ * 🔒 محسّن مع Security Validation Rules
  * ============================================
  */
 
 class Validator {
     constructor() {
-        this.errors = [];
-        this.warnings = [];
+        // Custom validation rules
+        this.rules = {};
+        
+        console.log('✅ Validator initialized');
     }
 
     // ============================================
-    // 📋 CORE VALIDATION METHODS
+    // 📋 MAIN VALIDATION METHOD
     // ============================================
-
-    /**
-     * Validate a single field
-     * @param {*} value - Value to validate
-     * @param {Array<Function|string>} rules - Validation rules
-     * @returns {object} Validation result
-     */
-    validateField(value, rules) {
-        for (const rule of rules) {
-            const result = typeof rule === 'function' 
-                ? rule(value) 
-                : this.applyRule(rule, value);
-            
-            if (result && !result.valid) {
-                return result;
-            }
-        }
-        
-        return { valid: true };
-    }
-
-    /**
-     * Apply a predefined validation rule
-     * @param {string} ruleName - Rule name
-     * @param {*} value - Value to validate
-     * @returns {object} Validation result
-     */
-    applyRule(ruleName, value) {
-        const [rule, ...params] = ruleName.split(':');
-        
-        const ruleMap = {
-            required: () => this.required(value),
-            email: () => this.email(value),
-            employeeCode: () => this.employeeCode(value),
-            password: () => this.password(value),
-            minLength: () => this.minLength(value, parseInt(params[0])),
-            maxLength: () => this.maxLength(value, parseInt(params[0])),
-            pattern: () => this.pattern(value, params[0]),
-            match: () => this.match(value, params[0]),
-            numeric: () => this.numeric(value),
-            phone: () => this.phone(value),
-            name: () => this.name(value),
-            date: () => this.date(value),
-            url: () => this.url(value),
-            inRange: () => this.inRange(value, parseFloat(params[0]), parseFloat(params[1]))
-        };
-
-        return ruleMap[rule] ? ruleMap[rule]() : { valid: true };
-    }
 
     /**
      * Validate entire form
-     * @param {HTMLElement} formElement - Form element
-     * @param {object} rules - Field rules mapping
-     * @returns {object} Validation result with errors per field
+     * @param {HTMLFormElement} form - Form element to validate
+     * @param {object} fieldRules - Field validation rules
+     * @returns {object} Validation result {isValid, errors}
      */
-    validateForm(formElement, rules) {
+    validateForm(form, fieldRules = {}) {
         const result = {
             isValid: true,
             errors: {},
             firstErrorField: null
         };
 
-        for (const [fieldName, fieldRules] of Object.entries(rules)) {
-            const field = formElement.querySelector(`[name="${fieldName}"], #${fieldName}`);
-            if (!field) continue;
-
-            const value = field.value || field.textContent;
-            const validationResult = this.validateField(value, fieldRules);
-
-            if (!validationResult.valid) {
-                result.isValid = false;
-                result.errors[fieldName] = validationResult.message;
-                
-                if (!result.firstErrorField) {
-                    result.firstErrorField = fieldName;
-                }
-                
-                this.showFieldError(field, validationResult.message);
-            } else {
-                this.clearFieldError(field);
-                this.showFieldSuccess(field);
-            }
+        if (!form) {
+            result.isValid = false;
+            result.errors.form = 'Form element not found';
+            return result;
         }
 
-        if (result.firstErrorField) {
-            const firstErrorElement = formElement.querySelector(
-                `[name="${result.firstErrorField}"], #${result.firstErrorField}`
-            );
-            if (firstErrorElement) {
-                firstErrorElement.focus();
-                this.scrollToField(firstErrorElement);
+        // Clear previous errors
+        this.clearFormErrors(form);
+
+        // Validate each field according to rules
+        Object.keys(fieldRules).forEach(fieldName => {
+            const input = form.querySelector(`[name="${fieldName}"], #${fieldName}`);
+            
+            if (!input) return; // Skip if field not found
+
+            const value = input.value?.trim() || '';
+            const rules = Array.isArray(fieldRules[fieldName]) ? 
+                         fieldRules[fieldName] : 
+                         [fieldRules[fieldName]];
+
+            let fieldValid = true;
+
+            // Apply each rule
+            for (const rule of rules) {
+                const validationResult = this.validateRule(value, rule, fieldName);
+                
+                if (!validationResult.valid) {
+                    fieldValid = false;
+                    result.isValid = false;
+                    result.errors[fieldName] = validationResult.message;
+
+                    // Show error on field
+                    this.showFieldError(input, validationResult.message);
+
+                    // Track first error for focus
+                    if (!result.firstErrorField) {
+                        result.firstErrorField = input;
+                    }
+
+                    break; // Stop at first error for this field
+                }
             }
+
+            // Show success for valid fields that have value
+            if (fieldValid && value) {
+                this.showFieldSuccess(input);
+            }
+        });
+
+        // Focus on first error field
+        if (result.firstErrorField && typeof ui !== 'undefined') {
+            ui.shakeElement(result.firstErrorField);
+            result.firstErrorField.focus();
         }
 
         return result;
     }
 
+    /**
+     * Validate single value against a rule
+     * @param {*} value - Value to validate
+     * @param {string} rule - Rule name or custom function
+     * @param {string} fieldName - Field name for messages
+     * @returns {object} {valid, message}
+     */
+    validateRule(value, rule, fieldName) {
+        // Handle custom validator functions
+        if (typeof rule === 'function') {
+            const result = rule(value, fieldName);
+            return {
+                valid: result === true || result?.valid === true,
+                message: result?.message || 'Validation failed'
+            };
+        }
+
+        // Handle built-in rules
+        switch (rule.toLowerCase()) {
+            case 'required':
+                return this.validateRequired(value, fieldName);
+                
+            case 'email':
+                return this.validateEmail(value);
+                
+            case 'password':
+                return this.validatePassword(value);
+                
+            case 'employeecode':
+                return this.validateEmployeeCode(value);
+                
+            case 'name':
+                return this.validateName(value);
+                
+            case 'phone':
+                return this.validatePhone(value);
+                
+            case 'minlength':
+                return this.validateMinLength(value, 3);
+                
+            default:
+                // Check for parameterized rules like "min:5"
+                if (typeof rule === 'string' && rule.includes(':')) {
+                    const [ruleName, param] = rule.split(':');
+                    return this.validateParameterizedRule(value, ruleName, param, fieldName);
+                }
+
+                return { valid: true, message: '' };
+        }
+    }
+
     // ============================================
-    // 🎯 PREDEFINED VALIDATION RULES
+    // 🔍 BUILT-IN VALIDATION RULES
     // ============================================
 
     /**
      * Required field validation
-     * @param {*} value - Value to check
-     * @returns {object} Validation result
      */
-    required(value) {
-        const isEmpty = (
-            value === null ||
-            value === undefined ||
-            (typeof value === 'string' && value.trim() === '') ||
-            (Array.isArray(value) && value.length === 0)
-        );
-
-        return {
-            valid: !isEmpty,
-            message: ErrorCodes.VALIDATION_REQUIRED_FIELD.message,
-            code: ErrorCodes.VALIDATION_REQUIRED_FIELD.code
-        };
+    validateRequired(value, fieldName) {
+        if (!value || value.trim() === '') {
+            return {
+                valid: false,
+                message: ErrorCodes.VALIDATION_REQUIRED_FIELD.message || 'هذا الحقل مطلوب'
+            };
+        }
+        return { valid: true };
     }
 
     /**
-     * Email validation
-     * @param {string} email - Email address
-     * @returns {object} Validation result
+     * Email format validation
      */
-    email(email) {
-        if (!email || email.trim() === '') {
-            return { valid: true }; // Optional field
+    validateEmail(value) {
+        if (!value) return { valid: true }; // Optional field
+        
+        if (!Utils.isValidEmail(value)) {
+            return {
+                valid: false,
+                message: ErrorCodes.VALIDATION_INVALID_EMAIL.message || 'بريد إلكتروني غير صالح'
+            };
+        }
+        return { valid: true };
+    }
+
+    /**
+     * Password strength validation
+     */
+    validatePassword(value) {
+        if (!value) {
+            return {
+                valid: false,
+                message: ErrorCodes.VALIDATION_REQUIRED_FIELD.message || 'كلمة المرور مطلوبة'
+            };
         }
 
-        const isValid = Constants.regex.email.test(email.trim());
-        return {
-            valid: isValid,
-            message: ErrorCodes.VALIDATION_INVALID_EMAIL.message,
-            code: ErrorCodes.VALIDATION_INVALID_EMAIL.code
-        };
+        const minLength = AppConfig?.security?.password?.minLength || 4;
+        
+        if (value.length < minLength) {
+            return {
+                valid: false,
+                message: `كلمة المرور يجب أن تكون ${minLength} أحرف على الأقل`
+            };
+        }
+
+        // Additional strength checks (optional based on config)
+        const config = AppConfig?.security?.password;
+        
+        if (config?.requireUppercase && !/[A-Z]/.test(value)) {
+            return {
+                valid: false,
+                message: 'كلمة المرور يجب أن تحتوي على حرف كبير'
+            };
+        }
+
+        if (config?.requireNumbers && !/\d/.test(value)) {
+            return {
+                valid: false,
+                message: 'كلمة المرور يجب أن تحتوي على رقم'
+            };
+        }
+
+        if (config?.requireSpecialChars && !/[!@#$%^&*(),.?":{}|<>]/.test(value)) {
+            return {
+                valid: false,
+                message: 'كلمة المرور يجب أن تحتوي على رمز خاص'
+            };
+        }
+
+        return { valid: true };
     }
 
     /**
      * Employee code validation
-     * @param {string} code - Employee code
-     * @returns {object} Validation result
      */
-    employeeCode(code) {
-        if (!code) {
-            return this.required(code);
-        }
-
-        const isValid = Constants.regex.employeeCode.test(code.toUpperCase().trim());
-        return {
-            valid: isValid,
-            message: ErrorCodes.VALIDATION_INVALID_CODE.message,
-            code: ErrorCodes.VALIDATION_INVALID_CODE.code
-        };
-    }
-
-    /**
-     * Password validation
-     * @param {string} password - Password string
-     * @returns {object} Validation result
-     */
-    password(password) {
-        if (!password) {
-            return this.required(password);
-        }
-
-        const config = AppConfig.security.password;
-        let isValid = true;
-        let message = '';
-
-        if (password.length < config.minLength) {
-            isValid = false;
-            message = `كلمة المرور يجب أن تكون ${config.minLength} أحرف على الأقل`;
-        } else if (password.length > config.maxLength) {
-            isValid = false;
-            message = `كلمة المرور يجب أن لا تتجاوز ${config.maxLength} حرف`;
-        }
-
-        // Check strength if needed
-        if (isValid) {
-            const strength = Utils.checkPasswordStrength(password);
-            if (strength.level === 'weak' && password.length < 6) {
-                message = 'كلمة مرور ضعيفة جداً - يرجى اختيار كلمة أقوى';
-                // Don't invalidate, just warn
-                this.warnings.push(message);
-            }
-        }
-
-        return {
-            valid: isValid,
-            message: message || ErrorCodes.VALIDATION_WEAK_PASSWORD.message,
-            code: ErrorCodes.VALIDATION_WEAK_PASSWORD.code
-        };
-    }
-
-    /**
-     * Minimum length validation
-     * @param {string} value - Value to check
-     * @param {number} min - Minimum length
-     * @returns {object} Validation result
-     */
-    minLength(value, min) {
-        if (!value) return { valid: true };
-
-        const isValid = String(value).length >= min;
-        return {
-            valid: isValid,
-            message: `يجب أن يكون ${min} أحرف على الأقل`
-        };
-    }
-
-    /**
-     * Maximum length validation
-     * @param {string} value - Value to check
-     * @param {number} max - Maximum length
-     * @returns {object} Validation result
-     */
-    maxLength(value, max) {
-        if (!value) return { valid: true };
-
-        const isValid = String(value).length <= max;
-        return {
-            valid: isValid,
-            message: `يجب أن لا يتجاوز ${max} حرف`
-        };
-    }
-
-    /**
-     * Pattern/Regex validation
-     * @param {string} value - Value to check
-     * @param {string} patternStr - Regex pattern string
-     * @returns {object} Validation result
-     */
-    pattern(value, patternStr) {
-        if (!value) return { valid: true };
-
-        try {
-            const regex = new RegExp(patternStr);
-            const isValid = regex.test(value);
+    validateEmployeeCode(value) {
+        if (!value) {
             return {
-                valid: isValid,
-                message: 'الصيغة غير صحيحة'
+                valid: false,
+                message: ErrorCodes.VALIDATION_REQUIRED_FIELD.message || 'كود الموظف مطلوب'
             };
-        } catch (e) {
-            console.error('Invalid regex pattern:', e);
-            return { valid: true };
         }
+
+        if (!Utils.isValidEmployeeCode(value)) {
+            return {
+                valid: false,
+                message: ErrorCodes.VALIDATION_INVALID_CODE.message || 'كود الموظف غير صالح'
+            };
+        }
+
+        return { valid: true };
     }
 
     /**
-     * Match another field's value
-     * @param {string} value - Current value
-     * @param {string} otherFieldId - Other field ID
-     * @returns {object} Validation result
+     * Name validation
      */
-    match(value, otherFieldId) {
-        const otherField = document.getElementById(otherFieldId);
-        if (!otherField) return { valid: true };
+    validateName(value) {
+        if (!value) {
+            return {
+                valid: false,
+                message: ErrorCodes.VALIDATION_REQUIRED_FIELD.message || 'الاسم مطلوب'
+            };
+        }
 
-        const otherValue = otherField.value;
-        const isValid = value === otherValue;
+        if (value.length < 3) {
+            return {
+                valid: false,
+                message: 'الاسم يجب أن يكون 3 أحرف على الأقل'
+            };
+        }
 
-        return {
-            valid: isValid,
-            message: ErrorCodes.VALIDATION_PASSWORD_MISMATCH.message,
-            code: ErrorCodes.VALIDATION_PASSWORD_MISMATCH.code
-        };
-    }
+        if (value.length > 100) {
+            return {
+                valid: false,
+                message: 'الاسم طويل جداً'
+            };
+        }
 
-    /**
-     * Numeric validation
-     * @param {*} value - Value to check
-     * @returns {object} Validation result
-     */
-    numeric(value) {
-        if (!value) return { valid: true };
+        // Allow Arabic and English letters, spaces, and common name characters
+        const nameRegex = /^[\u0600-\u06FFa-zA-Z\s\-\.]+$/;
+        if (!nameRegex.test(value)) {
+            return {
+                valid: false,
+                message: 'الاسم يحتوي على أحرف غير مسموحة'
+            };
+        }
 
-        const num = Number(value);
-        const isValid = !isNaN(num) && isFinite(num);
-
-        return {
-            valid: isValid,
-            message: 'يجب إدخال رقم صحيح'
-        };
+        return { valid: true };
     }
 
     /**
      * Phone number validation
-     * @param {string} phone - Phone number
-     * @returns {object} Validation result
      */
-    phone(phone) {
-        if (!phone) return { valid: true };
+    validatePhone(value) {
+        if (!value) return { valid: true }; // Optional field
 
-        const isValid = Constants.regex.phone.test(phone.replace(/\s/g, ''));
-
-        return {
-            valid: isValid,
-            message: 'رقم الهاتف غير صالح'
-        };
-    }
-
-    /**
-     * Name validation (Arabic/English)
-     * @param {string} name - Name to validate
-     * @returns {object} Validation result
-     */
-    name(name) {
-        if (!name) return this.required(name);
-
-        const trimmed = name.trim();
-        const isValid = Constants.regex.name.test(trimmed);
-
-        return {
-            valid: isValid,
-            message: 'الاسم غير صحيح (3-100 حرف، عربي أو إنجليزي فقط)'
-        };
-    }
-
-    /**
-     * Date validation
-     * @param {string} dateStr - Date string
-     * @returns {object} Validation result
-     */
-    date(dateStr) {
-        if (!dateStr) return { valid: true };
-
-        const date = new Date(dateStr);
-        const isValid = !isNaN(date.getTime());
-
-        return {
-            valid: isValid,
-            message: 'التاريخ غير صحيح'
-        };
-    }
-
-    /**
-     * URL validation
-     * @param {string} url - URL to validate
-     * @returns {object} Validation result
-     */
-    url(url) {
-        if (!url) return { valid: true };
-
-        try {
-            new URL(url);
-            return { valid: true };
-        } catch {
+        // Simple phone validation (can be enhanced)
+        const phoneRegex = /^[+]?[\d\s\-\(\)]{7,15}$/;
+        
+        if (!phoneRegex.test(value)) {
             return {
                 valid: false,
-                message: 'رابط URL غير صحيح'
+                message: 'رقم الهاتف غير صالح'
             };
         }
+
+        return { valid: true };
     }
 
     /**
-     * Range validation
-     * @param {number} value - Numeric value
-     * @param {number} min - Minimum value
-     * @param {number} max - Maximum value
-     * @returns {object} Validation result
+     * Minimum length validation
      */
-    inRange(value, min, max) {
-        if (value === null || value === undefined) return { valid: true };
+    validateMinLength(value, minLength = 3) {
+        if (value && value.length < minLength) {
+            return {
+                valid: false,
+                message: `يجب أن يكون ${minLength} أحرف على الأقل`
+            };
+        }
+        return { valid: true };
+    }
 
-        const num = Number(value);
-        const isValid = num >= min && num <= max;
+    /**
+     * Parameterized rule handler (e.g., "min:5", "max:100")
+     */
+    validateParameterizedRule(value, ruleName, param, fieldName) {
+        switch (ruleName.toLowerCase()) {
+            case 'min':
+                return this.validateMinLength(value, parseInt(param));
+                
+            case 'max':
+                if (value && value.length > parseInt(param)) {
+                    return {
+                        valid: false,
+                        message: `يجب ألا يتجاوز ${param} حرف`
+                    };
+                }
+                return { valid: true };
 
-        return {
-            valid: isValid,
-            message: `يجب أن يكون بين ${min} و ${max}`
-        };
+            case 'pattern':
+                try {
+                    const regex = new RegExp(param);
+                    if (value && !regex.test(value)) {
+                        return {
+                            valid: false,
+                            message: 'الصيغة غير صحيحة'
+                        };
+                    }
+                } catch (e) {
+                    console.error('Invalid regex pattern:', param);
+                }
+                return { valid: true };
+
+            default:
+                console.warn(`⚠️ Unknown parameterized rule: ${ruleName}`);
+                return { valid: true };
+        }
     }
 
     // ============================================
-    // 🎨 UI FEEDBACK METHODS
+    // 🎨 ERROR DISPLAY METHODS
     // ============================================
 
     /**
-     * Show error on a field
-     * @param {HTMLElement} field - Form field element
+     * Show error on specific field
+     * @param {HTMLElement} input - Input element
      * @param {string} message - Error message
      */
-    showFieldError(field, message) {
-        // Add error class
-        field.classList.add('error');
-        field.classList.remove('success');
+    showFieldError(input, message) {
+        if (!input) return;
 
-        // Find or create error message element
-        let errorEl = field.parentElement.querySelector('.error-message');
-        if (errorEl) {
-            errorEl.textContent = message;
-            errorEl.style.display = 'block';
+        // Add error class to input
+        input.classList.add('error');
+        
+        // Add error class to parent group
+        const group = input.closest('.input-group');
+        if (group) {
+            group.classList.add('error');
+            group.classList.remove('success');
         }
 
-        // Add shake animation
-        field.style.animation = 'shake 0.5s ease';
-        setTimeout(() => {
-            field.style.animation = '';
-        }, 500);
+        // Find or create error message element
+        let errorEl = input.parentElement.querySelector('.error-message');
+        
+        if (!errorEl) {
+            errorEl = document.createElement('span');
+            errorEl.className = 'error-message';
+            input.parentElement.appendChild(errorEl);
+        }
+
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+
+        // Shake animation
+        if (typeof ui !== 'undefined' && ui.shakeElement) {
+            ui.shakeElement(group || input);
+        }
     }
 
     /**
-     * Clear error from field
-     * @param {HTMLElement} field - Form field element
+     * Show success state on field
+     * @param {HTMLElement} input - Input element
      */
-    clearFieldError(field) {
-        field.classList.remove('error');
+    showFieldSuccess(input) {
+        if (!input) return;
 
-        const errorEl = field.parentElement.querySelector('.error-message');
+        input.classList.remove('error');
+        input.classList.add('valid');
+
+        const group = input.closest('.input-group');
+        if (group) {
+            group.classList.remove('error');
+            group.classList.add('success');
+        }
+
+        // Hide error message if exists
+        const errorEl = input.parentElement.querySelector('.error-message');
         if (errorEl) {
             errorEl.textContent = '';
             errorEl.style.display = 'none';
@@ -433,279 +411,113 @@ class Validator {
     }
 
     /**
-     * Show success state on field
-     * @param {HTMLElement} field - Form field element
+     * Clear all errors from form
+     * @param {HTMLFormElement} form - Form element
      */
-    showFieldSuccess(field) {
-        field.classList.add('success');
-        field.classList.remove('error');
-    }
+    clearFormErrors(form) {
+        if (!form) return;
 
-    /**
-     * Scroll to field with error
-     * @param {HTMLElement} field - Field element
-     */
-    scrollToField(field) {
-        setTimeout(() => {
-            field.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center'
-            });
-            field.focus();
-        }, 100);
-    }
-
-    /**
-     * Clear all validation states from form
-     * @param {HTMLElement} formElement - Form element
-     */
-    clearFormValidation(formElement) {
-        const fields = formElement.querySelectorAll('.error, .success');
-        fields.forEach(field => {
-            field.classList.remove('error', 'success');
+        // Remove error/success classes from inputs
+        form.querySelectorAll('.error, .valid').forEach(el => {
+            el.classList.remove('error', 'valid');
         });
 
-        const errorMessages = formElement.querySelectorAll('.error-message');
-        errorMessages.forEach(el => {
-            el.textContent = '';
-            el.style.display = 'none';
+        // Remove classes from groups
+        form.querySelectorAll('.input-group.error, .input-group.success').forEach(group => {
+            group.classList.remove('error', 'success');
+        });
+
+        // Clear error messages
+        form.querySelectorAll('.error-message').forEach(errorEl => {
+            errorEl.textContent = '';
+            errorEl.style.display = 'none';
         });
     }
 
     // ============================================
-    // 🔧 UTILITY METHODS
-    // ============================================
+     // 🔧 UTILITY METHODS
+     // ============================================
 
     /**
-     * Reset validator state
+     * Sanitize string input (prevent XSS)
+     * @param {string} str - String to sanitize
+     * @returns {string} Sanitized string
      */
-    reset() {
-        this.errors = [];
-        this.warnings = [];
+    sanitize(str) {
+        if (!str || typeof str !== 'string') return '';
+        
+        return Utils.sanitizeHTML(str);
     }
 
     /**
-     * Get all collected errors
-     * @returns {Array} Errors array
+     * Escape special HTML characters
+     * @param {string} str - String to escape
+     * @returns {string} Escaped string
      */
-    getErrors() {
-        return [...this.errors];
-    }
-
-    /**
-     * Get all warnings
-     * @returns {Array} Warnings array
-     */
-    getWarnings() {
-        return [...this.warnings];
-    }
-
-    /**
-     * Check if there are any errors
-     * @returns {boolean} Has errors
-     */
-    hasErrors() {
-        return this.errors.length > 0;
-    }
-
-    /**
-     * Sanitize and validate request data (for API calls)
-     * @param {object} data - Request data object
-     * @param {object} schema - Validation schema
-     * @returns {object} Validation result with sanitized data
-     */
-    validateAndSanitizeRequest(data, schema) {
-        const sanitized = {};
-        const errors = [];
-
-        for (const [field, rules] of Object.entries(schema)) {
-            const value = data[field];
-            
-            // Apply sanitization
-            sanitized[field] = this.sanitizeValue(value, field);
-            
-            // Apply validation
-            if (rules && rules.length > 0) {
-                const result = this.validateField(sanitized[field], rules);
-                if (!result.valid) {
-                    errors.push({
-                        field,
-                        message: result.message,
-                        code: result.code
-                    });
-                }
-            }
-        }
-
-        return {
-            isValid: errors.length === 0,
-            data: sanitized,
-            errors
-        };
-    }
-
-    /**
-     * Sanitize a value based on field type
-     * @param {*} value - Value to sanitize
-     * @param {string} field - Field name
-     * @returns {*} Sanitized value
-     */
-    sanitizeValue(value, field) {
-        if (value === null || value === undefined) return '';
-
-        const stringValue = String(value).trim();
-
-        // Field-specific sanitization
-        switch (field.toLowerCase()) {
-            case 'email':
-                return Utils.sanitizeEmail(stringValue) || '';
-            
-            case 'code':
-            case 'employee_code':
-                return stringValue.toUpperCase().substring(0, 10);
-            
-            case 'name':
-            case 'employee_name':
-                return Utils.sanitizeString(stringValue);
-            
-            case 'password':
-                return stringValue; // Don't trim passwords too much
-            
-            default:
-                return Utils.sanitizeString(stringValue);
-        }
-    }
-
-    // ============================================
-    // 📊 ADVANCED VALIDATION
-    // ============================================
-
-    /**
-     * Async validation (for API checks)
-     * @param {*} value - Value to validate
-     * @param {Function} asyncCheck - Async validation function
-     * @returns {Promise<object>} Validation result
-     */
-    async validateAsync(value, asyncCheck) {
-        try {
-            const result = await asyncCheck(value);
-            return result;
-        } catch (error) {
-            console.error('Async validation error:', error);
-            return {
-                valid: false,
-                message: 'خطأ في التحقق'
-            };
-        }
-    }
-
-    /**
-     * Validate attendance data before submission
-     * @param {object} attendanceData - Attendance record data
-     * @returns {object} Validation result
-     */
-    validateAttendanceData(attendanceData) {
-        const errors = [];
-        const requiredFields = ['employee_code', 'employee_name', 'type', 'shift'];
-
-        for (const field of requiredFields) {
-            if (!attendanceData[field] || String(attendanceData[field]).trim() === '') {
-                errors.push({
-                    field,
-                    message: `${field} مطلوب`
-                });
-            }
-        }
-
-        // Validate type
-        if (attendanceData.type && !['حضور', 'انصراف'].includes(attendanceData.type)) {
-            errors.push({
-                field: 'type',
-                message: 'نوع الحضور غير صالح (يجب أن يكون حضور أو انصراف)'
-            });
-        }
-
-        // Validate shift
-        const validShifts = AppConfig.attendance.shifts.map(s => s.id);
-        if (attendanceData.shift && !validShifts.includes(attendanceData.shift)) {
-            errors.push({
-                field: 'shift',
-                message: 'وردية العمل غير صالحة'
-            });
-        }
-
-        return {
-            isValid: errors.length === 0,
-            errors,
-            data: attendanceData
-        };
-    }
-
-    /**
-     * Validate user registration data
-     * @param {object} regData - Registration data
-     * @returns {object} Validation result
-     */
-    validateRegistration(regData) {
-        const schema = {
-            name: ['required', 'name'],
-            code: ['required', 'employeeCode'],
-            password: ['required', 'password']
+    escapeHtml(str) {
+        if (!str) return '';
+        
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
         };
 
-        // Optional fields
-        if (regData.email) {
-            schema.email = ['email'];
-        }
-
-        return this.validateAndSanitizeRequest(regData, schema);
+        return str.replace(/[&<>"']/g, m => map[m]);
     }
 
     /**
-     * Validate login credentials
-     * @param {object} loginData - Login data
-     * @returns {object} Validation result
+     * Check if value is empty
+     * @param {*} value - Value to check
+     * @returns {boolean}
      */
-    validateLogin(loginData) {
-        const schema = {
-            code: ['required', 'employeeCode'],
-            password: ['required', 'password']
-        };
+    isEmpty(value) {
+        if (value === null || value === undefined) return true;
+        if (typeof value === 'string') return value.trim() === '';
+        if (Array.isArray(value)) return value.length === 0;
+        if (typeof value === 'object') return Object.keys(value).length === 0;
+        return false;
+    }
 
-        return this.validateAndSanitizeRequest(loginData, schema);
+    /**
+     * Add custom validation rule
+     * @param {string} ruleName - Rule name
+     * @param {Function} validatorFn - Validator function
+     */
+    addRule(ruleName, validatorFn) {
+        if (typeof validatorFn === 'function') {
+            this.rules[ruleName] = validatorFn;
+            console.log(`✅ Custom validation rule added: ${ruleName}`);
+        } else {
+            console.error('❌ Validator must be a function');
+        }
+    }
+
+    /**
+     * Remove custom validation rule
+     * @param {string} ruleName - Rule name to remove
+     */
+    removeRule(ruleName) {
+        delete this.rules[ruleName];
     }
 }
 
-// Create global instance
-const validator = new Validator();
+// ============================================
+// 🌍 GLOBAL INSTANCE
+// ============================================
 
-// Export for use in other modules
-window.Validator = Validator;
-window.validator = validator;
+/**
+ * Global validator instance
+ */
+let validator;
 
-// Add shake animation CSS dynamically
-const shakeStyle = document.createElement('style');
-shakeStyle.textContent = `
-    @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-        20%, 40%, 60%, 80% { transform: translateX(5px); }
-    }
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    validator = new Validator();
     
-    input.error, select.error {
-        border-color: var(--danger-500) !important;
-        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
-    }
-    
-    input.success {
-        border-color: var(--success-500) !important;
-    }
-    
-    .error-message {
-        color: var(--danger-500);
-        font-size: 12px;
-        margin-top: 4px;
-        display: none;
-    }
-`;
-document.head.appendChild(shakeStyle);
+    console.log('✅ Validator module loaded');
+});
+
+console.log('✅ validator.js v4.1 loaded successfully');
