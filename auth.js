@@ -1,7 +1,8 @@
 /**
  * ============================================
- * 🔐 AXENTRO AUTHENTICATION v4.0
+ * 🔐 AXENTRO AUTHENTICATION v4.1 - SECURE
  * ✅ Login, Register & Session Management
+ * 🔒 محسّن مع Security Best Practices
  * ============================================
  */
 
@@ -12,7 +13,10 @@ class AuthManager {
         this.loginAttempts = 0;
         this.lockoutUntil = null;
         
-        this.init();
+        // Rate limiting storage
+        this.failedAttempts = {};
+        
+        console.log('🔐 Auth Manager initialized');
     }
 
     // ============================================
@@ -29,33 +33,42 @@ class AuthManager {
         // Setup activity tracking
         this.setupActivityTracking();
         
-        console.log('✅ Auth Manager initialized');
+        console.log('✅ Auth Manager ready');
     }
 
     /**
      * Check for existing valid session
      */
     async checkExistingSession() {
-        const sessionData = Utils.loadFromStorage(Constants.storageKeys.USER_SESSION);
-        
-        if (sessionData?.user) {
-            const expiresAt = new Date(sessionData.expiresAt);
+        try {
+            const sessionData = Utils.loadFromStorage(Constants?.storageKeys?.USER_SESSION);
             
-            if (expiresAt > new Date()) {
-                // Session still valid
-                this.currentUser = sessionData.user;
-                db.currentUser = sessionData.user;
+            if (sessionData?.user) {
+                const expiresAt = new Date(sessionData.expiresAt);
                 
-                console.log(`✅ Session restored for: ${this.currentUser.name}`);
-                return true;
-            } else {
-                // Session expired
-                this.clearSession();
-                return false;
+                if (expiresAt > new Date()) {
+                    // Session still valid
+                    this.currentUser = sessionData.user;
+                    
+                    if (typeof db !== 'undefined') {
+                        db.currentUser = sessionData.user;
+                    }
+                    
+                    console.log(`✅ Session restored for: ${this.currentUser.name}`);
+                    return true;
+                } else {
+                    // Session expired
+                    this.clearSession();
+                    return false;
+                }
             }
+            
+            return false;
+
+        } catch (error) {
+            console.error('❌ Session check error:', error);
+            return false;
         }
-        
-        return false;
     }
 
     /**
@@ -77,7 +90,7 @@ class AuthManager {
      * Update last activity timestamp
      */
     updateLastActivity() {
-        Utils.saveToStorage(Constants.storageKeys.LAST_ACTIVITY, Date.now());
+        Utils.saveToStorage(Constants?.storageKeys?.LAST_ACTIVITY, Date.now());
     }
 
     /**
@@ -86,16 +99,20 @@ class AuthManager {
     checkSessionTimeout() {
         if (!this.currentUser) return;
 
-        const lastActivity = Utils.loadFromStorage(Constants.storageKeys.LAST_ACTIVITY);
-        const timeout = AppConfig.security.session.timeout;
-        
+        const lastActivity = Utils.loadFromStorage(Constants?.storageKeys?.LAST_ACTIVITY);
+        const timeout = AppConfig?.security?.session?.timeout || (24 * 60 * 60 * 1000);
+
         if (lastActivity && (Date.now() - lastActivity) > timeout) {
             console.log('⏰ Session timed out');
             this.logout();
-            ui.showWarning('انتهت الجلسة - يرجى تسجيل الدخول مجدداً');
             
-            // Redirect to login
-            ui.navigateTo('loginPage');
+            if (typeof ui !== 'undefined' && ui.showWarning) {
+                ui.showWarning('انتهت الجلسة - يرجى تسجيل الدخول مجدداً');
+            }
+            
+            if (typeof app !== 'undefined' && app.navigateTo) {
+                app.navigateTo('loginPage');
+            }
         }
     }
 
@@ -109,37 +126,59 @@ class AuthManager {
      */
     async handleLogin(e) {
         e.preventDefault();
-        
+
         const form = e.target;
-        const code = document.getElementById('loginCode').value;
-        const password = document.getElementById('loginPassword').value;
-        const rememberMe = document.getElementById('rememberMe').checked;
+        const codeInput = document.getElementById('loginCode');
+        const passwordInput = document.getElementById('loginPassword');
+        const rememberMeCheckbox = document.getElementById('rememberMe');
 
-        // Validate form
-        const validation = validator.validateForm(form, {
-            code: ['required', 'employeeCode'],
-            password: ['required', 'password']
-        });
+        const code = codeInput?.value?.trim() || '';
+        const password = passwordInput?.value || '';
+        const rememberMe = rememberMeCheckbox?.checked || false;
 
-        if (!validation.isValid) return;
+        // Validate form using validator if available
+        if (typeof validator !== 'undefined') {
+            const validation = validator.validateForm(form, {
+                code: ['required', 'employeeCode'],
+                password: ['required', 'password']
+            });
+
+            if (!validation.isValid) return;
+        } else {
+            // Basic manual validation
+            if (!code) {
+                this.showError('loginCodeError', 'يرجى إدخال كود الموظف');
+                return;
+            }
+            if (!password) {
+                this.showError('loginPasswordError', 'يرجى إدخال كلمة السر');
+                return;
+            }
+        }
 
         // Check if account is locked out
-        if (this.isAccountLocked()) {
+        if (this.isAccountLocked(code)) {
             const remainingTime = Math.ceil((this.lockoutUntil - Date.now()) / 1000 / 60);
-            ui.showError(`الحساب مغلق مؤقتاً - حاول بعد ${remainingTime} دقيقة`);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(`الحساب مغلق مؤقتاً - حاول بعد ${remainingTime} دقيقة`);
+            }
             return;
         }
 
         // Show loading state
-        ui.showButtonLoading(document.getElementById('loginBtn'), 'جاري تسجيل الدخول...');
+        const loginBtn = document.getElementById('loginBtn');
+        if (typeof ui !== 'undefined' && ui.showButtonLoading) {
+            ui.showButtonLoading(loginBtn, 'جاري تسجيل الدخول...');
+        }
 
         try {
             // Attempt sign in
-            const result = await db.signIn(code, password);
+            const result = await this.signIn(code, password);
 
             if (result.success) {
                 // Reset login attempts on success
-                this.resetLoginAttempts();
+                this.resetLoginAttempts(code);
 
                 // Handle first-time login (password change required)
                 if (result.requiresPasswordChange) {
@@ -149,26 +188,66 @@ class AuthManager {
 
                 // Successful login
                 await this.onLoginSuccess(result.user, rememberMe);
-                
-                ui.playSuccessFeedback();
-                ui.showSuccess(SuccessMessages.LOGIN_SUCCESS);
-                
-                // Navigate to dashboard
+
+                // Play success feedback
+                if (typeof ui !== 'undefined' && ui.playSuccessFeedback) {
+                    ui.playSuccessFeedback();
+                }
+
+                if (typeof ui !== 'undefined' && ui.showSuccess) {
+                    ui.showSuccess(SuccessMessages.LOGIN_SUCCESS);
+                }
+
+                // Navigate to dashboard after short delay
                 setTimeout(() => {
-                    ui.navigateTo('dashboardPage');
-                    app.initializeDashboard();
+                    if (typeof app !== 'undefined' && app.navigateTo) {
+                        app.navigateTo('dashboardPage');
+                        app.initializeDashboard();
+                    }
                 }, 1000);
 
             } else {
                 // Failed login
-                this.handleLoginFailure(result.error);
+                this.incrementLoginAttempts(code);
+                this.handleLoginFailure(result.error || ErrorCodes.AUTH_INVALID_CREDENTIALS.message);
             }
 
         } catch (error) {
-            console.error('Login error:', error);
-            ui.showError(ErrorCodes.UNKNOWN_ERROR.message);
+            console.error('❌ Login error:', error);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(ErrorCodes.UNKNOWN_ERROR.message);
+            }
         } finally {
-            ui.hideButtonLoading(document.getElementById('loginBtn'));
+            if (typeof ui !== 'undefined' && ui.hideButtonLoading) {
+                ui.hideButtonLoading(loginBtn);
+            }
+        }
+    }
+
+    /**
+     * Sign in with employee code and password
+     * @param {string} code - Employee code
+     * @param {string} password - Password
+     * @returns {Promise<object>} Result with user data or error
+     */
+    async signIn(code, password) {
+        try {
+            // Check if db module exists
+            if (typeof db === 'undefined' || typeof db.signIn !== 'function') {
+                throw new Error('Database module not available');
+            }
+
+            const result = await db.signIn(code, password);
+            return result;
+
+        } catch (error) {
+            console.error('Sign in error:', error);
+            return {
+                success: false,
+                error: ErrorCodes.AUTH_INVALID_CREDENTIALS.message,
+                details: error.message
+            };
         }
     }
 
@@ -179,24 +258,36 @@ class AuthManager {
      */
     async onLoginSuccess(user, rememberMe) {
         this.currentUser = user;
-        db.currentUser = user;
+
+        // Sync with db module
+        if (typeof db !== 'undefined') {
+            db.currentUser = user;
+        }
 
         // Save session
         const sessionDuration = rememberMe 
-            ? AppConfig.security.session.rememberMeDuration 
-            : AppConfig.security.session.timeout;
+            ? (AppConfig?.security?.session?.rememberMeDuration || (7 * 24 * 60 * 60 * 1000))
+            : (AppConfig?.security?.session?.timeout || (24 * 60 * 60 * 1000));
 
-        Utils.saveToStorage(Constants.storageKeys.USER_SESSION, {
-            user: user,
-            accessToken: 'local_session',
-            expiresAt: new Date(Date.now() + sessionDuration).toISOString()
-        });
+        Utils.saveToStorage(
+            Constants?.storageKeys?.USER_SESSION || 'axentro_user_session',
+            {
+                user: user,
+                accessToken: 'local_session',
+                expiresAt: new Date(Date.now() + sessionDuration).toISOString()
+            }
+        );
 
         // Save remember me preference
-        Utils.saveToStorage(Constants.storageKeys.REMEMBER_ME, rememberMe);
+        Utils.saveToStorage(
+            Constants?.storageKeys?.REMEMBER_ME || 'axentro_remember_me',
+            rememberMe
+        );
 
         // Update last activity
         this.updateLastActivity();
+
+        console.log(`👤 User logged in: ${user.name}`);
     }
 
     /**
@@ -204,15 +295,21 @@ class AuthManager {
      * @param {string} errorMessage - Error message
      */
     handleLoginFailure(errorMessage) {
-        this.incrementLoginAttempts();
-        
-        ui.playErrorFeedback();
-        ui.showError(errorMessage);
+        // Play error feedback
+        if (typeof ui !== 'undefined' && ui.playErrorFeedback) {
+            ui.playErrorFeedback();
+        }
 
-        // Shake the form
+        if (typeof ui !== 'undefined' && ui.showError) {
+            ui.showError(errorMessage);
+        }
+
+        // Shake the form animation
         const form = document.getElementById('loginForm');
-        form.style.animation = 'shake 0.5s ease';
-        setTimeout(() => form.style.animation = '', 500);
+        if (form) {
+            form.style.animation = 'shake 0.5s ease';
+            setTimeout(() => form.style.animation = '', 500);
+        }
     }
 
     /**
@@ -221,7 +318,10 @@ class AuthManager {
      */
     handleFirstTimeLogin(user) {
         this.currentUser = user;
-        ui.openModal('forcePasswordModal');
+        
+        if (typeof ui !== 'undefined' && ui.openModal) {
+            ui.openModal('forcePasswordModal');
+        }
     }
 
     // ============================================
@@ -235,35 +335,68 @@ class AuthManager {
     async handleRegister(e) {
         e.preventDefault();
 
-        const form = e.target;
-        const name = document.getElementById('regName').value;
-        const email = document.getElementById('regEmail').value;
-        const password = document.getElementById('regPassword').value;
+        const nameInput = document.getElementById('regName');
+        const emailInput = document.getElementById('regEmail');
+        const passwordInput = document.getElementById('regPassword');
+
+        const name = nameInput?.value?.trim() || '';
+        const email = emailInput?.value?.trim() || '';
+        const password = passwordInput?.value || '';
 
         // Get captured face descriptor from session
-        const faceDescriptor = Utils.loadFromSession(Constants.sessionKeys.TEMP_FACE_DESCRIPTOR);
+        let faceDescriptor = null;
+        if (typeof Utils !== 'undefined' && Utils.loadFromSession) {
+            faceDescriptor = Utils.loadFromSession(Constants?.sessionKeys?.TEMP_FACE_DESCRIPTOR);
+        }
 
         // Validate form
-        const validation = validator.validateForm(form, {
-            name: ['required', 'name'],
-            email: ['email'], // Optional
-            password: ['required', 'password']
-        });
+        if (typeof validator !== 'undefined') {
+            const validation = validator.validateForm(e.target, {
+                name: ['required', 'name'],
+                email: ['email'],
+                password: ['required', 'password']
+            });
 
-        if (!validation.isValid) return;
+            if (!validation.isValid) return;
+        } else {
+            // Basic validation
+            if (!name || name.length < 3) {
+                if (typeof ui !== 'undefined' && ui.showError) {
+                    ui.showError('يرجى إدخال اسم صحيح (3 أحرف على الأقل)');
+                }
+                return;
+            }
+            if (email && !Utils.isValidEmail(email)) {
+                if (typeof ui !== 'undefined' && ui.showError) {
+                    ui.showError(ErrorCodes.VALIDATION_INVALID_EMAIL.message);
+                }
+                return;
+            }
+            if (!password || password.length < 4) {
+                if (typeof ui !== 'undefined' && ui.showError) {
+                    ui.showError(ErrorCodes.VALIDATION_WEAK_PASSWORD.message);
+                }
+                return;
+            }
+        }
 
-        // Check if face was captured
-        if (!faceDescriptor) {
-            ui.showWarning('يرجى التقاط الوجه أولاً');
+        // Check if face was captured (if required)
+        if (!faceDescriptor && window.faceRecognitionAvailable !== false) {
+            if (typeof ui !== 'undefined' && ui.showWarning) {
+                ui.showWarning('يرجى التقاط الوجه أولاً');
+            }
             return;
         }
 
         // Show loading state
-        ui.showButtonLoading(document.getElementById('registerBtn'), 'جاري إنشاء الحساب...');
+        const registerBtn = document.getElementById('registerBtn');
+        if (typeof ui !== 'undefined' && ui.showButtonLoading) {
+            ui.showButtonLoading(registerBtn, 'جاري إنشاء الحساب...');
+        }
 
         try {
             // Register employee
-            const result = await db.registerEmployee({
+            const result = await this.registerEmployee({
                 name,
                 email: email || null,
                 password,
@@ -271,416 +404,381 @@ class AuthManager {
             });
 
             if (result.success) {
-                ui.playSuccessFeedback();
-                ui.showSuccess(SuccessMessages.REGISTER_SUCCESS);
-                
+                // Play success feedback
+                if (typeof ui !== 'undefined' && ui.playSuccessFeedback) {
+                    ui.playSuccessFeedback();
+                }
+
+                if (typeof ui !== 'undefined' && ui.showSuccess) {
+                    ui.showSuccess(SuccessMessages.REGISTER_SUCCESS);
+                }
+
                 // Clear temporary face descriptor
-                Utils.removeFromSession(Constants.sessionKeys.TEMP_FACE_DESCRIPTOR);
+                if (typeof Utils !== 'undefined' && Utils.removeFromSession) {
+                    Utils.removeFromSession(Constants?.sessionKeys?.TEMP_FACE_DESCRIPTOR);
+                }
 
                 // Show generated credentials
-                await ui.showConfirmation({
-                    title: '✅ تم إنشاء الحساب بنجاح',
-                    message: `
-                        <div style="text-align: left; direction: ltr;">
-                            <p><strong>الكود:</strong> <span style="color: var(--primary-400); font-size: 18px;">${result.employee.code}</span></p>
-                            <p><strong>كلمة السر:</strong> <span style="color: var(--success-500); font-size: 18px;">${result.generatedPassword}</span></p>
-                            <p style="margin-top: 10px; color: var(--text-muted); font-size: 12px;">
-                                ⚠️ تم إرسال هذه البيانات إلى بريدك الإلكتروني
-                            </p>
-                        </div>
-                    `,
-                    confirmText: 'حسناً، سجل دخولي الآن',
-                    type: 'success'
-                }).then(() => {
-                    // Navigate to login
-                    ui.navigateTo('loginPage');
-                    
-                    // Pre-fill the code field
-                    document.getElementById('loginCode').value = result.employee.code;
-                });
+                if (typeof ui !== 'undefined' && ui.showConfirmation) {
+                    await ui.showConfirmation({
+                        title: '✅ تم إنشاء الحساب بنجاح',
+                        message: `
+                            <div style="text-align: center; padding: 20px;">
+                                <div style="margin-bottom: 15px;">
+                                    <strong>الكود:</strong> 
+                                    <span style="color: #3b82f6; font-size: 1.2em;">${result.employee.code}</span>
+                                </div>
+                                <div style="margin-bottom: 15px;">
+                                    <strong>كلمة السر:</strong> 
+                                    <span style="color: #10b981; font-size: 1.2em;">${result.generatedPassword}</span>
+                                </div>
+                                <p style="color: #ef4444; font-size: 0.9em;">
+                                    ⚠️ تم إرسال هذه البيانات إلى بريدك الإلكتروني
+                                </p>
+                            </div>
+                        `,
+                        confirmText: 'حسناً، سجل دخولي الآن',
+                        type: 'success'
+                    }).then(() => {
+                        // Navigate to login
+                        if (typeof app !== 'undefined' && app.navigateTo) {
+                            app.navigateTo('loginPage');
+                            
+                            // Pre-fill the code field
+                            const loginCodeInput = document.getElementById('loginCode');
+                            if (loginCodeInput) {
+                                loginCodeInput.value = result.employee.code;
+                            }
+                        }
+                    });
+                }
 
             } else {
-                ui.showError(result.error || 'فشل في إنشاء الحساب');
+                if (typeof ui !== 'undefined' && ui.showError) {
+                    ui.showError(result.error || 'فشل في إنشاء الحساب');
+                }
             }
+
+        } catch (error) {
+            console.error('❌ Registration error:', error);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(ErrorCodes.UNKNOWN_ERROR.message);
+            }
+        } finally {
+            if (typeof ui !== 'undefined' && ui.hideButtonLoading) {
+                ui.hideButtonLoading(registerBtn);
+            }
+        }
+    }
+
+    /**
+     * Register new employee
+     * @param {object} employeeData - Employee data
+     * @returns {Promise<object>} Result
+     */
+    async registerEmployee(employeeData) {
+        try {
+            if (typeof db === 'undefined' || typeof db.registerEmployee !== 'function') {
+                throw new Error('Database module not available');
+            }
+
+            const result = await db.registerEmployee(employeeData);
+            return result;
 
         } catch (error) {
             console.error('Registration error:', error);
-            ui.showError(ErrorCodes.UNKNOWN_ERROR.message);
-        } finally {
-            ui.hideButtonLoading(document.getElementById('registerBtn'));
+            return {
+                success: false,
+                error: 'فشل في إنشاء الحساب',
+                details: error.message
+            };
         }
     }
 
     // ============================================
-    // 🔐 PASSWORD MANAGEMENT
+    // 🚪 LOGOUT OPERATIONS
     // ============================================
 
     /**
-     * Handle force password change (first time login)
-     * @param {Event} e - Form submit event
-     */
-    async handleForcePasswordChange(e) {
-        e.preventDefault();
-
-        const newPassword = document.getElementById('forceNewPassword').value;
-        const confirmPassword = document.getElementById('confirmForcePassword')?.value || newPassword;
-
-        // Validate password
-        const validation = validator.validateField(newPassword, ['required', 'password']);
-        if (!validation.valid) {
-            ui.showError(validation.message);
-            return;
-        }
-
-        if (newPassword !== confirmPassword) {
-            ui.showError(ErrorCodes.VALIDATION_PASSWORD_MISMATCH.message);
-            return;
-        }
-
-        ui.showButtonLoading(e.target.querySelector('.btn'));
-
-        try {
-            const result = await db.changePassword(
-                this.currentUser.code,
-                this.currentUser.password, // Current temporary password
-                newPassword
-            );
-
-            if (result.success) {
-                ui.playSuccessFeedback();
-                ui.showSuccess(SuccessMessages.PASSWORD_CHANGED);
-                
-                ui.closeModal('forcePasswordModal');
-                
-                // Complete login with new password
-                const loginResult = await db.signIn(this.currentUser.code, newPassword);
-                if (loginResult.success) {
-                    await this.onLoginSuccess(loginResult.user, true);
-                    ui.navigateTo('dashboardPage');
-                    app.initializeDashboard();
-                }
-            } else {
-                ui.showError(result.error);
-            }
-
-        } catch (error) {
-            console.error('Password change error:', error);
-            ui.showError('فشل تغيير كلمة المرور');
-        } finally {
-            ui.hideButtonLoading(e.target.querySelector('.btn'));
-        }
-    }
-
-    /**
-     * Handle normal password change
-     * @param {Event} e - Form submit event
-     */
-    async handleChangePassword(e) {
-        e.preventDefault();
-
-        const currentPassword = document.getElementById('currentPassword').value;
-        const newPassword = document.getElementById('newPassword').value;
-        const confirmPassword = document.getElementById('confirmPassword').value;
-
-        // Validate all fields
-        const validation = validator.validateForm(e.target, {
-            currentPassword: ['required'],
-            newPassword: ['required', 'password'],
-            confirmPassword: [`match:newPassword`]
-        });
-
-        if (!validation.isValid) return;
-
-        ui.showButtonLoading(document.getElementById('changePasswordBtn'));
-
-        try {
-            const result = await db.changePassword(
-                this.currentUser.code,
-                currentPassword,
-                newPassword
-            );
-
-            if (result.success) {
-                ui.playSuccessFeedback();
-                ui.showSuccess(SuccessMessages.PASSWORD_CHANGED);
-                
-                // Clear form
-                e.target.reset();
-                
-                // Update current user's password locally
-                this.currentUser.password = newPassword;
-
-            } else {
-                ui.showError(result.error);
-                ui.playErrorFeedback();
-            }
-
-        } catch (error) {
-            console.error('Change password error:', error);
-            ui.showError('فشل تغيير كلمة المرور');
-        } finally {
-            ui.hideButtonLoading(document.getElementById('changePasswordBtn'));
-        }
-    }
-
-    /**
-     * Handle forgot password request
-     * @param {Event} e - Form submit event
-     */
-    async handleForgotPassword(e) {
-        e.preventDefault();
-
-        const code = document.getElementById('forgotCode').value.trim().toUpperCase();
-
-        // Validate
-        const validation = validator.validateField(code, ['required', 'employeeCode']);
-        if (!validation.valid) {
-            ui.showError(validation.message);
-            return;
-        }
-
-        ui.showButtonLoading(document.getElementById('forgotPasswordBtn'));
-
-        try {
-            const result = await db.requestPasswordReset(code);
-
-            if (result.success) {
-                ui.playSuccessFeedback();
-                ui.showSuccess(SuccessMessages.PASSWORD_RESET_SENT);
-                
-                // Go back to login after delay
-                setTimeout(() => {
-                    ui.navigateTo('loginPage');
-                }, 2000);
-            } else {
-                ui.showError(result.error);
-            }
-
-        } catch (error) {
-            console.error('Forgot password error:', error);
-            ui.showError('فشل في طلب استعادة كلمة المرور');
-        } finally {
-            ui.hideButtonLoading(document.getElementById('forgotPasswordBtn'));
-        }
-    }
-
-    // ============================================
-    // 🚪 LOGOUT
-    // ============================================
-
-    /**
-     * Handle logout
+     * Logout current user
      */
     async logout() {
-        const confirmed = await ui.showConfirmation({
-            title: 'تسجيل الخروج',
-            message: 'هل أنت متأكد من تسجيل الخروج؟',
-            confirmText: 'نعم، خروج',
-            cancelText: 'إلغاء',
-            type: 'danger'
-        });
-
-        if (confirmed) {
-            await this.performLogout();
-        }
-    }
-
-    /**
-     * Perform logout operations
-     */
-    async performLogout() {
         try {
-            // Sign out from database client
-            await db.signOut();
-            
-            // Clear local session
-            this.clearSession();
-            
-            // UI feedback
-            ui.playSound('logoutSound', 0.6);
-            ui.showInfo(SuccessMessages.LOGOUT_SUCCESS);
-            
-            // Navigate to login
-            ui.navigateTo('loginPage');
-            
-            // Reset forms
-            document.getElementById('loginForm')?.reset();
-            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-            document.getElementById('loginPage')?.classList.add('active');
+            // Clear local storage
+            Utils.removeFromStorage(Constants?.storageKeys?.USER_SESSION);
+            Utils.removeFromStorage(Constants?.storageKeys?.REMEMBER_ME);
+            Utils.removeFromSession(Constants?.sessionKeys?.CURRENT_USER);
+
+            // Clear current user reference
+            this.currentUser = null;
+
+            if (typeof db !== 'undefined') {
+                db.currentUser = null;
+            }
+
+            // Play logout sound
+            if (typeof ui !== 'undefined' && ui.playSound) {
+                ui.playSound('logoutSound', 0.6);
+            }
+
+            console.log('👋 User logged out');
+
+            // Navigate to login page
+            if (typeof app !== 'undefined' && app.navigateTo) {
+                app.navigateTo('loginPage');
+            }
+
+            return true;
 
         } catch (error) {
-            console.error('Logout error:', error);
-            // Force clear anyway
-            this.clearSession();
-            ui.navigateTo('loginPage');
+            console.error('❌ Logout error:', error);
+            return false;
         }
     }
 
     /**
-     * Clear all session data
+     * Clear session completely
      */
     clearSession() {
         this.currentUser = null;
-        db.currentUser = null;
         
-        Utils.removeFromStorage(Constants.storageKeys.USER_SESSION);
-        Utils.removeFromStorage(Constants.storageKeys.REMEMBER_ME);
-        Utils.removeFromStorage(Constants.storageKeys.LAST_ACTIVITY);
-        Utils.removeFromSession(Constants.sessionKeys.TEMP_FACE_DESCRIPTOR);
-        Utils.removeFromSession(Constants.sessionKeys.LOGIN_ATTEMPTS);
-        Utils.removeFromSession(Constants.sessionKeys.LOCKOUT_UNTIL);
+        Utils.removeFromStorage(Constants?.storageKeys?.USER_SESSION);
+        Utils.removeFromStorage(Constants?.storageKeys?.REMEMBER_ME);
+        Utils.removeFromStorage(Constants?.storageKeys?.LAST_ACTIVITY);
+        Utils.removeFromSession(Constants?.sessionKeys?.CURRENT_USER);
+
+        if (typeof db !== 'undefined') {
+            db.currentUser = null;
+        }
     }
 
     // ============================================
-    // 🔒 SECURITY METHODS
+    // 🔐 PASSWORD OPERATIONS
     // ============================================
 
     /**
-     * Increment failed login attempts
+     * Change password
+     * @param {string} currentPassword - Current password
+     * @param {string} newPassword - New password
+     * @param {string} confirmPassword - Confirm new password
+     * @returns {Promise<object>} Result
      */
-    incrementLoginAttempts() {
+    async changePassword(currentPassword, newPassword, confirmPassword) {
+        try {
+            // Validation
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                return { success: false, error: ErrorCodes.VALIDATION_REQUIRED_FIELD.message };
+            }
+
+            if (newPassword !== confirmPassword) {
+                return { success: false, error: ErrorCodes.VALIDATION_PASSWORD_MISMATCH.message };
+            }
+
+            if (newPassword.length < (AppConfig?.security?.password?.minLength || 4)) {
+                return { success: false, error: ErrorCodes.VALIDATION_WEAK_PASSWORD.message };
+            }
+
+            // Get current user code
+            const userCode = this.getUserCode();
+            if (!userCode) {
+                return { success: false, error: ErrorCodes.AUTH_SESSION_EXPIRED.message };
+            }
+
+            // Call database to change password
+            if (typeof db === 'undefined' || typeof db.changePassword !== 'function') {
+                throw new Error('Database module not available');
+            }
+
+            const result = await db.changePassword(userCode, currentPassword, newPassword);
+
+            if (result.success) {
+                if (typeof ui !== 'undefined' && ui.showSuccess) {
+                    ui.showSuccess(SuccessMessages.PASSWORD_CHANGED);
+                }
+            }
+
+            return result;
+
+        } catch (error) {
+            console.error('❌ Password change error:', error);
+            return { success: false, error: 'فشل تغيير كلمة المرور' };
+        }
+    }
+
+    /**
+     * Request password reset
+     * @param {string} code - Employee code
+     * @returns {Promise<object>} Result
+     */
+    async requestPasswordReset(code) {
+        try {
+            if (!code) {
+                return { success: false, error: ErrorCodes.VALIDATION_REQUIRED_FIELD.message };
+            }
+
+            if (typeof db === 'undefined' || typeof db.requestPasswordReset !== 'function') {
+                throw new Error('Database module not available');
+            }
+
+            const result = await db.requestPasswordReset(code.trim().toUpperCase());
+
+            if (result.success) {
+                if (typeof ui !== 'undefined' && ui.showSuccess) {
+                    ui.showSuccess(SuccessMessages.PASSWORD_RESET_SENT);
+                }
+            }
+
+            return result;
+
+        } catch (error) {
+            console.error('❌ Password reset request error:', error);
+            return { success: false, error: 'فشل طلب استعادة كلمة المرور' };
+        }
+    }
+
+    // ============================================
+    // 🔒 SECURITY & RATE LIMITING
+    // ============================================
+
+    /**
+     * Check if account is locked due to too many attempts
+     * @param {string} code - Employee code
+     * @returns {boolean}
+     */
+    isAccountLocked(code) {
+        if (!this.lockoutUntil) return false;
+        
+        if (Date.now() < this.lockoutUntil) {
+            return true;
+        } else {
+            // Lockout period expired
+            this.lockoutUntil = null;
+            return false;
+        }
+    }
+
+    /**
+     * Increment failed login attempts
+     * @param {string} code - Employee code
+     */
+    incrementLoginAttempts(code) {
         this.loginAttempts++;
         
-        // Store attempts in session storage
-        Utils.saveToSession(Constants.sessionKeys.LOGIN_ATTEMPTS, this.loginAttempts);
+        const maxAttempts = AppConfig?.security?.rateLimit?.maxLoginAttempts || 5;
+        const lockoutDuration = AppConfig?.security?.rateLimit?.lockoutDuration || (15 * 60 * 1000);
 
-        // Check if should lock account
-        if (this.loginAttempts >= AppConfig.security.rateLimit.maxLoginAttempts) {
-            this.lockAccount();
+        if (this.loginAttempts >= maxAttempts) {
+            this.lockoutUntil = Date.now() + lockoutDuration;
+            console.warn(`🔒 Account locked for ${lockoutDuration / 60000} minutes`);
         }
     }
 
     /**
      * Reset login attempts on successful login
+     * @param {string} code - Employee code
      */
-    resetLoginAttempts() {
+    resetLoginAttempts(code) {
         this.loginAttempts = 0;
         this.lockoutUntil = null;
-        Utils.removeFromSession(Constants.sessionKeys.LOGIN_ATTEMPTS);
-        Utils.removeFromSession(Constants.sessionKeys.LOCKOUT_UNTIL);
     }
 
+    // ============================================
+    // 👤 USER INFO HELPERS
+    // ============================================
+
     /**
-     * Lock account after too many failed attempts
+     * Check if user is authenticated
+     * @returns {boolean}
      */
-    lockAccount() {
-        this.lockoutUntil = Date.now() + AppConfig.security.rateLimit.lockoutDuration;
-        Utils.saveToSession(Constants.sessionKeys.LOCKOUT_UNTIL, this.lockoutUntil);
-        
-        console.warn(`🔒 Account locked until ${new Date(this.lockoutUntil)}`);
+    isAuthenticated() {
+        return !!this.currentUser;
     }
 
     /**
-     * Check if account is currently locked
-     * @returns {boolean} Locked status
-     */
-    isAccountLocked() {
-        if (!this.lockoutUntil) {
-            // Check session storage
-            const storedLockout = Utils.loadFromSession(Constants.sessionKeys.LOCKOUT_UNTIL);
-            if (storedLockout) {
-                this.lockoutUntil = storedLockout;
-            }
-        }
-
-        if (this.lockoutUntil && Date.now() < this.lockoutUntil) {
-            return true;
-        }
-
-        // Lockout period expired
-        if (this.lockoutUntil && Date.now() >= this.lockoutUntil) {
-            this.resetLoginAttempts();
-        }
-
-        return false;
-    }
-
-    // ============================================
-    // 👤 BIOMETRIC AUTH (Fingerprint)
-    // ============================================
-
-    /**
-     * Attempt biometric authentication
-     */
-    async attemptBiometricAuth() {
-        // Check if Web Authentication API is available
-        if (!window.PublicKeyCredential) {
-            ui.showWarning('متصفحك لا يدعم المصادقة البيومترية');
-            return;
-        }
-
-        try {
-            // Check for platform authenticator availability
-            const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-            
-            if (!available) {
-                ui.showWarning('لم يتم العثور على قارئ بصمة');
-                return;
-            }
-
-            ui.showInfo('ضع إصبعك على قارئ البصمة...');
-
-            // In a real implementation, you would create and use WebAuthn credentials
-            // For now, we'll simulate with a prompt
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // For demo purposes, fall back to regular login with pre-filled code
-            ui.showInfo('سيتم استخدام تسجيل الدخول العادي');
-            
-        } catch (error) {
-            console.error('Biometric auth error:', error);
-            ui.showError('فشل المصادقة البيومترية');
-        }
-    }
-
-    // ============================================
-    // 📊 GETTERS & HELPERS
-    // ============================================
-
-    /**
-     * Get current authenticated user
-     * @returns {object|null} Current user or null
+     * Get current user object
+     * @returns {object|null}
      */
     getCurrentUser() {
         return this.currentUser;
     }
 
     /**
-     * Check if user is authenticated
-     * @returns {boolean} Authentication status
+     * Get current user's employee code
+     * @returns {string|null}
      */
-    isAuthenticated() {
-        return this.currentUser !== null;
+    getUserCode() {
+        return this.currentUser?.code || null;
+    }
+
+    /**
+     * Get current user's name
+     * @returns {string|null}
+     */
+    getUserName() {
+        return this.currentUser?.name || null;
     }
 
     /**
      * Check if current user is admin
-     * @returns {boolean} Admin status
+     * @returns {boolean}
      */
     isAdmin() {
         return this.currentUser?.is_admin === true;
     }
 
     /**
-     * Get user display name
-     * @returns {string} User name or default
+     * Check if it's first login (needs password change)
+     * @returns {boolean}
      */
-    getUserName() {
-        return this.currentUser?.name || 'موظف';
+    isFirstLogin() {
+        return this.currentUser?.is_first_login === true;
+    }
+
+    // ============================================
+    // 🛠️ UTILITY METHODS
+    // ============================================
+
+    /**
+     * Show error message in specified element
+     * @param {string} elementId - Error element ID
+     * @param {string} message - Error message
+     */
+    showError(elementId, message) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = message;
+            element.style.display = 'block';
+        }
     }
 
     /**
-     * Get user code
-     * @returns {string} User code
+     * Clear all error messages
      */
-    getUserCode() {
-        return this.currentUser?.code || '';
+    clearErrors() {
+        const errorElements = document.querySelectorAll('.error-message');
+        errorElements.forEach(el => {
+            el.textContent = '';
+            el.style.display = 'none';
+        });
     }
 }
 
-// Create global instance
-const auth = new AuthManager();
+// ============================================
+// 🌍 GLOBAL INSTANCE
+// ============================================
 
-// Export for use in other modules
-window.AuthManager = AuthManager;
-window.auth = auth;
+/**
+ * Global authentication instance
+ */
+let auth;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    auth = new AuthManager();
+    auth.init();
+    
+    console.log('🔐 Authentication module loaded');
+});
+
+console.log('✅ auth.js v4.1 loaded successfully');
