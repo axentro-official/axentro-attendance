@@ -1,7 +1,8 @@
 /**
  * ============================================
- * 🗄️ AXENTRO SUPABASE CLIENT v4.0
+ * 🗄️ AXENTRO SUPABASE CLIENT v4.1 - ROBUST
  * ✅ Database Connection & Operations
+ * 🔌 محسّن مع Error Handling و Retry Logic
  * ============================================
  */
 
@@ -11,8 +12,12 @@ class SupabaseClient {
         this.isConnected = false;
         this.currentUser = null;
         this.retryCount = 0;
+        this.maxRetries = AppConfig?.retry?.maxAttempts || 3;
         
+        // Initialize immediately
         this.init();
+        
+        console.log('🗄️ Supabase Client initialized');
     }
 
     // ============================================
@@ -20,14 +25,30 @@ class SupabaseClient {
     // ============================================
 
     /**
-     * Initialize Supabase client
+     * Initialize Supabase client with error handling
      */
     init() {
         try {
+            // Check if Supabase library is loaded
+            if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
+                console.error('❌ Supabase library not loaded');
+                this.isConnected = false;
+                return;
+            }
+
+            // Get configuration with fallbacks
+            const config = AppConfig?.supabase;
+            
+            if (!config?.url || !config?.anonKey) {
+                console.error('❌ Supabase configuration missing');
+                this.isConnected = false;
+                return;
+            }
+
             // Create Supabase client
             this.client = window.supabase.createClient(
-                AppConfig.supabase.url,
-                AppConfig.supabase.anonKey,
+                config.url,
+                config.anonKey,
                 {
                     auth: {
                         autoRefreshToken: true,
@@ -40,17 +61,19 @@ class SupabaseClient {
                     global: {
                         headers: {
                             'x-app-name': 'axentro-attendance',
-                            'x-app-version': AppConfig.app.version
+                            'x-app-version': AppConfig?.app?.version || '4.1.0'
                         }
                     }
                 }
             );
 
+            // Setup authentication listeners
             this.setupAuthListeners();
+
             this.isConnected = true;
             
-            console.log('✅ Supabase client initialized successfully');
-            
+            console.log('✅ Supabase client created successfully');
+
         } catch (error) {
             console.error('❌ Failed to initialize Supabase client:', error);
             this.isConnected = false;
@@ -58,47 +81,57 @@ class SupabaseClient {
     }
 
     /**
-     * Setup authentication state listeners
+     * Setup authentication state change listeners
      */
     setupAuthListeners() {
         if (!this.client) return;
 
-        // Listen for auth changes
+        // Listen for auth state changes
         this.client.auth.onAuthStateChange((event, session) => {
             console.log(`🔐 Auth event: ${event}`);
-            
+
             switch (event) {
                 case 'SIGNED_IN':
                     this.handleSignIn(session);
                     break;
-                    
+
                 case 'SIGNED_OUT':
                     this.handleSignOut();
                     break;
-                    
+
                 case 'TOKEN_REFRESHED':
-                    console.log('✅ Token refreshed');
+                    console.log('✅ Auth token refreshed');
                     break;
-                    
+
                 case 'USER_UPDATED':
-                    console.log('👤 User updated');
+                    console.log('👤 User profile updated');
                     break;
+
+                default:
+                    console.log(`ℹ️ Unhandled auth event: ${event}`);
             }
         });
     }
 
     /**
-     * Handle sign in event
-     * @param {object} session - Auth session
+     * Handle successful sign in event
+     * @param {object} session - Session object from Supabase
      */
     handleSignIn(session) {
         if (session?.user) {
             this.currentUser = session.user;
-            Utils.saveToStorage(Constants.storageKeys.USER_SESSION, {
-                user: session.user,
-                accessToken: session.access_token,
-                expiresAt: session.expires_at
-            });
+            
+            // Save session to local storage for persistence
+            Utils.saveToStorage(
+                Constants?.storageKeys?.USER_SESSION || 'axentro_user_session',
+                {
+                    user: session.user,
+                    accessToken: session.access_token,
+                    expiresAt: new Date((session.expires_at || 0) * 1000).toISOString()
+                }
+            );
+
+            console.log(`✅ Signed in as: ${session.user.email || session.user.id}`);
         }
     }
 
@@ -107,7 +140,107 @@ class SupabaseClient {
      */
     handleSignOut() {
         this.currentUser = null;
-        Utils.removeFromStorage(Constants.storageKeys.USER_SESSION);
+        
+        Utils.removeFromStorage(Constants?.storageKeys?.USER_SESSION);
+        
+        console.log('👋 Signed out');
+    }
+
+    // ============================================
+    // 🔗 CONNECTION STATUS
+    // ============================================
+
+    /**
+     * Check if connected to Supabase
+     * @returns {boolean}
+     */
+    isConnectedToSupabase() {
+        return this.isConnected && !!this.client;
+    }
+
+    /**
+     * Attempt to reconnect if disconnected
+     * @returns {Promise<boolean>}
+     */
+    async attemptReconnect() {
+        if (this.isConnected) return true;
+
+        console.log('🔄 Attempting to reconnect to Supabase...');
+        
+        try {
+            this.init();
+            return this.isConnected;
+        } catch (error) {
+            console.error('❌ Reconnection failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Execute operation with automatic retry on failure
+     * @param {Function} operation - Async function to execute
+     * @param {number} maxRetries - Maximum retry attempts
+     * @returns {Promise<*>} Operation result
+     */
+    async executeWithRetry(operation, maxRetries = null) {
+        const retries = maxRetries || this.maxRetries;
+        let lastError;
+
+        for (let i = 0; i <= retries; i++) {
+            try {
+                const result = await operation();
+                
+                // Reset retry count on success
+                this.retryCount = 0;
+                
+                return result;
+
+            } catch (error) {
+                lastError = error;
+                this.retryCount++;
+                
+                console.warn(`⚠️ Operation failed (attempt ${i + 1}/${retries + 1}):`, error.message);
+
+                // Don't retry on certain errors
+                if (this.shouldNotRetry(error)) {
+                    throw error;
+                }
+
+                // Wait before retrying (exponential backoff)
+                if (i < retries) {
+                    const delay = Math.min(
+                        1000 * Math.pow(2, i),
+                        AppConfig?.retry?.maxDelay || 10000
+                    );
+                    
+                    await Utils.sleep(delay);
+                }
+            }
+        }
+
+        throw lastError;
+    }
+
+    /**
+     * Determine if error should not be retried
+     * @param {Error} error - Error object
+     * @returns {boolean}
+     */
+    shouldNotRetry(error) {
+        const nonRetryableCodes = [
+            '23505', // Unique violation
+            '23503', // Foreign key violation
+            '42501', // Insufficient privilege
+            'PGRST', // PostgREST errors
+            'JWT'
+        ];
+
+        const errorMessage = error.message || '';
+        const errorCode = error.code || '';
+
+        return nonRetryableCodes.some(code => 
+            errorMessage.includes(code) || errorCode.includes(code)
+        );
     }
 
     // ============================================
@@ -115,21 +248,27 @@ class SupabaseClient {
     // ============================================
 
     /**
-     * Sign in with employee code and password
+     * Sign in with employee code and password (custom implementation)
      * @param {string} code - Employee code
      * @param {string} password - Password
      * @returns {Promise<object>} Result with user data or error
      */
     async signIn(code, password) {
         try {
-            // Custom sign in using RPC or direct query
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*')
-                .eq('code', code.toUpperCase().trim())
-                .eq('password', password)
-                .eq('is_deleted', false)
-                .single();
+            if (!this.isConnectedToSupabase()) {
+                throw new Error('Database connection not available');
+            }
+
+            // Query employees table directly (custom auth)
+            const { data, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .select('*')
+                    .eq('code', code.toUpperCase().trim())
+                    .eq('password', password)
+                    .eq('is_deleted', false)
+                    .single();
+            });
 
             if (error) throw error;
 
@@ -141,7 +280,7 @@ class SupabaseClient {
                 };
             }
 
-            // Check if password change is required
+            // Check if password change required
             if (data.is_first_login && !data.is_admin) {
                 return {
                     success: true,
@@ -150,7 +289,7 @@ class SupabaseClient {
                 };
             }
 
-            // Set current user context for RLS
+            // Set current user context
             await this.setUserContext(data);
 
             return {
@@ -159,7 +298,8 @@ class SupabaseClient {
             };
 
         } catch (error) {
-            console.error('Sign in error:', error);
+            console.error('❌ Sign in error:', error);
+
             return {
                 success: false,
                 error: ErrorCodes.AUTH_INVALID_CREDENTIALS.message,
@@ -169,62 +309,80 @@ class SupabaseClient {
     }
 
     /**
-     * Set user context for Row Level Security
-     * @param {object} user - User data
+     * Set user context for Row Level Security (RLS)
+     * @param {object} user - User data object
      */
     async setUserContext(user) {
         try {
-            // This would typically be done via a server-side function
-            // For now, we'll store the context locally
             this.currentUser = user;
-            
-            // Store in session for API calls
+
+            // Store context locally for API calls
             Utils.saveToSession('current_user', {
                 code: user.code,
-                isAdmin: user.is_admin
+                isAdmin: user.is_admin,
+                name: user.name
             });
 
+            console.log(`👤 User context set: ${user.code}`);
+
         } catch (error) {
-            console.error('Error setting user context:', error);
+            console.error('⚠️ Failed to set user context:', error);
         }
     }
 
     /**
      * Sign out current user
-     * @returns {Promise<boolean>} Success status
+     * @returns {Promise<boolean>}
      */
     async signOut() {
         try {
             // Clear local storage
-            Utils.removeFromStorage(Constants.storageKeys.USER_SESSION);
-            Utils.removeFromStorage(Constants.storageKeys.REMEMBER_ME);
+            Utils.removeFromStorage(Constants?.storageKeys?.USER_SESSION);
+            Utils.removeFromStorage(Constants?.storageKeys?.REMEMBER_ME);
             Utils.removeFromSession('current_user');
-            
+
+            // Clear Supabase session if exists
+            if (this.client?.auth) {
+                await this.client.auth.signOut();
+            }
+
             this.currentUser = null;
-            
-            ui.playSound('logoutSound', 0.6);
-            
+
+            // Play logout sound
+            Utils.playSound('logoutSound', 0.6);
+
+            console.log('👋 User signed out');
+
             return true;
 
         } catch (error) {
-            console.error('Sign out error:', error);
+            console.error('❌ Sign out error:', error);
             return false;
         }
     }
 
+    // ============================================
+    // 👤 EMPLOYEE OPERATIONS
+    // ============================================
+
     /**
      * Register new employee
-     * @param {object} employeeData - Employee data
+     * @param {object} employeeData - Employee information
      * @returns {Promise<object>} Result with new employee or error
      */
     async registerEmployee(employeeData) {
         try {
+            if (!this.isConnectedToSupabase()) {
+                throw new Error('Database connection not available');
+            }
+
             // Generate unique code if not provided
             const code = employeeData.code || this.generateEmployeeCode();
-            
+
             // Generate secure password if not provided
             const password = employeeData.password || Utils.generatePassword(10);
 
+            // Prepare new employee object
             const newEmployee = {
                 code: code.toUpperCase(),
                 name: employeeData.name.trim(),
@@ -235,14 +393,17 @@ class SupabaseClient {
                 is_first_login: true
             };
 
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .insert(newEmployee)
-                .select()
-                .single();
+            // Insert into database
+            const { data, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .insert(newEmployee)
+                    .select()
+                    .single();
+            });
 
             if (error) {
-                // Check for unique constraint violation
+                // Handle unique constraint violation
                 if (error.code === '23505') {
                     return {
                         success: false,
@@ -256,8 +417,10 @@ class SupabaseClient {
             // Send welcome emails via Google Apps Script
             await this.sendNewEmployeeEmails({
                 ...newEmployee,
-                password: password // Send generated password to email service
+                password: password
             });
+
+            console.log(`✅ New employee registered: ${code}`);
 
             return {
                 success: true,
@@ -266,7 +429,8 @@ class SupabaseClient {
             };
 
         } catch (error) {
-            console.error('Registration error:', error);
+            console.error('❌ Registration error:', error);
+
             return {
                 success: false,
                 error: 'فشل في إنشاء الحساب',
@@ -283,12 +447,9 @@ class SupabaseClient {
         const prefix = 'AX';
         const year = new Date().getFullYear().toString().slice(-2);
         const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+
         return `${prefix}${year}${random}`;
     }
-
-    // ============================================
-    // 👤 EMPLOYEE OPERATIONS
-    // ============================================
 
     /**
      * Get employee by code
@@ -297,18 +458,21 @@ class SupabaseClient {
      */
     async getEmployeeByCode(code) {
         try {
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*')
-                .eq('code', code.toUpperCase().trim())
-                .eq('is_deleted', false)
-                .single();
+            const { data, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .select('*')
+                    .eq('code', code.toUpperCase().trim())
+                    .eq('is_deleted', false)
+                    .single();
+            });
 
             if (error) throw error;
+
             return data;
 
         } catch (error) {
-            console.error('Get employee error:', error);
+            console.error('❌ Get employee error:', error);
             return null;
         }
     }
@@ -319,37 +483,43 @@ class SupabaseClient {
      */
     async getAllEmployees() {
         try {
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*')
-                .eq('is_deleted', false)
-                .order('created_at', { ascending: false });
+            const { data, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .select('*')
+                    .eq('is_deleted', false)
+                    .order('created_at', { ascending: false });
+            });
 
             if (error) throw error;
+
             return data || [];
 
         } catch (error) {
-            console.error('Get all employees error:', error);
+            console.error('❌ Get all employees error:', error);
             return [];
         }
     }
 
     /**
      * Get total employees count
-     * @returns {Promise<number>} Count
+     * @returns {Promise<number>} Count of employees
      */
     async getEmployeesCount() {
         try {
-            const { count, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*', { count: 'exact', head: true })
-                .eq('is_deleted', false);
+            const { count, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('is_deleted', false);
+            });
 
             if (error) throw error;
+
             return count || 0;
 
         } catch (error) {
-            console.error('Count error:', error);
+            console.error('❌ Count error:', error);
             return 0;
         }
     }
@@ -362,22 +532,25 @@ class SupabaseClient {
      */
     async updateEmployee(code, updates) {
         try {
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .update(updates)
-                .eq('code', code.toUpperCase().trim())
-                .select()
-                .single();
+            const { data, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .update(updates)
+                    .eq('code', code.toUpperCase().trim())
+                    .select()
+                    .single();
+            });
 
             if (error) throw error;
-            
+
             return { success: true, data };
 
         } catch (error) {
-            console.error('Update employee error:', error);
-            return { 
-                success: false, 
-                error: error.message 
+            console.error('❌ Update employee error:', error);
+
+            return {
+                success: false,
+                error: error.message
             };
         }
     }
@@ -392,12 +565,14 @@ class SupabaseClient {
     async changePassword(code, currentPassword, newPassword) {
         try {
             // Verify current password first
-            const { data: employee, error: verifyError } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*')
-                .eq('code', code.toUpperCase().trim())
-                .eq('password', currentPassword)
-                .single();
+            const { data: employee, error: verifyError } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .select('*')
+                    .eq('code', code.toUpperCase().trim())
+                    .eq('password', currentPassword)
+                    .single();
+            });
 
             if (verifyError || !employee) {
                 return {
@@ -407,21 +582,24 @@ class SupabaseClient {
             }
 
             // Update password
-            const { error: updateError } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .update({ 
-                    password: newPassword,
-                    is_first_login: false,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('code', code);
+            const { error: updateError } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .update({
+                        password: newPassword,
+                        is_first_login: false,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('code', code);
+            });
 
             if (updateError) throw updateError;
 
             return { success: true };
 
         } catch (error) {
-            console.error('Change password error:', error);
+            console.error('❌ Change password error:', error);
+
             return {
                 success: false,
                 error: 'فشل تغيير كلمة المرور'
@@ -436,19 +614,21 @@ class SupabaseClient {
      */
     async requestPasswordReset(code) {
         try {
+            // Get employee info
             const employee = await this.getEmployeeByCode(code);
-            
+
             if (!employee) {
                 return {
                     success: false,
-                    error: 'الكود غير موجود'
+                    error: ErrorCodes.AUTH_USER_NOT_FOUND.message
                 };
             }
 
             if (!employee.email) {
                 return {
                     success: false,
-                    error: 'لا يوجد بريد إلكتروني مسجل لهذا الكود'
+                    error: 'لا يوجد بريد إلكتروني مسجل لهذا الحساب',
+                    skipped: true
                 };
             }
 
@@ -456,29 +636,38 @@ class SupabaseClient {
             const newPassword = Utils.generatePassword(10);
 
             // Update password in database
-            await this.updateEmployee(code, { password: newPassword });
+            const { error: updateError } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .update({ password: newPassword })
+                    .eq('code', code);
+            });
 
-            // Send email with new password
+            if (updateError) throw updateError;
+
+            // Send email notification
             await this.sendPasswordResetEmail({
-                code: code,
-                name: employee.name,
-                email: employee.email,
+                ...employee,
                 password: newPassword
             });
 
-            return { success: true };
+            return {
+                success: true,
+                message: 'تم إرسال كلمة المرور الجديدة إلى بريدك الإلكتروني'
+            };
 
         } catch (error) {
-            console.error('Password reset error:', error);
+            console.error('❌ Password reset error:', error);
+
             return {
                 success: false,
-                error: 'فشل في إرسال كلمة المرور الجديدة'
+                error: 'فشل طلب استعادة كلمة المرور'
             };
         }
     }
 
     // ============================================
-    // 📊 ATTENDANCE OPERATIONS
+    // ⏰ ATTENDANCE OPERATIONS
     // ============================================
 
     /**
@@ -488,44 +677,44 @@ class SupabaseClient {
      */
     async recordAttendance(attendanceData) {
         try {
-            // Validate attendance data
-            const validation = validator.validateAttendanceData(attendanceData);
-            if (!validation.isValid) {
-                return {
-                    success: false,
-                    error: 'بيانات الحضور غير صحيحة',
-                    details: validation.errors
-                };
+            if (!this.isConnectedToSupabase()) {
+                throw new Error('Database connection not available');
             }
 
             // Prepare attendance record
             const record = {
-                employee_code: attendanceData.employee_code.toUpperCase(),
+                employee_code: attendanceData.employee_code,
                 employee_name: attendanceData.employee_name,
-                type: attendanceData.type, // 'حضور' or 'انصراف'
-                location_link: attendanceData.locationLink || null,
+                type: attendanceData.type,
+                location_link: attendanceData.location_link || null,
                 shift: attendanceData.shift || 'لم يتم التحديد',
-                hours_worked: attendanceData.hoursWorked || null,
+                hours_worked: attendanceData.hours_worked || null,
                 overtime: attendanceData.overtime || '0 دقيقة',
-                ip_address: await this.getClientIP(),
+                ip_address: null, // Can be added later
                 user_agent: navigator.userAgent,
-                gps_accuracy: attendanceData.gpsAccuracy || null,
-                attendance_image_url: attendanceData.imageUrl || null
+                gps_accuracy: attendanceData.gps_accuracy || null,
+                attendance_image_url: attendanceData.image_url || null
             };
 
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.attendance)
-                .insert(record)
-                .select()
-                .single();
+            // Insert into database
+            const { data, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.attendance || 'attendance')
+                    .insert(record)
+                    .select()
+                    .single();
+            });
 
             if (error) throw error;
 
-            // Send notification email
+            // Send attendance alert email
             await this.sendAttendanceAlert({
-                ...record,
-                datetime: Utils.formatDate(new Date(), 'datetime')
+                ...attendanceData,
+                datetime: new Date().toISOString(),
+                id: data.id
             });
+
+            console.log(`✅ Attendance recorded: ${attendanceData.type}`);
 
             return {
                 success: true,
@@ -533,7 +722,8 @@ class SupabaseClient {
             };
 
         } catch (error) {
-            console.error('Record attendance error:', error);
+            console.error('❌ Record attendance error:', error);
+
             return {
                 success: false,
                 error: 'فشل تسجيل الحضور',
@@ -543,7 +733,7 @@ class SupabaseClient {
     }
 
     /**
-     * Get today's attendance for employee
+     * Get today's attendance records for specific employee
      * @param {string} employeeCode - Employee code
      * @returns {Promise<Array>} Today's records
      */
@@ -551,146 +741,98 @@ class SupabaseClient {
         try {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            
+
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
 
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.attendance)
-                .select('*')
-                .eq('employee_code', employeeCode.toUpperCase())
-                .gte('created_at', today.toISOString())
-                .lt('created_at', tomorrow.toISOString())
-                .order('created_at', { ascending: true });
+            const { data, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.attendance || 'attendance')
+                    .select('*')
+                    .eq('employee_code', employeeCode)
+                    .gte('created_at', today.toISOString())
+                    .lt('created_at', tomorrow.toISOString())
+                    .order('created_at', { ascending: true });
+            });
 
             if (error) throw error;
+
             return data || [];
 
         } catch (error) {
-            console.error('Get today attendance error:', error);
+            console.error('❌ Get today attendance error:', error);
             return [];
         }
     }
 
     /**
-     * Get attendance history with date range
+     * Get attendance records by date range
      * @param {string} employeeCode - Employee code
      * @param {Date} startDate - Start date
      * @param {Date} endDate - End date
-     * @returns {Promise<Array>} Attendance records
+     * @returns {Promise<Array>} Records array
      */
-    async getAttendanceHistory(employeeCode, startDate, endDate) {
+    async getAttendanceByRange(employeeCode, startDate, endDate) {
         try {
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.attendance)
-                .select('*')
-                .eq('employee_code', employeeCode.toUpperCase())
-                .gte('created_at', startDate.toISOString())
-                .lte('created_at', endDate.toISOString())
-                .order('created_at', { ascending: false });
+            const { data, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.attendance || 'attendance')
+                    .select('*')
+                    .eq('employee_code', employeeCode)
+                    .gte('created_at', startDate.toISOString())
+                    .lte('created_at', endDate.toISOString())
+                    .order('created_at', { ascending: false });
+            });
 
             if (error) throw error;
+
             return data || [];
 
         } catch (error) {
-            console.error('Get attendance history error:', error);
+            console.error('❌ Get attendance range error:', error);
             return [];
         }
     }
 
-    /**
-     * Get monthly summary for employee
-     * @param {string} employeeCode - Employee code
-     * @param {number} month - Month (1-12)
-     * @param {number} year - Year
-     * @returns {object} Summary statistics
-     */
-    async getMonthlySummary(employeeCode, month, year) {
-        try {
-            const startDate = new Date(year, month - 1, 1);
-            const endDate = new Date(year, month, 0, 23, 59, 59);
-
-            const records = await this.getAttendanceHistory(
-                employeeCode, 
-                startDate, 
-                endDate
-            );
-
-            // Calculate statistics
-            let totalHours = 0;
-            let totalOvertime = 0;
-            let daysPresent = 0;
-            let checkIns = 0;
-            let checkOuts = 0;
-
-            records.forEach(record => {
-                if (record.type === 'حضور') {
-                    checkIns++;
-                    daysPresent++;
-                } else {
-                    checkOuts++;
-                }
-
-                // Parse hours
-                const hours = parseFloat(record.hours_worked) || 0;
-                totalHours += hours;
-
-                // Parse overtime
-                const overtimeMatch = record.overtime?.match(/[\d.]+/);
-                const overtime = overtimeMatch ? parseFloat(overtimeMatch[0]) : 0;
-                totalOvertime += overtime;
-            });
-
-            return {
-                records,
-                summary: {
-                    totalRecords: records.length,
-                    daysPresent,
-                    totalHours: parseFloat(totalHours.toFixed(2)),
-                    totalOvertime: parseFloat(totalOvertime.toFixed(2)),
-                    averageHoursPerDay: daysPresent > 0 ? parseFloat((totalHours / daysPresent).toFixed(2)) : 0,
-                    checkIns,
-                    checkOuts
-                }
-            };
-
-        } catch (error) {
-            console.error('Monthly summary error:', error);
-            return { records: [], summary: {} };
-        }
-    }
-
     // ============================================
-    // 📧 EMAIL OPERATIONS (via Google Apps Script)
+    // 📤 EMAIL OPERATIONS (via Google Apps Script)
     // ============================================
 
     /**
-     * Send new employee emails
-     * @param {object} data - Employee data
+     * Send new employee welcome emails
+     * @param {object} data - Employee data including password
      */
     async sendNewEmployeeEmails(data) {
         try {
-            const response = await fetch(AppConfig.emailService.url, {
+            const emailServiceUrl = AppConfig?.emailService?.url;
+
+            if (!emailServiceUrl) {
+                console.warn('⚠️ Email service URL not configured');
+                return;
+            }
+
+            const payload = {
+                action: 'sendNewEmpEmails',
+                name: data.name,
+                code: data.code,
+                email: data.email,
+                password: data.password
+            };
+
+            const response = await fetch(emailServiceUrl, {
                 method: 'POST',
+                mode: 'no-cors', // Required for cross-origin requests
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    action: 'sendNewEmpEmails',
-                    name: data.name,
-                    code: data.code,
-                    email: data.email || '',
-                    password: data.password
-                })
+                body: JSON.stringify(payload)
             });
 
-            const result = await response.json();
-            console.log('Email result:', result);
-            return result.success;
+            console.log('✅ New employee emails triggered');
 
         } catch (error) {
-            console.error('Send email error:', error);
-            return false;
+            console.warn('⚠️ Failed to trigger new employee emails:', error.message);
+            // Don't throw - email failure shouldn't block registration
         }
     }
 
@@ -700,77 +842,102 @@ class SupabaseClient {
      */
     async sendAttendanceAlert(data) {
         try {
-            const response = await fetch(AppConfig.emailService.url, {
+            const emailServiceUrl = AppConfig?.emailService?.url;
+
+            if (!emailServiceUrl) return;
+
+            const payload = {
+                action: 'sendAttAlert',
+                name: data.employee_name,
+                code: data.employee_code,
+                type: data.type,
+                datetime: data.datetime,
+                location: data.location_link,
+                shift: data.shift,
+                hoursWorked: data.hours_worked,
+                overtime: data.overtime,
+                imgBase64: null // Can be added later if needed
+            };
+
+            await fetch(emailServiceUrl, {
                 method: 'POST',
+                mode: 'no-cors',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    action: 'sendAttAlert',
-                    ...data
-                })
+                body: JSON.stringify(payload)
             });
 
-            const result = await response.json();
-            return result.success;
+            console.log('✅ Attendance alert email triggered');
 
         } catch (error) {
-            console.error('Send attendance alert error:', error);
-            return false;
+            console.warn('⚠️ Failed to send attendance alert:', error.message);
         }
     }
 
     /**
      * Send password reset email
-     * @param {object} data - Reset data
+     * @param {object} data - User data with new password
      */
     async sendPasswordResetEmail(data) {
         try {
-            const response = await fetch(AppConfig.emailService.url, {
+            const emailServiceUrl = AppConfig?.emailService?.url;
+
+            if (!emailServiceUrl) return;
+
+            const payload = {
+                action: 'sendForgotPw',
+                name: data.name,
+                code: data.code,
+                email: data.email,
+                password: data.password
+            };
+
+            await fetch(emailServiceUrl, {
                 method: 'POST',
+                mode: 'no-cors',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    action: 'sendForgotPw',
-                    ...data
-                })
+                body: JSON.stringify(payload)
             });
 
-            const result = await response.json();
-            return result.success;
+            console.log('✅ Password reset email triggered');
 
         } catch (error) {
-            console.error('Send password reset error:', error);
-            return false;
+            console.warn('⚠️ Failed to send password reset email:', error.message);
         }
     }
 
     // ============================================
-    // 🖼️ STORAGE OPERATIONS (Face Images)
+    // 🖼️ STORAGE OPERATIONS (Supabase Storage)
     // ============================================
 
     /**
      * Upload face image to Supabase Storage
-     * @param {string} base64Image - Base64 image string
+     * @param {string} base64Image - Base64 encoded image
      * @param {string} fileName - File name
      * @returns {Promise<string|null>} Public URL or null
      */
     async uploadFaceImage(base64Image, fileName) {
         try {
-            // Convert base64 to blob
-            const base64Response = await fetch(base64Image);
-            const blob = await base64Response.blob();
-
-            // Check file size
-            if (blob.size > AppConfig.supabase.storage.maxFileSize) {
-                throw new Error('File too large');
+            if (!this.client?.storage) {
+                console.warn('⚠️ Storage not available');
+                return null;
             }
 
-            const filePath = `faces/${fileName}_${Date.now()}.jpg`;
+            const bucketName = AppConfig?.supabase?.storage?.bucketName || 'faces';
 
+            // Convert base64 to blob
+            const response = await fetch(base64Image);
+            const blob = await response.blob();
+
+            // Generate unique file path
+            const filePath = `${fileName}_${Date.now()}.jpg`;
+
+            // Upload to storage
             const { data, error } = await this.client.storage
-                .from(AppConfig.supabase.storage.bucketName)
+                .from(bucketName)
                 .upload(filePath, blob, {
                     cacheControl: '3600',
                     upsert: false
@@ -779,80 +946,123 @@ class SupabaseClient {
             if (error) throw error;
 
             // Get public URL
-            const { publicURL, error: urlError } = this.client.storage
-                .from(AppConfig.supabase.storage.bucketName)
+            const { data: urlData } = this.client.storage
+                .from(bucketName)
                 .getPublicUrl(filePath);
 
-            if (urlError) throw urlError;
+            console.log('✅ Image uploaded successfully');
 
-            return publicURL;
+            return urlData?.publicUrl || null;
 
         } catch (error) {
-            console.error('Upload face image error:', error);
+            console.error('❌ Upload image error:', error);
             return null;
         }
     }
 
     // ============================================
-    // 🛠️ UTILITY METHODS
+    // 📊 ADMIN OPERATIONS
     // ============================================
 
     /**
-     * Get client IP address (approximate)
-     * @returns {Promise<string>} IP address
+     * Delete employee (soft delete)
+     * @param {string} code - Employee code
+     * @returns {Promise<object>} Result
      */
-    async getClientIP() {
+    async deleteEmployee(code) {
         try {
-            // Using a free IP service
-            const response = await fetch('https://api.ipify.org?format=json');
-            const data = await response.json();
-            return data.ip;
-        } catch {
-            return 'unknown';
+            const { error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.employees || 'employees')
+                    .update({ is_deleted: true })
+                    .eq('code', code);
+            });
+
+            if (error) throw error;
+
+            return { success: true };
+
+        } catch (error) {
+            console.error('❌ Delete employee error:', error);
+
+            return {
+                success: false,
+                error: error.message
+            };
         }
     }
 
     /**
-     * Check connection status
-     * @returns {boolean} Connected status
+     * Get system statistics (admin only)
+     * @returns {Promise<object>} Statistics
      */
-    isConnectedToSupabase() {
-        return this.isConnected && this.client !== null;
+    async getSystemStats() {
+        try {
+            const [employeesResult, todayAttendanceResult] = await Promise.all([
+                this.getEmployeesCount(),
+                this.getTodayAttendanceForAll()
+            ]);
+
+            return {
+                totalEmployees: employeesResult,
+                todayCheckIns: todayAttendanceResult.filter(r => r.type === 'حضور').length,
+                todayCheckOuts: todayAttendanceResult.filter(r => r.type === 'انصراف').length
+            };
+
+        } catch (error) {
+            console.error('❌ Get stats error:', error);
+            return {
+                totalEmployees: 0,
+                todayCheckIns: 0,
+                todayCheckOuts: 0
+            };
+        }
     }
 
     /**
-     * Get current user
-     * @returns {object|null} Current user object
+     * Get all today's attendance records (admin)
+     * @returns {Promise<Array>}
      */
-    getCurrentUser() {
-        return this.currentUser;
-    }
+    async getTodayAttendanceForAll() {
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
 
-    /**
-     * Execute query with retry logic
-     * @param {Function} queryFn - Query function
-     * @param {number} maxRetries - Max retry attempts
-     * @returns {Promise<*>} Query result
-     */
-    async executeWithRetry(queryFn, maxRetries = 3) {
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-            try {
-                return await queryFn();
-            } catch (error) {
-                console.warn(`Query attempt ${attempt + 1} failed:`, error.message);
-                
-                if (attempt === maxRetries - 1) throw error;
-                
-                // Exponential backoff
-                await Utils.sleep(1000 * Math.pow(2, attempt));
-            }
+            const { data, error } = await this.executeWithRetry(async () => {
+                return await this.client
+                    .from(AppConfig?.supabase?.tables?.attendance || 'attendance')
+                    .select('*')
+                    .gte('created_at', today.toISOString())
+                    .lt('created_at', tomorrow.toISOString());
+            });
+
+            if (error) throw error;
+
+            return data || [];
+
+        } catch (error) {
+            console.error('❌ Get all today attendance error:', error);
+            return [];
         }
     }
 }
 
-// Create global instance
-const db = new SupabaseClient();
+// ============================================
+// 🌍 GLOBAL INSTANCE
+// ============================================
 
-// Export for use in other modules
-window.SupabaseClient = SupabaseClient;
-window.db = db;
+/**
+ * Global database instance
+ */
+let db;
+
+// Initialize when DOM is ready (and after config loads)
+document.addEventListener('DOMContentLoaded', () => {
+    db = new SupabaseClient();
+    
+    console.log('🗄️ Database module loaded');
+});
+
+console.log('✅ supabase-client.js v4.1 loaded successfully');
