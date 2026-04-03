@@ -1,652 +1,753 @@
 /**
  * ============================================
- * 📊 AXENTRO REPORTS MANAGER v4.0
- * ✅ Attendance Reports & Analytics
+ * 🎯 AXENTRO APPLICATION v4.0
+ * ✅ Main Application Controller
  * ============================================
  */
 
-class ReportsManager {
+class App {
     constructor() {
-        this.currentReportData = null;
-        this.dateRange = {
-            start: AppConfig.reporting.defaultDateRange.start(),
-            end: AppConfig.reporting.defaultDateRange.end()
+        this.isInitialized = false;
+        this.currentPage = 'loginPage';
+        
+        // Module references
+        this.modules = {
+            ui: null,
+            auth: null,
+            db: null,
+            faceRecognition: null,
+            attendance: null,
+            admin: null,
+            reports: null
         };
         
-        this.init();
+        // Bind methods
+        this.init = this.init.bind(this);
+        this.handleOnlineStatus = this.handleOnlineStatus.bind(this);
     }
 
     // ============================================
-    // 🚀 INITIALIZATION
+    // 🚀 APPLICATION INITIALIZATION
     // ============================================
 
     /**
-     * Initialize reports manager
+     * Initialize the entire application
      */
-    init() {
-        console.log('📊 Reports Manager initialized');
+    async init() {
+        console.log('🚀 Starting Axentro Application v' + AppConfig.app.version);
         
-        // Set default date inputs
-        this.setDefaultDates();
-        
-        // Setup event listeners
-        this.setupEventListeners();
+        try {
+            // Step 1: Update loading progress
+            ui.updateLoadingProgress(10, 'تهيئة الواجهة...');
+            
+            // Step 2: Initialize UI Manager (already created globally)
+            await Utils.sleep(100);
+            
+            // Step 3: Setup global event listeners
+            this.setupGlobalEventListeners();
+            ui.updateLoadingProgress(20, 'إعداد المستمعين...');
+            
+            // Step 4: Initialize database client
+            ui.updateLoadingProgress(30, 'الاتصال بقاعدة البيانات...');
+            if (!db.isConnectedToSupabase()) {
+                throw new Error('فشل الاتصال بقاعدة البيانات');
+            }
+            
+            // Step 5: Load face recognition models
+            ui.updateLoadingProgress(50, 'تحميل نماذج الذكاء الاصطناعي...');
+            if (!faceRecognition.areModelsLoaded()) {
+                await faceRecognition.loadModels();
+            }
+            
+            // Step 6: Check for existing session
+            ui.updateLoadingProgress(70, 'التحقق من الجلسة...');
+            const hasSession = await auth.checkExistingSession();
+            
+            // Step 7: Load user settings
+            ui.updateLoadingProgress(80, 'تحميل الإعدادات...');
+            this.loadUserSettings();
+            
+            // Step 8: Setup PWA features
+            ui.updateLoadingProgress(90, 'إعداد التطبيق...');
+            this.setupPWAFeatures();
+            
+            // Step 9: Final initialization
+            ui.updateLoadingProgress(100, 'جاهز! ✓');
+            
+            // Hide loading screen after a short delay
+            setTimeout(() => {
+                ui.hideLoadingScreen();
+                
+                // Navigate to appropriate page
+                if (hasSession && auth.isAuthenticated()) {
+                    this.navigateTo('dashboardPage');
+                    this.initializeDashboard();
+                } else {
+                    this.navigateTo('loginPage');
+                }
+                
+                this.isInitialized = true;
+                console.log('✅ Application initialized successfully!');
+                
+            }, 800);
+
+        } catch (error) {
+            console.error('❌ Application initialization failed:', error);
+            ui.updateLoadingProgress(0, 'حدث خطأ في التحميل');
+            
+            // Show error and retry option
+            setTimeout(() => {
+                ui.hideLoadingScreen();
+                ui.showError('فشل تحميل التطبيق - يرجى تحديث الصفحة');
+                
+                // Add retry button
+                const retryBtn = document.createElement('button');
+                retryBtn.className = 'btn btn-primary btn-block';
+                retryBtn.innerHTML = '<i class="fas fa-redo"></i> إعادة المحاولة';
+                retryBtn.onclick = () => window.location.reload();
+                
+                document.getElementById('loginPage')?.querySelector('.auth-form')?.appendChild(retryBtn);
+                
+            }, 1500);
+        }
     }
 
     /**
-     * Set default date range in form inputs
+     * Setup global event listeners
      */
-    setDefaultDates() {
-        const fromInput = document.getElementById('reportDateFrom');
-        const toInput = document.getElementById('reportDateTo');
-
-        if (fromInput) {
-            fromInput.value = this.formatDateForInput(this.dateRange.start);
-        }
+    setupGlobalEventListeners() {
+        // ============================================
+        // NAVIGATION EVENTS
+        // ============================================
         
-        if (toInput) {
-            toInput.value = this.formatDateForInput(this.dateRange.end);
+        // Bottom navigation buttons
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetPage = btn.dataset.page;
+                if (targetPage) {
+                    this.navigateTo(targetPage);
+                    
+                    // Page-specific initialization
+                    switch (targetPage) {
+                        case 'dashboardPage':
+                            this.initializeDashboard();
+                            break;
+                        case 'reportsPage':
+                            reports.setDefaultDates();
+                            break;
+                        case 'changePasswordPage':
+                            // Nothing special needed
+                            break;
+                    }
+                }
+            });
+        });
+
+        // ============================================
+        // AUTH FORMS
+        // ============================================
+        
+        // Login form
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => auth.handleLogin(e));
         }
-    }
 
-    /**
-     * Setup report page event listeners
-     */
-    setupEventListeners() {
-        // Apply filter button
-        const applyBtn = document.getElementById('applyReportFilter');
-        if (applyBtn) {
-            applyBtn.addEventListener('click', () => this.applyDateFilter());
+        // Register form
+        const registerForm = document.getElementById('registerForm');
+        if (registerForm) {
+            registerForm.addEventListener('submit', (e) => auth.handleRegister(e));
         }
 
-        // Export buttons
-        const exportPDFBtn = document.getElementById('exportPDFBtn');
-        if (exportPDFBtn) {
-            exportPDFBtn.addEventListener('click', () => this.exportToPDF());
+        // Forgot password form
+        const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+        if (forgotPasswordForm) {
+            forgotPasswordForm.addEventListener('submit', (e) => auth.handleForgotPassword(e));
         }
 
-        const exportExcelBtn = document.getElementById('exportExcelBtn');
-        if (exportExcelBtn) {
-            exportExcelBtn.addEventListener('click', () => this.exportToExcel());
+        // Change password form
+        const changePasswordForm = document.getElementById('changePasswordForm');
+        if (changePasswordForm) {
+            changePasswordForm.addEventListener('submit', (e) => auth.handleChangePassword(e));
         }
 
-        // Date input change handlers
-        const fromInput = document.getElementById('reportDateFrom');
-        const toInput = document.getElementById('reportDateTo');
+        // Force password change form
+        const forcePasswordForm = document.getElementById('forcePasswordForm');
+        if (forcePasswordForm) {
+            forcePasswordForm.addEventListener('submit', (e) => auth.handleForcePasswordChange(e));
+        }
 
-        if (fromInput) {
-            fromInput.addEventListener('change', (e) => {
-                this.dateRange.start = new Date(e.target.value);
+        // ============================================
+        // AUTH LINKS & BUTTONS
+        // ============================================
+        
+        // Show registration link
+        const showRegisterLink = document.getElementById('showRegisterLink');
+        if (showRegisterLink) {
+            showRegisterLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.navigateTo('registerPage');
             });
         }
 
-        if (toInput) {
-            toInput.addEventListener('change', (e) => {
-                this.dateRange.end = new Date(e.target.value);
+        // Show forgot password link
+        const showForgotLink = document.getElementById('showForgotPasswordLink');
+        if (showForgotLink) {
+            showForgotLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.navigateTo('forgotPasswordPage');
             });
         }
-    }
 
-    // ============================================
-    // 📅 DATE HANDLING
-    // ============================================
+        // Back buttons
+        document.querySelectorAll('.back-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.navigateTo('loginPage');
+            });
+        });
 
-    /**
-     * Format date for input element
-     * @param {Date} date - Date object
-     * @returns {string} Formatted date string (YYYY-MM-DD)
-     */
-    formatDateForInput(date) {
-        return date.toISOString().split('T')[0];
-    }
-
-    /**
-     * Apply selected date filter and load data
-     */
-    async applyDateFilter() {
-        try {
-            ui.showButtonLoading(document.getElementById('applyReportFilter'), 'جاري التحميل...');
-
-            // Validate date range
-            if (this.dateRange.start > this.dateRange.end) {
-                ui.showError('تاريخ البداية يجب أن يكون قبل تاريخ النهاية');
-                return;
-            }
-
-            // Load attendance records for the date range
-            await this.loadReportData();
-
-            ui.showSuccess('تم تحميل التقرير ✓');
-
-        } catch (error) {
-            console.error('Apply filter error:', error);
-            ui.showError('فشل تحميل البيانات');
-        } finally {
-            ui.hideButtonLoading(document.getElementById('applyReportFilter'));
+        const backToLoginBtn = document.getElementById('backToLoginBtn');
+        if (backToLoginBtn) {
+            backToLoginBtn.addEventListener('click', () => {
+                this.navigateTo('loginPage');
+            });
         }
-    }
 
-    /**
-     * Set custom date range
-     * @param {Date} start - Start date
-     * @param {Date} end - End date
-     */
-    setDateRange(start, end) {
-        this.dateRange.start = start;
-        this.dateRange.end = end;
+        const backToLoginFromRegister = document.getElementById('backToLoginFromRegister');
+        if (backToLoginFromRegister) {
+            backToLoginFromRegister.addEventListener('click', () => {
+                this.navigateTo('loginPage');
+            });
+        }
+
+        const backToLoginFromForgot = document.getElementById('backToLoginFromForgot');
+        if (backToLoginFromForgot) {
+            backToLoginFromForgot.addEventListener('click', () => {
+                this.navigateTo('loginPage');
+            });
+        }
+
+        // Biometric login button
+        const biometricLoginBtn = document.getElementById('biometricLoginBtn');
+        if (biometricLoginBtn) {
+            biometricLoginBtn.addEventListener('click', () => auth.attemptBiometricAuth());
+        }
+
+        // ============================================
+        // DASHBOARD ACTIONS
+        // ============================================
         
-        // Update inputs
-        this.setDefaultDates();
-    }
-
-    /**
-     * Quick select preset date ranges
-     * @param {string} preset - Preset name ('today', 'week', 'month', 'year')
-     */
-    selectPresetRange(preset) {
-        const today = new Date();
-        let start, end;
-
-        switch (preset) {
-            case 'today':
-                start = new Date(today.setHours(0, 0, 0, 0));
-                end = new Date();
-                break;
-
-            case 'week':
-                start = new Date(today.setDate(today.getDate() - today.getDay()));
-                end = new Date();
-                break;
-
-            case 'month':
-                start = new Date(today.getFullYear(), today.getMonth(), 1);
-                end = new Date();
-                break;
-
-            case 'year':
-                start = new Date(today.getFullYear(), 0, 1);
-                end = new Date();
-                break;
-
-            default:
-                return;
+        // Logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => auth.logout());
         }
 
-        this.setDateRange(start, end);
-        this.applyDateFilter();
-    }
-
-    // ============================================
-    // 📊 DATA LOADING & PROCESSING
-    // ============================================
-
-    /**
-     * Load report data for current date range
-     */
-    async loadReportData() {
-        if (!auth.isAuthenticated()) {
-            ui.showError(ErrorCodes.AUTH_SESSION_EXPIRED.message);
-            return;
+        // Check-in button
+        const checkInBtn = document.getElementById('checkInBtn');
+        if (checkInBtn) {
+            checkInBtn.addEventListener('click', () => attendance.handleCheckIn());
         }
 
-        try {
-            const userCode = auth.getUserCode();
-            
-            // Get attendance history
-            const records = await db.getAttendanceHistory(
-                userCode,
-                this.dateRange.start,
-                this.dateRange.end
-            );
-
-            // Process and calculate statistics
-            this.currentReportData = this.processRecords(records);
-
-            // Update UI with results
-            this.renderReport();
-
-        } catch (error) {
-            console.error('Load report data error:', error);
-            throw error;
+        // Check-out button
+        const checkOutBtn = document.getElementById('checkOutBtn');
+        if (checkOutBtn) {
+            checkOutBtn.addEventListener('click', () => attendance.handleCheckOut());
         }
-    }
 
-    /**
-     * Process raw records into statistics
-     * @param {Array} records - Raw attendance records
-     * @returns {object} Processed report data
-     */
-    processRecords(records) {
-        let totalHours = 0;
-        let totalOvertime = 0;
-        let daysPresent = 0;
-        let checkIns = 0;
-        let checkOuts = 0;
-        const dailyRecords = {};
+        // Switch camera button
+        const switchCameraBtn = document.getElementById('switchCameraBtn');
+        if (switchCameraBtn) {
+            switchCameraBtn.addEventListener('click', () => faceRecognition.switchCamera());
+        }
 
-        // Group by date
-        records.forEach(record => {
-            const dateKey = Utils.formatDate(record.created_at, 'short');
-            
-            if (!dailyRecords[dateKey]) {
-                dailyRecords[dateKey] = [];
-            }
-            dailyRecords[dateKey].push(record);
+        // Face capture for registration
+        const startFaceCaptureBtn = document.getElementById('startFaceCaptureBtn');
+        if (startFaceCaptureBtn) {
+            startFaceCaptureBtn.addEventListener('click', async () => {
+                try {
+                    ui.showButtonLoading(startFaceCaptureBtn, 'جاري تشغيل الكاميرا...');
+                    
+                    await faceRecognition.startCamera(
+                        faceRecognition.registerVideo,
+                        { facingMode: 'user' }
+                    );
+                    
+                    // Show capture button
+                    const captureBtn = document.getElementById('captureFaceBtn');
+                    if (captureBtn) captureBtn.classList.remove('hidden');
+                    
+                    // Hide overlay when camera starts
+                    const overlay = document.getElementById('registerOverlay');
+                    if (overlay) overlay.style.display = 'none';
+                    
+                    ui.showSuccess('تم تشغيل الكاميرا ✓');
+                    
+                    // Setup capture button event
+                    const captureFaceBtn = document.getElementById('captureFaceBtn');
+                    if (captureFaceBtn && !captureFaceBtn.dataset.listenerAttached) {
+                        captureFaceBtn.addEventListener('click', (e) => 
+                            faceRecognition.handleRegistrationCapture(e)
+                        );
+                        captureFaceBtn.dataset.listenerAttached = 'true';
+                    }
+                    
+                } catch (error) {
+                    ui.showError(error.message || 'فشل تشغيل الكاميرا');
+                } finally {
+                    ui.hideButtonLoading(startFaceCaptureBtn);
+                }
+            });
+        }
 
-            // Count types
-            if (record.type === 'حضور') {
-                checkIns++;
-                daysPresent++; // Each check-in counts as a day present
-            } else {
-                checkOuts++;
-            }
+        // ============================================
+        // SETTINGS & PANELS
+        // ============================================
+        
+        // Notifications panel
+        const notificationsBtn = document.getElementById('notificationsBtn');
+        if (notificationsBtn) {
+            notificationsBtn.addEventListener('click', () => {
+                ui.openPanel('notificationsPanel');
+            });
+        }
 
-            // Sum hours
-            const hours = parseFloat(record.hours_worked) || 0;
-            totalHours += hours;
+        const closeNotificationsBtn = document.getElementById('closeNotificationsBtn');
+        if (closeNotificationsBtn) {
+            closeNotificationsBtn.addEventListener('click', () => {
+                ui.closePanel('notificationsPanel');
+            });
+        }
 
-            // Sum overtime
-            const overtimeMatch = record.overtime?.match(/[\d.]+/);
-            if (overtimeMatch) {
-                totalOvertime += parseFloat(overtimeMatch[0]);
+        const markAllReadBtn = document.getElementById('markAllReadBtn');
+        if (markAllReadBtn) {
+            markAllReadBtn.addEventListener('click', () => admin.markAllNotificationsRead());
+        }
+
+        // Settings panel
+        const settingsBtn = document.getElementById('settingsBtn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                ui.openPanel('settingsPanel');
+            });
+        }
+
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        if (closeSettingsBtn) {
+            closeSettingsBtn.addEventListener('click', () => {
+                ui.closePanel('settingsPanel');
+            });
+        }
+
+        // Settings toggles
+        document.querySelectorAll('#settingsPanel input[type="checkbox"]').forEach(toggle => {
+            toggle.addEventListener('change', (e) => {
+                this.saveSetting(e.target.id, e.target.checked);
+            });
+        });
+
+        // ============================================
+        // PASSWORD VISIBILITY TOGGLES
+        // ============================================
+        
+        document.querySelectorAll('.toggle-password').forEach(btn => {
+            btn.addEventListener('click', (e) => ui.togglePasswordVisibility(e));
+        });
+
+        // ============================================
+        // PASSWORD STRENGTH INDICATORS
+        // ============================================
+        
+        const regPassword = document.getElementById('regPassword');
+        if (regPassword) {
+            regPassword.addEventListener('input', (e) => {
+                ui.updatePasswordStrength(e.target.value, 'passwordStrength');
+            });
+        }
+
+        const newPassword = document.getElementById('newPassword');
+        if (newPassword) {
+            newPassword.addEventListener('input', (e) => {
+                ui.updatePasswordStrength(e.target.value, 'newPasswordStrength');
+            });
+        }
+
+        const forceNewPassword = document.getElementById('forceNewPassword');
+        if (forceNewPassword) {
+            forceNewPassword.addEventListener('input', (e) => {
+                ui.updatePasswordStrength(e.target.value, 'forcePasswordStrength');
+            });
+        }
+
+        // ============================================
+        // NETWORK STATUS
+        // ============================================
+        
+        window.addEventListener('online', this.handleOnlineStatus);
+        window.addEventListener('offline', this.handleOnlineStatus);
+
+        // ============================================
+        // KEYBOARD SHORTCUTS
+        // ============================================
+        
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + L to focus on location bar (prevent default)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+                e.preventDefault();
             }
         });
 
-        return {
-            records,
-            summary: {
-                totalRecords: records.length,
-                daysPresent,
-                uniqueDays: Object.keys(dailyRecords).length,
-                totalHours: parseFloat(totalHours.toFixed(2)),
-                totalOvertime: parseFloat(totalOvertime.toFixed(2)),
-                averageHoursPerDay: daysPresent > 0 
-                    ? parseFloat((totalHours / daysPresent).toFixed(2)) 
-                    : 0,
-                averageOvertimePerDay: daysPresent > 0 
-                    ? parseFloat((totalOvertime / daysPresent).toFixed(2)) 
-                    : 0,
-                checkIns,
-                checkOuts,
-                completionRate: checkIns > 0 
-                    ? Math.min(100, Math.round((checkOuts / checkIns) * 100)) 
-                    : 0
-            },
-            dailyBreakdown: dailyRecords
-        };
+        // Prevent zoom on double tap (mobile)
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
     }
 
     // ============================================
-    // 🎨 RENDERING
+    // 📱 PAGE NAVIGATION
     // ============================================
 
     /**
-     * Render report data to UI
+     * Navigate to a specific page
+     * @param {string} pageId - Target page ID
      */
-    renderReport() {
-        if (!this.currentReportData) return;
-
-        const { summary, records } = this.currentReportData;
-
-        // Update stat cards
-        this.updateStatCard('reportTotalDays', summary.daysPresent);
-        this.updateStatCard('reportTotalHours', summary.totalHours);
-        this.updateStatCard('reportOvertime', summary.totalOvertime);
-
-        // Render table
-        this.renderTable(records);
-
-        // Show/hide empty state
-        const noRecordsState = document.getElementById('noRecordsState');
-        const tableContainer = document.querySelector('.records-table-container');
+    navigateTo(pageId) {
+        // Validate user is authenticated for protected pages
+        const protectedPages = ['dashboardPage', 'reportsPage', 'changePasswordPage'];
         
-        if (records.length === 0) {
-            if (noRecordsState) noRecordsState.classList.remove('hidden');
-            if (tableContainer) tableContainer.classList.add('hidden');
-        } else {
-            if (noRecordsState) noRecordsState.classList.add('hidden');
-            if (tableContainer) tableContainer.classList.remove('hidden');
-        }
-    }
-
-    /**
-     * Update a stat card value with animation
-     * @param {string} elementId - Element ID
-     * @param {*} value - New value
-     */
-    updateStatCard(elementId, value) {
-        const el = document.getElementById(elementId);
-        if (el) {
-            ui.animateStatValue(elementId, value);
-        }
-    }
-
-    /**
-     * Render attendance records table
-     * @param {Array} records - Records to display
-     */
-    renderTable(records) {
-        const tbody = document.getElementById('attendanceRecordsBody');
-        if (!tbody) return;
-
-        if (records.length === 0) {
-            tbody.innerHTML = '';
+        if (protectedPages.includes(pageId) && !auth.isAuthenticated()) {
+            ui.showWarning('يجب تسجيل الدخول أولاً');
+            this.navigateTo('loginPage');
             return;
         }
 
-        // Sort by date descending (newest first)
-        const sortedRecords = Utils.sortBy(records, 'created_at', 'desc');
+        // Navigate using UI Manager
+        ui.navigateTo(pageId);
+        this.currentPage = pageId;
 
-        tbody.innerHTML = sortedRecords.map(record => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${Utils.formatDate(record.created_at)}</td>
-                <td>
-                    <span class="badge ${record.type === 'حضور' ? 'badge-in' : 'badge-out'}">
-                        ${record.type}
-                    </span>
-                </td>
-                <td>${Utils.formatDate(record.created_at, 'time')}</td>
-                <td>${record.shift || '-'}</td>
-                <td style="color: var(--primary-400); font-weight: bold;">
-                    ${record.hours_worked || '-'}
-                </td>
-                <td>${record.overtime || 'لا يوجد'}</td>
-            `;
-            return row.outerHTML;
-        }).join('');
+        // Page-specific actions
+        this.onPageEnter(pageId);
+    }
+
+    /**
+     * Handle page enter events
+     * @param {string} pageId - Entered page ID
+     */
+    onPageEnter(pageId) {
+        switch (pageId) {
+            case 'dashboardPage':
+                this.initializeDashboard();
+                break;
+                
+            case 'reportsPage':
+                reports.setDefaultDates();
+                break;
+                
+            case 'loginPage':
+                // Stop camera if running on other pages
+                if (faceRecognition.isCameraRunning()) {
+                    faceRecognition.stopCamera();
+                }
+                break;
+        }
     }
 
     // ============================================
-    // 📈 CHARTS & VISUALIZATIONS
+    // 🏠 DASHBOARD INITIALIZATION
     // ============================================
 
     /**
-     * Generate simple text-based chart (for environments without chart libraries)
-     * @param {Array} data - Chart data points
-     * @param {string} type - Chart type ('bar', 'line')
-     * @returns {HTMLElement} Chart container
+     * Initialize dashboard with user data
      */
-    generateSimpleChart(data, type = 'bar') {
-        const container = document.createElement('div');
-        container.className = 'simple-chart';
+    async initializeDashboard() {
+        try {
+            if (!auth.isAuthenticated()) return;
 
-        if (type === 'bar') {
-            const maxValue = Math.max(...data.map(d => d.value));
+            const user = auth.getCurrentUser();
+
+            // Update user info in header
+            const userNameEl = document.getElementById('userName');
+            const userCodeEl = document.getElementById('userCodeDisplay');
+
+            if (userNameEl) userNameEl.textContent = `مرحباً، ${user.name}`;
+            if (userCodeEl) userCodeEl.textContent = `CODE: ${user.code}`;
+
+            // Load dashboard stats
+            const totalEmployees = await db.getEmployeesCount();
+            ui.animateStatValue('totalEmployeesStat', totalEmployees);
+
+            // Load today's attendance records
+            await attendance.loadTodayRecords();
+
+            // Start camera for face recognition
+            this.startDashboardCamera();
+
+            // Load known faces for recognition
+            await faceRecognition.loadKnownFaces();
+
+            // If user is admin, enable admin features
+            if (auth.isAdmin()) {
+                admin.setupAdminFeatures();
+            }
+
+            console.log('📊 Dashboard initialized');
+
+        } catch (error) {
+            console.error('Dashboard init error:', error);
+        }
+    }
+
+    /**
+     * Start dashboard camera for face recognition
+     */
+    async startDashboardCamera() {
+        try {
+            const videoEl = document.getElementById('dashboardVideo');
+            const canvasEl = document.getElementById('dashboardCanvas');
             
-            container.innerHTML = data.map(item => `
-                <div class="chart-bar-item">
-                    <div class="chart-label">${item.label}</div>
-                    <div class="chart-bar-wrapper">
-                        <div class="chart-bar" style="width: ${(item.value / maxValue) * 100}%;">
-                            ${item.value}
-                        </div>
+            if (!videoEl || !canvasEl) return;
+
+            // Start camera
+            await faceRecognition.startCamera(videoEl, { facingMode: 'user' });
+
+            // Optional: Start continuous detection (can be resource-intensive)
+            // For now, we'll detect on demand when user clicks check-in/out
+
+            console.log('📹 Dashboard camera ready');
+
+        } catch (error) {
+            console.warn('Dashboard camera not available:', error.message);
+            
+            // Show manual entry option or message
+            const cameraContainer = document.getElementById('recognitionArea');
+            if (cameraContainer) {
+                cameraContainer.innerHTML += `
+                    <div style="text-align: center; padding: 20px; color: var(--text-muted);">
+                        <i class="fas fa-camera-slash" style="font-size: 48px; margin-bottom: 10px;"></i>
+                        <p>الكاميرا غير متاحة - يمكنك الاستمرار بدون التعرف على الوجه</p>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }
         }
-
-        return container;
-    }
-
-    /**
-     * Create weekly hours chart data
-     * @returns {Array} Chart data points
-     */
-    getWeeklyChartData() {
-        const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-        const today = new Date();
-        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-        // This would fetch actual weekly data
-        // For now, return placeholder structure
-        return days.map(day => ({
-            label: day,
-            value: 0 // Would be calculated from actual data
-        }));
     }
 
     // ============================================
-    // 📤 EXPORT FUNCTIONS
+    // ⚙️ SETTINGS MANAGEMENT
     // ============================================
 
     /**
-     * Export report to PDF (using browser print)
+     * Load user settings from storage
      */
-    async exportToPDF() {
-        if (!this.currentReportData) {
-            ui.showWarning('لا توجد بيانات للتصدير');
-            return;
-        }
+    loadUserSettings() {
+        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {
+            soundEnabled: true,
+            vibrationEnabled: true,
+            dataSaverMode: false
+        });
 
-        try {
-            ui.showInfo('جاري تحضير ملف PDF...');
-
-            // Create printable content
-            const printContent = this.generatePrintableContent();
-
-            // Open print dialog
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <!DOCTYPE html>
-                <html dir="rtl">
-                <head>
-                    <title>تقرير الحضور - ${auth.getUserName()}</title>
-                    <style>
-                        body { 
-                            font-family: Arial, sans-serif; 
-                            padding: 20px; 
-                            direction: rtl;
-                        }
-                        h1 { color: #1e293b; margin-bottom: 5px; }
-                        .subtitle { color: #64748b; margin-bottom: 20px; }
-                        .stats { 
-                            display: grid; 
-                            grid-template-columns: repeat(3, 1fr); 
-                            gap: 15px; 
-                            margin-bottom: 20px;
-                        }
-                        .stat-card { 
-                            background: #f8fafc; 
-                            padding: 15px; 
-                            border-radius: 8px;
-                            text-align: center;
-                        }
-                        .stat-value { font-size: 24px; font-weight: bold; color: #3b82f6; }
-                        .stat-label { font-size: 12px; color: #64748b; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: right; }
-                        th { background: #f1f5f9; font-weight: bold; }
-                        .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 12px; }
-                        @media print { body { print-color-adjust: exact; } }
-                    </style>
-                </head>
-                <body>
-                    ${printContent}
-                    <script>window.onload = () => window.print();</script>
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-
-            ui.showSuccess(SuccessMessages.DATA_EXPORTED);
-
-        } catch (error) {
-            console.error('Export PDF error:', error);
-            ui.showError('فشل تصدير الملف');
-        }
+        // Apply settings to UI
+        Object.entries(settings).forEach(([key, value]) => {
+            const toggle = document.getElementById(key);
+            if (toggle) {
+                toggle.checked = value;
+            }
+        });
     }
 
     /**
-     * Export report to Excel/CSV format
+     * Save a setting
+     * @param {string} key - Setting key
+     * @param {*} value - Setting value
      */
-    async exportToExcel() {
-        if (!this.currentReportData) {
-            ui.showWarning('لا توجد بيانات للتصدير');
-            return;
-        }
-
-        try {
-            ui.showInfo('جاري تحضير ملف Excel...');
-
-            // Convert to CSV (compatible with Excel)
-            const csvContent = this.convertToCSV(this.currentReportData.records);
-
-            // Download file
-            const filename = `attendance_report_${new Date().toISOString().split('T')[0]}.csv`;
-            Utils.downloadFile(csvContent, filename, 'text/csv;charset=utf-8;');
-
-            ui.showSuccess(SuccessMessages.DATA_EXPORTED);
-
-        } catch (error) {
-            console.error('Export Excel error:', error);
-            ui.showError('فشل تصدير الملف');
-        }
-    }
-
-    /**
-     * Convert records to CSV format
-     * @param {Array} records - Attendance records
-     * @returns {string} CSV content
-     */
-    convertToCSV(records) {
-        if (!records.length) return '';
-
-        // BOM for UTF-8 support in Excel
-        const BOM = '\uFEFF';
+    saveSetting(key, value) {
+        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
+        settings[key] = value;
+        Utils.saveToStorage(Constants.storageKeys.SETTINGS, settings);
         
-        // Headers
-        const headers = [
-            'التاريخ',
-            'اليوم',
-            'الحالة',
-            'الوقت',
-            'الوردية',
-            'ساعات العمل',
-            'الأوفر تايم'
-        ];
-
-        // Rows
-        const rows = records.map(record => [
-            Utils.formatDate(record.created_at),
-            new Date(record.created_at).toLocaleDateString('ar-EG', { weekday: 'long' }),
-            record.type,
-            Utils.formatDate(record.created_at, 'time'),
-            record.shift || '-',
-            record.hours_worked || '-',
-            record.overtime || '-'
-        ]);
-
-        // Combine
-        const csvContent = [headers, ...rows]
-            .map(row => row.map(cell => `"${cell}"`).join(','))
-            .join('\n');
-
-        return BOM + csvContent;
-    }
-
-    /**
-     * Generate printable HTML content
-     * @returns {string} HTML string
-     */
-    generatePrintableContent() {
-        const { summary } = this.currentReportData;
-        const user = auth.getCurrentUser();
-
-        return `
-            <h1>📊 تقرير الحضور والانصراف</h1>
-            <p class="subtitle">
-                الموظف: ${user?.name || '-'} | 
-                الكود: ${user?.code || '-'} |
-                الفترة: ${Utils.formatDate(this.dateRange.start)} - ${Utils.formatDate(this.dateRange.end)}
-            </p>
-
-            <div class="stats">
-                <div class="stat-card">
-                    <div class="stat-value">${summary.daysPresent}</div>
-                    <div class="stat-label">أيام الحضور</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${summary.totalHours}</div>
-                    <div class="stat-label">إجمالي الساعات</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${summary.totalOvertime}</div>
-                    <div class="stat-label">ساعات إضافية</div>
-                </div>
-            </div>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>التاريخ</th>
-                        <th>الحالة</th>
-                        <th>الوقت</th>
-                        <th>الوردية</th>
-                        <th>الساعات</th>
-                        <th>الأوفر تايم</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${this.currentReportData.records.map(record => `
-                        <tr>
-                            <td>${Utils.formatDate(record.created_at)}</td>
-                            <td>${record.type}</td>
-                            <td>${Utils.formatDate(record.created_at, 'time')}</td>
-                            <td>${record.shift || '-'}</td>
-                            <td>${record.hours_worked || '-'}</td>
-                            <td>${record.overtime || '-'}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-
-            <div class="footer">
-                <p>تم إنشاء هذا التقرير بواسطة نظام Axentro</p>
-                <p>تاريخ الإنشاء: ${new Date().toLocaleString('ar-EG')}</p>
-            </div>
-        `;
+        console.log(`⚙️ Setting saved: ${key} = ${value}`);
     }
 
     // ============================================
-    // 🔍 SEARCH & FILTER
+    // 📱 PWA FEATURES
     // ============================================
 
     /**
-     * Filter records by type (check-in/check-out)
-     * @param {string} type - Type filter or 'all'
+     * Setup Progressive Web App features
      */
-    filterByType(type) {
-        if (!this.currentReportData) return;
-
-        let filtered = [...this.currentReportData.records];
-
-        if (type !== 'all') {
-            filtered = filtered.filter(r => r.type === type);
+    setupPWAFeatures() {
+        // Register service worker (if not already registered)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(registration => {
+                console.log('✅ Service Worker active:', registration.scope);
+            }).catch(error => {
+                console.warn('⚠️ SW registration pending:', error);
+            });
         }
 
-        this.renderTable(filtered);
+        // Handle install prompt (for "Add to Home Screen")
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.deferredInstallPrompt = e;
+            
+            // Optionally show custom install button
+            console.log('📲 Install prompt available');
+        });
+
+        // Handle successful installation
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ App installed successfully');
+            ui.showSuccess('تم تثبيت التطبيق بنجاح! 🎉');
+            this.deferredInstallPrompt = null;
+        });
+
+        // Check if running as installed PWA
+        if (Utils.isPWAInstalled()) {
+            console.log('📱 Running as installed PWA');
+        }
     }
 
     /**
-     * Search records by keyword
-     * @param {string} query - Search query
+     * Prompt user to install PWA (call from custom button)
      */
-    searchRecords(query) {
-        if (!this.currentReportData || !query) {
-            this.renderTable(this.currentReportData.records);
+    async promptInstall() {
+        if (!this.deferredInstallPrompt) {
+            ui.showInfo('يمكنك تثبيت التطبيق من قائمة المتصفح');
             return;
         }
 
-        const searchLower = query.toLowerCase();
-        const filtered = this.currentReportData.records.filter(record =>
-            record.shift?.toLowerCase().includes(searchLower) ||
-            record.type.includes(searchLower) ||
-            record.hours_worked?.toString().includes(searchLower) ||
-            record.overtime?.includes(searchLower)
-        );
+        try {
+            const result = await this.deferredInstallPrompt.prompt();
+            
+            if (result.outcome === 'accepted') {
+                console.log('User accepted install prompt');
+            } else {
+                console.log('User dismissed install prompt');
+            }
+            
+            this.deferredInstallPrompt = null;
 
-        this.renderTable(filtered);
+        } catch (error) {
+            console.error('Install prompt error:', error);
+        }
+    }
+
+    // ============================================
+    // 🌐 NETWORK HANDLING
+    // ============================================
+
+    /**
+     * Handle online/offline status changes
+     * @param {Event} event - Online/offline event
+     */
+    handleOnlineStatus(event) {
+        if (event.type === 'online') {
+            ui.hideOfflineIndicator();
+            
+            // Process any queued offline operations
+            this.processOfflineQueue();
+            
+        } else if (event.type === 'offline') {
+            ui.showOfflineIndicator();
+        }
+    }
+
+    /**
+     * Process operations that were queued while offline
+     */
+    async processOfflineQueue() {
+        const queue = Utils.loadFromStorage(Constants.storageKeys.OFFLINE_QUEUE, []);
+        
+        if (queue.length === 0) return;
+
+        ui.showInfo(`جاري مزامنة ${queue.length} عملية محفوظة...`);
+
+        const remaining = [];
+
+        for (const operation of queue) {
+            try {
+                // Retry the operation
+                switch (operation.type) {
+                    case 'attendance':
+                        await db.recordAttendance(operation.data);
+                        break;
+                    // Add more operation types as needed
+                }
+                
+                console.log(`✅ Synced offline operation: ${operation.id}`);
+                
+            } catch (error) {
+                console.error(`Failed to sync: ${operation.id}`, error);
+                operation.retries = (operation.retries || 0) + 1;
+                
+                if (operation.retries < 3) {
+                    remaining.push(operation);
+                }
+            }
+        }
+
+        // Save remaining operations
+        Utils.saveToStorage(Constants.storageKeys.OFFLINE_QUEUE, remaining);
+
+        if (remaining.length === 0) {
+            ui.showSuccess('تمت المزامنة بنجاح ✓');
+        } else {
+            ui.showWarning(`بعض العمليات فشلت (${remaining.length} متبقية)`);
+        }
+    }
+
+    // ============================================
+    // 🔔 NOTIFICATIONS
+    // ============================================
+
+    /**
+     * Request notification permission (for push notifications)
+     */
+    async requestNotificationPermission() {
+        if (!('Notification' in window)) {
+            console.warn('This browser does not support notifications');
+            return false;
+        }
+
+        if (Notification.permission === 'granted') {
+            return true;
+        }
+
+        if (Notification.permission !== 'denied') {
+            const permission = await Notification.requestPermission();
+            return permission === 'granted';
+        }
+
+        return false;
+    }
+
+    /**
+     * Show browser notification
+     * @param {string} title - Notification title
+     * @param {object} options - Notification options
+     */
+    showBrowserNotification(title, options = {}) {
+        if (Notification.permission !== 'granted') return;
+
+        const notification = new Notification(title, {
+            icon: 'icon-192.png',
+            badge: 'icon-192.png',
+            dir: 'rtl',
+            lang: 'ar',
+            ...options
+        });
+
+        notification.onclick = () => {
+            window.focus();
+            notification.close();
+        };
+
+        // Auto-close after 5 seconds
+        setTimeout(() => notification.close(), 5000);
     }
 
     // ============================================
@@ -654,42 +755,118 @@ class ReportsManager {
     // ============================================
 
     /**
-     * Get current report data
-     * @returns {object|null} Current report data
+     * Get current application state
+     * @returns {object} Application state
      */
-    getCurrentReportData() {
-        return this.currentReportData;
+    getState() {
+        return {
+            isInitialized: this.isInitialized,
+            currentPage: this.currentPage,
+            isAuthenticated: auth.isAuthenticated(),
+            currentUser: auth.getCurrentUser(),
+            isOnline: Utils.isOnline(),
+            isPWAInstalled: Utils.isPWAInstalled()
+        };
     }
 
     /**
-     * Clear current report data
+     * Log application state (for debugging)
      */
-    clearReportData() {
-        this.currentReportData = null;
+    logState() {
+        console.table(this.getState());
+    }
+
+    /**
+     * Force refresh/reload application
+     */
+    forceRefresh() {
+        if ('caches' in window) {
+            caches.keys().then(names => {
+                names.forEach(name => {
+                    caches.delete(name);
+                });
+            });
+        }
         
-        // Clear UI
-        const tbody = document.getElementById('attendanceRecordsBody');
-        if (tbody) tbody.innerHTML = '';
-
-        // Reset stats
-        ['reportTotalDays', 'reportTotalHours', 'reportOvertime'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = '0';
-        });
+        window.location.reload(true);
     }
 
     /**
-     * Refresh current report
+     * Clear all application data and reset
      */
-    async refreshReport() {
-        await this.loadReportData();
-        ui.showSuccess('تم تحديث التقرير ✓');
+    async clearAllData() {
+        const confirmed = await ui.showConfirmation({
+            title: '⚠️ مسح جميع البيانات',
+            message: 'سيتم حذف جميع البيانات المحلية والإعدادات. هذا الإجراء لا يمكن التراجع عنه!',
+            confirmText: 'نعم، امسح الكل',
+            cancelText: 'إلغاء',
+            type: 'danger'
+        });
+
+        if (confirmed) {
+            // Clear storages
+            localStorage.clear();
+            sessionStorage.clear();
+
+            // Clear caches
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                await Promise.all(cacheNames.map(name => caches.delete(name)));
+            }
+
+            // Reload
+            window.location.reload();
+        }
     }
 }
 
-// Create global instance
-const reports = new ReportsManager();
+// ============================================
+// 🎯 APPLICATION ENTRY POINT
+// ============================================
+
+// Create global application instance
+const app = new App();
 
 // Export for use in other modules
-window.ReportsManager = ReportsManager;
-window.reports = reports;
+window.App = App;
+window.app = app;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🌟 DOM Ready - Starting Axentro System v' + AppConfig.app.version);
+    
+    // Start application initialization
+    app.init().catch(error => {
+        console.error('Fatal error during initialization:', error);
+    });
+});
+
+// Handle unhandled errors globally
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    console.error('🚨 Global Error:', { msg, url, lineNo, columnNo, error });
+    
+    // Don't show toast for every error (too noisy)
+    // But log it for debugging
+    
+    return false;
+};
+
+window.onunhandledrejection = function(event) {
+    console.error('🚨 Unhandled Promise Rejection:', event.reason);
+    
+    // Show user-friendly message for network errors
+    if (event.reason?.message?.includes('fetch')) {
+        ui.showError('خطأ في الاتصال بالخادم');
+    }
+    
+    event.preventDefault();
+};
+
+// Log app version
+console.log(`
+%c┌─────────────────────────────────────┐
+│  AXENTRO ATTENDANCE SYSTEM v${AppConfig.app.version}  │
+│  © ${new Date().getFullYear()} Axentro Team              │
+│  Build: ${new Date().toISOString().split('T')[0]}       │
+└─────────────────────────────────────┘
+`, 'color: #3b82f6; font-weight: bold; font-size: 14px;');
