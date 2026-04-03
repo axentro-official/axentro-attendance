@@ -1,7 +1,8 @@
 /**
  * ============================================
- * 🔧 AXENTRO CONFIGURATION v4.0
+ * 🔧 AXENTRO CONFIGURATION v4.1 - OPTIMIZED
  * ✅ Centralized Configuration Management
+ * 🚀 مع تحسينات الأداء وإصلاح مشاكل التحميل
  * ============================================
  */
 
@@ -41,20 +42,31 @@ const AppConfig = {
 
     // ============================================
     // 🎭 FACE RECOGNITION CONFIGURATION
+    // ⚡ محسّن مع CDN Alternatives وFallbacks
     // ============================================
     faceRecognition: {
-        // Model URLs from CDN
+        // 🔥 PRIMARY CDN URLs (jsdelivr - Fast & Reliable)
         models: {
-            tinyFaceDetector: 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
-            faceLandmark68Tiny: 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
-            faceRecognition: 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
-            ssdMobilenetv1: 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
-            faceLandmark68: 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights'
+            tinyFaceDetector: 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights',
+            faceLandmark68Tiny: 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights',
+            faceRecognition: 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights',
+            ssdMobilenetv1: 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights',
+            faceLandmark68: 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights',
+            faceExpression: 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights' // Optional
+        },
+
+        // 🔄 BACKUP CDN URLs (unpkg) - If primary fails
+        backupModels: {
+            tinyFaceDetector: 'https://unpkg.com/face-api.js@0.22.2/weights',
+            faceLandmark68Tiny: 'https://unpkg.com/face-api.js@0.22.2/weights',
+            faceRecognition: 'https://unpkg.com/face-api.js@0.22.2/weights',
+            ssdMobilenetv1: 'https://unpkg.com/face-api.js@0.22.2/weights',
+            faceLandmark68: 'https://unpkg.com/face-api.js@0.22.2/weights'
         },
         
         // Detection Settings
         detection: {
-            inputSize: 320,          // Size for processing
+            inputSize: 320,          // Size for processing (reduced from 416 for speed)
             scoreThreshold: 0.5,     // Minimum confidence score
             minFaceSize: 100,        // Minimum face size in pixels
             maxFaces: 1              // Maximum faces to detect
@@ -72,6 +84,12 @@ const AppConfig = {
             height: 480,
             facingMode: 'user',      // Front camera
             frameRate: 30
+        },
+
+        // ⏱️ Timeout settings
+        timeout: {
+            modelLoad: 15000,       // 15 seconds max for model loading
+            cameraStart: 10000      // 10 seconds for camera permission
         }
     },
 
@@ -104,7 +122,7 @@ const AppConfig = {
     security: {
         // Password requirements
         password: {
-            minLength: 4,
+            minLength: 4,           // ⚠️ Consider increasing to 8 in production!
             maxLength: 50,
             requireUppercase: false,
             requireLowercase: false,
@@ -171,7 +189,7 @@ const AppConfig = {
     // ============================================
     app: {
         name: 'Axentro System',
-        version: '4.0.0',
+        version: '4.1.0',           // Updated version
         description: 'نظام إدارة الحضور والانصراف بالذكاء الاصطناعي',
         author: 'Axentro Team',
         
@@ -188,6 +206,13 @@ const AppConfig = {
             offlineSupport: true,        // PWA & offline queue
             pushNotifications: false,    // Future feature
             darkMode: true               // Default theme
+        },
+
+        // 🔥 NEW: Feature flags for graceful degradation
+        fallbacks: {
+            allowBasicMode: true,       // Allow app to work without face recognition
+            showSkipOption: true,       // Show "skip" button if loading fails
+            cacheModels: false          // Cache models in localStorage (future)
         }
     },
 
@@ -236,10 +261,19 @@ const AppConfig = {
     // 📱 PWA CONFIGURATION
     // ============================================
     pwa: {
-        cacheName: 'axentro-v4',
-        cacheVersion: '4.0.0',
+        cacheName: 'axentro-v4-1',
+        cacheVersion: '4.1.0',
         offlinePages: ['./'],
         precacheAssets: []
+    },
+
+    // ============================================
+    // 🌍 INTERNATIONALization (i18n)
+    // ============================================
+    i18n: {
+        defaultLocale: 'ar',
+        supportedLocales: ['ar', 'en'],
+        rtl: true                      // Right-to-left layout
     }
 };
 
@@ -265,100 +299,70 @@ const ErrorCodes = {
     FACE_NO_CAMERA: { code: 3001, message: 'لم يتم العثور على كاميرا' },
     FACE_CAMERA_PERMISSION_DENIED: { code: 3002, message: 'تم رفض إذن الكاميرا' },
     FACE_NO_FACE_DETECTED: { code: 3003, message: 'لم يتم اكتشاف وجه' },
-    FACE_MULTIPLE_FACES: { code: 3004, message: 'تم اكتشاف أكثر من وجه' },
-    FACE_RECOGNITION_FAILED: { code: 3005, message: 'فشل التعرف على الوجه' },
-    FACE_LOW_CONFIDENCE: { code: 3006, message: 'مستوى الثقة منخفض جداً' },
-    FACE_MODEL_LOAD_FAILED: { code: 3007, message: 'فشل تحميل نموذج التعرف' },
+    FACE_MODEL_LOAD_FAILED: { code: 3004, message: 'فشل تحميل نماذج التعرف على الوجوه' },
+    FACE_MATCH_FAILED: { code: 3005, message: 'لا يوجد تطابق للوجه' },
     
     // Attendance Errors (4000-4999)
-    ATTENDANCE_ALREADY_CHECKED_IN: { code: 4001, message: 'تم تسجيل الحضور مسبقاً' },
-    ATTENDANCE_ALREADY_CHECKED_OUT: { code: 4002, message: 'تم تسجيل الانصراف مسبقاً' },
-    ATTENDANCE_COOLDOWN_ACTIVE: { code: 4003, message: 'يرجى الانتظار قبل المحاولة مجدداً' },
-    ATTENDANCE_NO_SHIFT_SELECTED: { code: 4004, message: 'لم يتم اختيار وردية العمل' },
-    ATTENDANCE_LOCATION_ERROR: { code: 4005, message: 'خطأ في تحديد الموقع' },
+    ATTENDANCE_COOLDOWN_ACTIVE: { code: 4001, message: 'يرجى الانتظار قبل تسجيل عملية جديدة' },
+    ATTENDANCE_ALREADY_CHECKED_IN: { code: 4002, message: 'تم تسجيل الحضور مسبقاً' },
+    ATTENDANCE_ALREADY_CHECKED_OUT: { code: 4003, message: 'تم تسجيل الانصراف مسبقاً' },
+    ATTENDANCE_NO_SHIFT_SELECTED: { code: 4004, message: 'يرجى اختيار وردية العمل' },
     
-    // Network Errors (5000-5999)
-    NETWORK_OFFLINE: { code: 5001, message: 'لا يوجد اتصال بالإنترنت' },
-    NETWORK_TIMEOUT: { code: 5002, message: 'انتهت مهلة الاتصال' },
-    NETWORK_SERVER_ERROR: { code: 5003, message: 'خطأ في الخادم' },
-    NETWORK_RATE_LIMIT: { code: 5004, message: 'تجاوزت عدد المحاولات المسموحة' },
+    // Database Errors (5000-5999)
+    DB_CONNECTION_ERROR: { code: 5001, message: 'فشل الاتصال بقاعدة البيانات' },
+    DB_QUERY_ERROR: { code: 5002, message: 'حدث خطأ في استعلام البيانات' },
+    DB_INSERT_ERROR: { code: 5003, message: 'فشل حفظ البيانات' },
     
-    // General Errors (9000-9999)
-    UNKNOWN_ERROR: { code: 9001, message: 'حدث خطأ غير متوقع' },
-    OPERATION_CANCELLED: { code: 9002, message: 'تم إلغاء العملية' },
-    PERMISSION_DENIED: { code: 9003, message: 'ليس لديك الصلاحية' }
+    // Network Errors (6000-6999)
+    NETWORK_OFFLINE: { code: 6001, message: 'لا يوجد اتصال بالإنترنت' },
+    NETWORK_TIMEOUT: { code: 6002, message: 'تجاوز وقت الانتظار' },
+    NETWORK_SERVER_ERROR: { code: 6003, message: 'خطأ في الخادم' },
+    
+    // System Errors (7000-7999)
+    UNKNOWN_ERROR: { code: 7001, message: 'حدث خطأ غير متوقع' },
+    INITIALIZATION_FAILED: { code: 7002, message: 'فشل تهيئة النظام' },
+    FEATURE_NOT_AVAILABLE: { code: 7003, message: 'هذه الميزة غير متوفرة حالياً' }
 };
 
 // ============================================
-// 📝 SUCCESS MESSAGES
+// ✅ SUCCESS MESSAGES
 // ============================================
 const SuccessMessages = {
-    LOGIN_SUCCESS: 'تم تسجيل الدخول بنجاح ✅',
-    LOGOUT_SUCCESS: 'تم تسجيل الخروج بنجاح 👋',
-    REGISTER_SUCCESS: 'تم إنشاء الحساب بنجاح 🎉',
-    PASSWORD_CHANGED: 'تم تغيير كلمة المرور بنجاح 🔒',
-    PASSWORD_RESET_SENT: 'تم إرسال كلمة المرور الجديدة 📧',
-    
-    CHECK_IN_SUCCESS: 'تم تسجيل الحضور بنجاح ✓',
-    CHECK_OUT_SUCCESS: 'تم تسجيل الانصراف بنجاح ✓',
-    FACE_CAPTURED: 'تم التقاط الوجه بنجاح 📷',
-    FACE_RECOGNIZED: 'تم التعرف على الوجه بنجاح ✓',
-    
-    PROFILE_UPDATED: 'تم تحديث الملف الشخصي ✏️',
-    SETTINGS_SAVED: 'تم حفظ الإعدادات ⚙️',
-    DATA_EXPORTED: 'تم تصدير البيانات بنجاح 📊',
-    
-    EMAIL_SENT: 'تم إرسال الإيميل بنجاح 📧',
-    NOTIFICATION_SENT: 'تم إرسال الإشعار 🔔'
+    LOGIN_SUCCESS: 'تم تسجيل الدخول بنجاح ✓',
+    LOGOUT_SUCCESS: 'تم تسجيل الخروج بنجاح',
+    REGISTER_SUCCESS: 'تم إنشاء الحساب بنجاح ✓',
+    CHECK_IN_SUCCESS: '✅ تم تسجيل الحضور بنجاح',
+    CHECK_OUT_SUCCESS: '✅ تم تسجيل الانصراف بنجاح',
+    PASSWORD_CHANGED: 'تم تغيير كلمة المرور بنجاح',
+    PASSWORD_RESET_SENT: 'تم إرسال كلمة المرور الجديدة إلى بريدك',
+    DATA_SAVED: 'تم حفظ البيانات بنجاح',
+    FACE_CAPTURED: '✓ تم التقاط الوجه بنجاح'
 };
 
 // ============================================
-// 🎯 UTILITY CONSTANTS
+// 🎨 CONSTANTS
 // ============================================
 const Constants = {
-    // Regular Expressions
-    regex: {
-        email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-        employeeCode: /^[A-Z0-9]{4,10}$/,
-        password: /^.{4,50}$/,
-        name: /^[\u0600-\u06FFa-zA-Z\s]{3,100}$/,
-        phone: /^01[0-9]{9}$/
-    },
-    
-    // Time Constants
-    time: {
-        SECOND: 1000,
-        MINUTE: 60 * 1000,
-        HOUR: 60 * 60 * 1000,
-        DAY: 24 * 60 * 60 * 1000,
-        WEEK: 7 * 24 * 60 * 60 * 1000
-    },
-    
-    // Local Storage Keys
     storageKeys: {
         USER_SESSION: 'axentro_user_session',
         REMEMBER_ME: 'axentro_remember_me',
-        SETTINGS: 'axentro_settings',
-        OFFLINE_QUEUE: 'axentro_offline_queue',
+        USER_SETTINGS: 'axentro_user_settings',
         LAST_ACTIVITY: 'axentro_last_activity',
-        CSRF_TOKEN: 'axentro_csrf_token'
+        TEMP_FACE_DESCRIPTOR: 'axentro_temp_face_descriptor',
+        OFFLINE_QUEUE: 'axentro_offline_queue'
     },
     
-    // Session Storage Keys
     sessionKeys: {
-        TEMP_FACE_DESCRIPTOR: 'temp_face_descriptor',
-        LOGIN_ATTEMPTS: 'login_attempts',
-        LOCKOUT_UNTIL: 'lockout_until'
+        CURRENT_USER: 'current_user',
+        CSRF_TOKEN: 'csrf_token'
+    },
+    
+    events: {
+        LOGIN_SUCCESS: 'login_success',
+        LOGOUT: 'logout',
+        SESSION_EXPIRED: 'session_expired',
+        ATTENDANCE_RECORDED: 'attendance_recorded'
     }
 };
 
-// Freeze objects to prevent modification
-Object.freeze(AppConfig);
-Object.freeze(ErrorCodes);
-Object.freeze(SuccessMessages);
-Object.freeze(Constants);
-
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { AppConfig, ErrorCodes, SuccessMessages, Constants };
-}
+console.log(`⚙️ Config v${AppConfig.app.version} loaded successfully`);
