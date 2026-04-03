@@ -3,33 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Axentro System | إدارة الحضور والانصراف</title>
-    <meta name="description" content="نظام متابعة الحضور والانصراف بالذكاء الاصطناعي - Axentro">
-    <meta name="theme-color" content="#020617">
+    <title>Axentro System | نظام إدارة الحضور والانصراف</title>
+    <meta name="description" content="نظام متابعة الحضور والانصراف بالذكاء الاصطناعي">
+    <meta name="theme-color" content="#0f172a">
     
-    <!-- PWA Manifest -->
+    <!-- PWA -->
     <link rel="manifest" href="manifest.json">
-    
-    <!-- Icons -->
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     
     <!-- External CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Main Stylesheet -->
+    <!-- Main CSS -->
     <link rel="stylesheet" href="styles.css">
     
-    <!-- Security Headers -->
+    <!-- Security -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="X-Frame-Options" content="DENY">
     
-    <!-- ⚡ CRITICAL: Load Supabase FIRST (before other scripts) -->
+    <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
-    <!-- ⚡ CRITICAL: Load face-api.js with FALLBACK URLs -->
+    <!-- Face API with fallback -->
     <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"
-            onerror="window.faceApiLoadError = true; console.error('❌ face-api.js failed to load from primary CDN');"></script>
+            onerror="window.faceApiLoadError = true"></script>
 </head>
 <body>
 
@@ -49,29 +47,24 @@
         </div>
         <span id="loadStatus">تهيئة المكونات...</span>
         
-        <!-- 🔴 Error Container (Hidden by default) -->
-        <div id="loadingError" style="display: none; margin-top: 20px; padding: 15px; background: #fef2f2; border: 2px solid #ef4444; border-radius: 12px; text-align: right;">
-            <h4 style="color: #dc2626; margin-bottom: 10px;">
-                <i class="fas fa-exclamation-triangle"></i> 
-                فشل تحميل النظام - يرجى المتابعة
-            </h4>
-            <p id="errorMessage" style="color: #991b1b; font-size: 0.9rem; margin-bottom: 15px;"></p>
-            <button onclick="retryLoading()" class="btn btn-primary" style="margin: 5px;">
-                <i class="fas fa-redo"></i> إعادة المحاولة
-            </button>
-            <button onclick="skipFaceRecognition()" class="btn btn-outline" style="margin: 5px;">
-                <i class="fas fa-forward"></i> تخطي التعرف على الوجوه
-            </button>
+        <!-- Error Container -->
+        <div id="loadingError" style="display: none; margin-top: 20px; padding: 20px; background: rgba(239, 68, 68, 0.1); border: 2px solid #ef4444; border-radius: 12px;">
+            <h4 style="color: #dc2626; margin-bottom: 10px;"><i class="fas fa-exclamation-triangle"></i> فشل التحميل</h4>
+            <p id="errorMessage" style="color: #991b1b; font-size: 0.9rem;"></p>
+            <button onclick="retryLoading()" class="btn btn-primary" style="margin: 10px 5px 0;"><i class="fas fa-redo"></i> إعادة المحاولة</button>
+            <button onclick="skipFaceRecognition()" class="btn btn-outline" style="margin: 10px 5px 0;"><i class="fas fa-forward"></i> تخطي الوجه</button>
         </div>
     </div>
 </div>
 
 <!-- ============================================ -->
-<!-- 📱 MAIN APPLICATION CONTAINER -->
+<!-- 📱 MAIN APP CONTAINER -->
 <!-- ============================================ -->
 <div id="app" class="app-container hidden">
 
-    <!-- LOGIN PAGE -->
+    <!-- ================================ -->
+    <!-- 🔐 LOGIN PAGE -->
+    <!-- ================================ -->
     <section id="loginPage" class="page active">
         <div class="auth-container">
             <div class="auth-header">
@@ -84,35 +77,16 @@
 
             <form id="loginForm" class="auth-form" novalidate>
                 <div class="input-group">
-                    <label for="loginCode">
-                        <i class="fas fa-id-badge"></i>
-                        كود الموظف
-                    </label>
-                    <input type="text" 
-                           id="loginCode" 
-                           placeholder="أدخل كود الموظف"
-                           autocomplete="username"
-                           required
-                           pattern="[A-Z0-9]{4,10}"
-                           maxlength="10">
+                    <label for="loginCode"><i class="fas fa-id-badge"></i> كود الموظف</label>
+                    <input type="text" id="loginCode" placeholder="أدخل كود الموظف" autocomplete="username" required pattern="[A-Z0-9]{4,10}" maxlength="10">
                     <span class="error-message" id="loginCodeError"></span>
                 </div>
 
                 <div class="input-group">
-                    <label for="loginPassword">
-                        <i class="fas fa-lock"></i>
-                        كلمة السر
-                    </label>
+                    <label for="loginPassword"><i class="fas fa-lock"></i> كلمة السر</label>
                     <div class="password-wrapper">
-                        <input type="password" 
-                               id="loginPassword" 
-                               placeholder="كلمة السر"
-                               autocomplete="current-password"
-                               required
-                               minlength="4">
-                        <button type="button" class="toggle-password" data-target="loginPassword">
-                            <i class="fas fa-eye"></i>
-                        </button>
+                        <input type="password" id="loginPassword" placeholder="كلمة السر" autocomplete="current-password" required minlength="4">
+                        <button type="button" class="toggle-password" data-target="loginPassword"><i class="fas fa-eye"></i></button>
                     </div>
                     <span class="error-message" id="loginPasswordError"></span>
                 </div>
@@ -131,9 +105,7 @@
                     <span class="btn-loader hidden"></span>
                 </button>
 
-                <div class="auth-divider">
-                    <span>أو</span>
-                </div>
+                <div class="auth-divider"><span>أو</span></div>
 
                 <button type="button" class="btn btn-outline btn-block" id="biometricLoginBtn">
                     <i class="fas fa-fingerprint"></i>
@@ -153,38 +125,29 @@
         </div>
     </section>
 
-    <!-- REGISTER PAGE -->
+    <!-- ================================ -->
+    <!-- 📝 REGISTER PAGE -->
+    <!-- ================================ -->
     <section id="registerPage" class="page">
         <div class="auth-container">
             <div class="auth-header">
-                <button class="back-btn" id="backToLoginFromRegister">
-                    <i class="fas fa-arrow-right"></i>
-                </button>
+                <button class="back-btn" id="backToLoginFromRegister"><i class="fas fa-arrow-right"></i></button>
                 <h2>تسجيل موظف جديد</h2>
             </div>
 
             <form id="registerForm" class="auth-form" novalidate>
                 <div class="input-group">
-                    <label for="regName">
-                        <i class="fas fa-user"></i>
-                        الاسم الكامل
-                    </label>
+                    <label for="regName"><i class="fas fa-user"></i> الاسم الكامل</label>
                     <input type="text" id="regName" placeholder="الاسم الثلاثي" required>
                 </div>
 
                 <div class="input-group">
-                    <label for="regEmail">
-                        <i class="fas fa-envelope"></i>
-                        البريد الإلكتروني (اختياري)
-                    </label>
+                    <label for="regEmail"><i class="fas fa-envelope"></i> البريد الإلكتروني (اختياري)</label>
                     <input type="email" id="regEmail" placeholder="example@email.com">
                 </div>
 
                 <div class="input-group">
-                    <label for="regPassword">
-                        <i class="fas fa-lock"></i>
-                        كلمة السر
-                    </label>
+                    <label for="regPassword"><i class="fas fa-lock"></i> كلمة السر</label>
                     <input type="password" id="regPassword" placeholder="الأقل 4 أحرف" required minlength="4">
                 </div>
 
@@ -195,18 +158,12 @@
                     <div class="video-container" id="registerVideoContainer">
                         <video id="registerVideo" autoplay playsinline></video>
                         <canvas id="registerCanvas"></canvas>
-                        <div class="face-guide">
-                            <p>ضع وجهك داخل الإطار</p>
-                        </div>
+                        <div class="face-guide"><p>ضع وجهك داخل الإطار</p></div>
                     </div>
 
                     <div class="face-actions">
-                        <button type="button" class="btn btn-outline" id="startCameraBtn">
-                            <i class="fas fa-video"></i> تشغيل الكاميرا
-                        </button>
-                        <button type="button" class="btn btn-primary" id="captureFaceBtn" disabled>
-                            <i class="fas fa-camera-retro"></i> التقاط الوجه
-                        </button>
+                        <button type="button" class="btn btn-outline" id="startCameraBtn"><i class="fas fa-video"></i> تشغيل الكاميرا</button>
+                        <button type="button" class="btn btn-primary" id="captureFaceBtn" disabled><i class="fas fa-camera-retro"></i> التقاط الوجه</button>
                     </div>
 
                     <div id="capturedFacePreview" class="captured-face-preview hidden">
@@ -221,20 +178,18 @@
                     <span class="btn-loader hidden"></span>
                 </button>
 
-                <button type="button" class="btn btn-text" id="backToLoginFromRegFooter">
-                    رجوع لتسجيل الدخول
-                </button>
+                <button type="button" class="btn btn-text" id="backToLoginFromRegFooter">رجوع لتسجيل الدخول</button>
             </form>
         </div>
     </section>
 
-    <!-- FORGOT PASSWORD PAGE -->
+    <!-- ================================ -->
+    <!-- 🔑 FORGOT PASSWORD PAGE -->
+    <!-- ================================ -->
     <section id="forgotPasswordPage" class="page">
         <div class="auth-container">
             <div class="auth-header">
-                <button class="back-btn" id="backToLoginFromForgot">
-                    <i class="fas fa-arrow-right"></i>
-                </button>
+                <button class="back-btn" id="backToLoginFromForgot"><i class="fas fa-arrow-right"></i></button>
                 <h2>استعادة كلمة المرور</h2>
             </div>
 
@@ -245,10 +200,7 @@
 
             <form id="forgotPasswordForm" class="auth-form">
                 <div class="input-group">
-                    <label for="forgotCode">
-                        <i class="fas fa-id-badge"></i>
-                        كود الموظف
-                    </label>
+                    <label for="forgotCode"><i class="fas fa-id-badge"></i> كود الموظف</label>
                     <input type="text" id="forgotCode" placeholder="أدخل كود الموظف" required>
                 </div>
 
@@ -260,9 +212,11 @@
         </div>
     </section>
 
-    <!-- DASHBOARD PAGE -->
+    <!-- ================================ -->
+    <!-- 🏠 DASHBOARD PAGE -->
+    <!-- ================================ -->
     <section id="dashboardPage" class="page">
-        <!-- Dashboard Header -->
+        <!-- Header -->
         <header class="dashboard-header">
             <div class="user-info">
                 <h3 id="userName">مرحباً، موظف</h3>
@@ -275,6 +229,9 @@
                 </button>
                 <button class="icon-btn" id="settingsBtn" title="الإعدادات">
                     <i class="fas fa-cog"></i>
+                </button>
+                <button class="icon-btn admin-only" id="adminPanelBtn" title="لوحة التحكم">
+                    <i class="fas fa-user-shield"></i>
                 </button>
                 <button class="icon-btn" id="logoutBtn" title="تسجيل الخروج">
                     <i class="fas fa-sign-out-alt"></i>
@@ -299,7 +256,7 @@
             <div class="stat-card">
                 <i class="fas fa-users"></i>
                 <span class="stat-value" id="totalEmployeesStat">0</span>
-                <span class="stat-label">إجمالي الموظفين المسجلين</span>
+                <span class="stat-label">إجمالي الموظفين</span>
             </div>
             <div class="stat-card">
                 <i class="fas fa-clock"></i>
@@ -310,14 +267,11 @@
 
         <!-- Attendance Section -->
         <div class="attendance-section">
-            <h3 class="section-title">
-                <i class="fas fa-clipboard-check"></i>
-                تسجيل الحضور والانصراف
-            </h3>
+            <h3 class="section-title"><i class="fas fa-clipboard-check"></i> تسجيل الحضور والانصراف</h3>
 
             <!-- Shift Selection -->
             <div class="shift-selector">
-                <h4><i class="fas fa-calendar-alt"></i> اختر وردية العمل الخاصة بك</h4>
+                <h4><i class="fas fa-calendar-alt"></i> اختر وردية العمل</h4>
                 
                 <div class="shifts-grid">
                     <label class="shift-option">
@@ -349,7 +303,7 @@
                 </div>
             </div>
 
-            <!-- Face Recognition Area -->
+            <!-- Face Recognition Area (Hidden for Admin) -->
             <div class="recognition-area" id="recognitionArea">
                 <div class="video-container dashboard-video">
                     <video id="dashboardVideo" autoplay playsinline muted></video>
@@ -359,7 +313,7 @@
                     </div>
                 </div>
 
-                <div class="recognition-result" id="recognitionResult">
+                <div class="recognition-result" id="recognitionResult" style="display:none;">
                     <img id="recognizedFaceImg" alt="الوجه المعرف">
                     <div class="result-info">
                         <h4 id="recognizedEmployeeName">----</h4>
@@ -417,16 +371,18 @@
             </a>
             <a href="#" class="nav-link" data-page="reportsPage">
                 <i class="fas fa-chart-line"></i>
-                <span>سجل تقاريري</span>
+                <span>التقارير</span>
             </a>
             <a href="#" class="nav-link" data-page="changePasswordPage">
                 <i class="fas fa-key"></i>
-                <span>تغيير كلمة المرور</span>
+                <span>تغيير الرقم السري</span>
             </a>
         </nav>
     </section>
 
-    <!-- REPORTS PAGE -->
+    <!-- ================================ -->
+    <!-- 📊 REPORTS PAGE -->
+    <!-- ================================ -->
     <section id="reportsPage" class="page">
         <header class="page-header">
             <h2><i class="fas fa-chart-line"></i> التقارير</h2>
@@ -443,9 +399,7 @@
                     <label>إلى تاريخ</label>
                     <input type="date" id="reportEndDate">
                 </div>
-                <button class="btn btn-primary" id="applyDateRange">
-                    تطبيق
-                </button>
+                <button class="btn btn-primary" id="applyDateRange">تطبيق</button>
             </div>
 
             <!-- Report Stats -->
@@ -479,7 +433,10 @@
                     </thead>
                     <tbody id="reportsTableBody">
                         <tr>
-                            <td colspan="6" class="no-data">لا توجد سجلات في هذه الفترة</td>
+                            <td colspan="6" class="no-data">
+                                <i class="fas fa-inbox"></i>
+                                <p>لا توجد سجلات في هذه الفترة</p>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -488,12 +445,10 @@
             <!-- Export Buttons -->
             <div class="export-buttons">
                 <button class="btn btn-outline" id="exportPdfBtn">
-                    <i class="fas fa-file-pdf"></i>
-                    تصدير PDF
+                    <i class="fas fa-file-pdf"></i> تصدير PDF
                 </button>
                 <button class="btn btn-outline" id="exportExcelBtn">
-                    <i class="fas fa-file-excel"></i>
-                    تصدير Excel
+                    <i class="fas fa-file-excel"></i> تصدير Excel
                 </button>
             </div>
         </div>
@@ -506,52 +461,116 @@
             </a>
             <a href="#" class="nav-link active" data-page="reportsPage">
                 <i class="fas fa-chart-line"></i>
-                <span>سجل تقاريري</span>
+                <span>التقارير</span>
             </a>
             <a href="#" class="nav-link" data-page="changePasswordPage">
                 <i class="fas fa-key"></i>
-                <span>تغيير كلمة المرور</span>
+                <span>تغيير الرقم السري</span>
             </a>
         </nav>
     </section>
 
-    <!-- CHANGE PASSWORD PAGE -->
+    <!-- ================================ -->
+    <!-- 🔐 CHANGE PASSWORD PAGE (محسّن) -->
+    <!-- ================================ -->
     <section id="changePasswordPage" class="page">
         <header class="page-header">
             <h2><i class="fas fa-key"></i> تغيير كلمة السر</h2>
         </header>
 
-        <div class="form-container">
+        <div class="form-container" style="max-width: 500px; margin: 30px auto;">
             <form id="changePasswordForm" class="auth-form">
-                <div class="input-group">
+                <!-- Current Password (Optional for first login) -->
+                <div class="info-box" id="forcePasswordNotice" style="display:none;">
+                    <i class="fas fa-shield-alt"></i>
+                    <p><strong>تحديث أمني مطلوب</strong></p>
+                    <p style="font-size: 0.85rem; margin-top: 5px;">يجب عليك تغيير كلمة المرور المؤقتة قبل المتابعة</p>
+                </div>
+
+                <div class="input-group" id="currentPasswordField">
                     <label for="currentPassword">
-                        <i class="fas fa-lock"></i>
-                        كلمة السر الحالية
+                        <i class="fas fa-lock"></i> 
+                        <span id="currentPasswordLabel">كلمة السر الحالية</span>
                     </label>
-                    <input type="password" id="currentPassword" required>
+                    <div class="password-wrapper">
+                        <input type="password" id="currentPassword">
+                        <button type="button" class="toggle-password" data-target="currentPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="input-group">
                     <label for="newPassword">
-                        <i class="fas fa-key"></i>
-                        كلمة السر الجديدة
+                        <i class="fas fa-key"></i> كلمة السر الجديدة
                     </label>
-                    <input type="password" id="newPassword" required minlength="4">
+                    <div class="password-wrapper">
+                        <input type="password" id="newPassword" placeholder="الأقل 4 أحرف" required minlength="4">
+                        <button type="button" class="toggle-password" data-target="newPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Password Strength Indicator -->
+                    <div class="password-strength" id="passwordStrength" style="margin-top: 8px; display: none;">
+                        <div class="strength-bar">
+                            <div class="strength-fill" id="strengthFill"></div>
+                        </div>
+                        <small class="strength-text" id="strengthText"></small>
+                    </div>
                 </div>
 
                 <div class="input-group">
                     <label for="confirmNewPassword">
-                        <i class="fas fa-lock"></i>
-                        تأكيد كلمة السر الجديدة
+                        <i class="fas fa-lock"></i> تأكيد كلمة السر الجديدة
                     </label>
-                    <input type="password" id="confirmNewPassword" required>
+                    <div class="password-wrapper">
+                        <input type="password" id="confirmNewPassword" required>
+                        <button type="button" class="toggle-password" data-target="confirmNewPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Requirements List -->
+                <div class="requirements-list" style="background: var(--bg-tertiary); padding: 15px; border-radius: 12px; margin: 15px 0;">
+                    <h4 style="font-size: 0.9rem; margin-bottom: 10px; color: var(--text-secondary);">
+                        <i class="fas fa-info-circle"></i> متطلبات كلمة المرور:
+                    </h4>
+                    <ul style="list-style: none; font-size: 0.85rem;" id="requirementsList">
+                        <li id="req-length" style="padding: 4px 0; color: var(--text-muted);">
+                            <i class="fas fa-times" style="color: var(--danger); margin-left: 6px;"></i>
+                            4 أحرف على الأقل
+                        </li>
+                        <li id="req-upper" style="padding: 4px 0; color: var(--text-muted);">
+                            <i class="fas fa-times" style="color: var(--text-muted); margin-left: 6px;"></i>
+                            حرف كبير واحد على الأقل (اختياري)
+                        </li>
+                        <li id="req-number" style="padding: 4px 0; color: var(--text-muted);">
+                            <i class="fas fa-times" style="color: var(--text-muted); margin-left: 6px;"></i>
+                            رقم واحد على الأقل (اختياري)
+                        </li>
+                    </ul>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block" id="changePasswordBtn">
                     <i class="fas fa-save"></i>
-                    تحديث كلمة السر
+                    <span>تحديث كلمة السر</span>
+                    <span class="btn-loader hidden"></span>
                 </button>
             </form>
+
+            <!-- Success Message (Hidden by default) -->
+            <div id="passwordChangeSuccess" style="display: none; text-align: center; padding: 30px;">
+                <div style="font-size: 4rem; color: var(--success); margin-bottom: 15px;">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3 style="color: var(--success); margin-bottom: 10px;">تم تغيير كلمة المرور بنجاح!</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 25px;">سيتم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول بكلمة المرور الجديدة.</p>
+                <button onclick="app.navigateTo('loginPage')" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> تسجيل الدخول الآن
+                </button>
+            </div>
         </div>
 
         <!-- Bottom Navigation -->
@@ -562,11 +581,115 @@
             </a>
             <a href="#" class="nav-link" data-page="reportsPage">
                 <i class="fas fa-chart-line"></i>
-                <span>سجل تقاريري</span>
+                <span>التقارير</span>
             </a>
             <a href="#" class="nav-link active" data-page="changePasswordPage">
                 <i class="fas fa-key"></i>
-                <span>تغيير كلمة المرور</span>
+                <span>تغيير الرقم السري</span>
+            </a>
+        </nav>
+    </section>
+
+    <!-- ================================ -->
+    <!-- 👔 ADMIN PANEL PAGE (NEW!) -->
+    <!-- ================================ -->
+    <section id="adminPage" class="page">
+        <header class="page-header" style="background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);">
+            <h2><i class="fas fa-user-shield"></i> لوحة تحكم المدير</h2>
+            <p style="color: rgba(255,255,255,0.8); margin-top: 5px;">إدارة الموظفين والنظام</p>
+        </header>
+
+        <div class="admin-container" style="max-width: 1200px; margin: 30px auto;">
+            
+            <!-- Admin Stats Cards -->
+            <div class="admin-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                <div class="stat-card" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;">
+                    <i class="fas fa-users" style="font-size: 2rem; opacity: 0.9;"></i>
+                    <span class="stat-value" id="adminTotalEmp" style="color: white;">0</span>
+                    <span class="stat-label" style="color: rgba(255,255,255,0.8);">إجمالي الموظفين</span>
+                </div>
+                
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+                    <i class="fas fa-user-check" style="font-size: 2rem; opacity: 0.9;"></i>
+                    <span class="stat-value" id="adminTodayCheckIns" style="color: white;">0</span>
+                    <span class="stat-label" style="color: rgba(255,255,255,0.8);">حضور اليوم</span>
+                </div>
+                
+                <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">
+                    <i class="fas fa-user-clock" style="font-size: 2rem; opacity: 0.9;"></i>
+                    <span class="stat-value" id="adminTodayCheckOuts" style="color: white;">0</span>
+                    <span class="stat-label" style="color: rgba(255,255,255,0.8);">انصراف اليوم</span>
+                </div>
+                
+                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white;">
+                    <i class="fas fa-user-plus" style="font-size: 2rem; opacity: 0.9;"></i>
+                    <span class="stat-value" id="adminNewThisMonth" style="color: white;">0</span>
+                    <span class="stat-label" style="color: rgba(255,255,255,0.8);">مسجلين هذا الشهر</span>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions" style="display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="document.getElementById('addEmployeeModal').style.display='flex'">
+                    <i class="fas fa-user-plus"></i> إضافة موظف
+                </button>
+                <button class="btn btn-outline" onclick="admin.exportEmployeesList()">
+                    <i class="fas fa-download"></i> تصدير القائمة
+                </button>
+                <button class="btn btn-outline" onclick="admin.refreshData()">
+                    <i class="fas fa-sync-alt"></i> تحديث البيانات
+                </button>
+            </div>
+
+            <!-- Employees Table -->
+            <div class="employees-table-container" style="background: var(--bg-primary); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.1rem;"><i class="fas fa-users"></i> قائمة الموظفين</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="searchEmployee" placeholder="بحث بالاسم أو الكود..." 
+                               style="padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px; width: 250px;">
+                    </div>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table class="admin-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: var(--bg-tertiary);">
+                                <th style="padding: 12px; text-align: right;">#</th>
+                                <th style="padding: 12px; text-align: right;">الكود</th>
+                                <th style="padding: 12px; text-align: right;">الاسم</th>
+                                <th style="padding: 12px; text-align: right;">البريد</th>
+                                <th style="padding: 12px; text-align: right;">الحالة</th>
+                                <th style="padding: 12px; text-align: right;">تاريخ التسجيل</th>
+                                <th style="padding: 12px; text-align: center;">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminEmployeesTableBody">
+                            <tr>
+                                <td colspan="7" style="padding: 40px; text-align: center; color: var(--text-muted);">
+                                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; display: block; margin: 0 auto 10px;"></i>
+                                    جاري تحميل البيانات...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <a href="#" class="nav-link active" data-page="dashboardPage">
+                <i class="fas fa-home"></i>
+                <span>الرئيسية</span>
+            </a>
+            <a href="#" class="nav-link" data-page="adminPage">
+                <i class="fas fa-user-shield"></i>
+                <span>لوحة التحكم</span>
+            </a>
+            <a href="#" class="nav-link" data-page="changePasswordPage">
+                <i class="fas fa-key"></i>
+                <span>تغيير الرقم السري</span>
             </a>
         </nav>
     </section>
@@ -574,17 +697,20 @@
 </div><!-- End App Container -->
 
 <!-- ============================================ -->
-<!-- 🔧 MODALS -->
+<!-- 🪟 MODALS -->
 <!-- ============================================ -->
 
-<!-- Force Password Change Modal -->
+<!-- Force Password Modal -->
 <div class="modal" id="forcePasswordModal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 450px;">
         <div class="modal-header">
             <h3><i class="fas fa-shield-alt"></i> تحديث أمني مطلوب</h3>
         </div>
         <div class="modal-body">
-            <p>يجب عليك تغيير كلمة المرور المؤقتة قبل المتابعة.</p>
+            <p style="margin-bottom: 20px; color: var(--text-secondary);">
+                <i class="fas fa-info-circle" style="color: var(--warning);"></i>
+                يجب عليك تغيير كلمة المرور المؤقتة قبل المتابعة.
+            </p>
             
             <form id="forcePasswordForm">
                 <div class="input-group">
@@ -593,8 +719,7 @@
                 </div>
                 
                 <button type="submit" class="btn btn-primary btn-block">
-                    <i class="fas fa-save"></i>
-                    حفظ وتسجيل الوجه
+                    <i class="fas fa-save"></i> حفظ وتسجيل الوجه
                 </button>
             </form>
         </div>
@@ -610,11 +735,12 @@
         </div>
         <div class="modal-body">
             <button class="btn btn-outline btn-block mb-3" id="markAllReadBtn">
-                <i class="fas fa-check-double"></i>
-                تعيين الكل كمقروء
+                <i class="fas fa-check-double"></i> تعيين الكل كمقروء
             </button>
             <div id="notificationsList" class="notifications-list">
-                <!-- Notifications will be loaded here -->
+                <p style="text-align: center; color: var(--text-muted); padding: 20px;">
+                    لا توجد إشعارات
+                </p>
             </div>
         </div>
     </div>
@@ -660,6 +786,49 @@
                     <span class="toggle-slider"></span>
                 </label>
             </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border-light); margin: 20px 0;">
+
+            <button class="btn btn-danger btn-block" onclick="if(confirm('هل تريد تسجيل الخروج؟')) auth.logout();">
+                <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Employee Modal -->
+<div class="modal" id="addEmployeeModal" style="display: none;">
+    <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-user-plus"></i> إضافة موظف جديد</h3>
+            <button class="close-modal" onclick="this.closest('.modal').style.display='none'">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="addEmployeeModalForm">
+                <div class="input-group">
+                    <label><i class="fas fa-user"></i> الاسم الكامل</label>
+                    <input type="text" id="newEmpName" required placeholder="الاسم الثلاثي">
+                </div>
+                
+                <div class="input-group">
+                    <label><i class="fas fa-envelope"></i> البريد الإلكتروني</label>
+                    <input type="email" id="newEmpEmail" placeholder="example@email.com">
+                </div>
+                
+                <div class="input-group">
+                    <label><i class="fas fa-lock"></i> كلمة المرور المؤقتة</label>
+                    <input type="password" id="newEmpPassword" required minlength="4" value="">
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-plus"></i> إنشاء الحساب
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="this.closest('.modal').style.display='none'" style="flex: 1;">
+                        إلغاء
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -668,91 +837,73 @@
 <div id="toastContainer" class="toast-container"></div>
 
 <!-- ============================================ -->
-<!-- 📜 SCRIPTS - ORDER MATTERS! -->
+<!-- 📜 SCRIPTS -->
 <!-- ============================================ -->
 
-<!-- ⚠️ IMPORTANT: Load order is critical -->
-
-<!-- 1. Configuration (MUST BE FIRST) -->
+<!-- Config (MUST BE FIRST) -->
 <script src="config.js"></script>
 
-<!-- 2. Utilities & Helpers -->
+<!-- Utilities -->
 <script src="utils.js"></script>
 
-<!-- 3. Validator -->
+<!-- Validator -->
 <script src="validator.js"></script>
 
-<!-- 4. UI Manager -->
+<!-- UI Manager -->
 <script src="ui-manager.js"></script>
 
-<!-- 5. Database Client (Supabase) -->
+<!-- Database Client -->
 <script src="supabase-client.js"></script>
 
-<!-- 6. Authentication Manager -->
+<!-- Authentication -->
 <script src="auth.js"></script>
 
-<!-- 7. Face Recognition Manager -->
+<!-- Face Recognition -->
 <script src="face-recognition.js"></script>
 
-<!-- 8. Attendance Manager -->
+<!-- Attendance -->
 <script src="attendance.js"></script>
 
-<!-- 9. Reports Manager -->
+<!-- Reports -->
 <script src="reports.js"></script>
 
-<!-- 10. Admin Panel (if exists) -->
+<!-- Admin Panel -->
 <script src="admin.js"></script>
 
-<!-- 11. Main Application Controller (MUST BE LAST) -->
+<!-- Main App Controller (MUST BE LAST) -->
 <script src="app.js"></script>
 
-<!-- 🔥 CRITICAL FIX: Error Recovery Script -->
+<!-- Error Recovery & Helpers -->
 <script>
-// Global error handler for loading failures
+// Global error handler
 window.addEventListener('error', function(e) {
-    console.error('❌ Global error:', e.message, e.filename, e.lineno);
-    
-    // Show error in loading screen if still visible
-    const loadingScreen = document.getElementById('loadingScreen');
-    if (loadingScreen && loadingScreen.style.display !== 'none') {
-        showLoadingError(e.message || 'حدث خطأ غير متوقع');
+    console.error('❌ Error:', e.message);
+    const loading = document.getElementById('loadingScreen');
+    if (loading && loading.style.display !== 'none') {
+        showLoadingError(e.message || 'حدث خطأ');
     }
 });
 
-// Retry loading function
-function retryLoading() {
-    hideLoadingError();
-    window.location.reload();
-}
+function retryLoading() { location.reload(); }
 
-// Skip face recognition and continue
 function skipFaceRecognition() {
-    console.log('⚠️ Skipping face recognition...');
     window.skipFaceApi = true;
     hideLoadingError();
-    
-    // Try to initialize app without face recognition
-    if (typeof app !== 'undefined' && typeof app.init === 'function') {
-        app.init();
-    } else {
-        showLoadingError('لا يمكن تهيئة التطبيق - يرجى تحديث الصفحة');
-    }
+    if (typeof app !== 'undefined') app.init();
 }
 
-function showLoadingError(message) {
-    const errorDiv = document.getElementById('loadingError');
-    const errorMsg = document.getElementById('errorMessage');
-    if (errorDiv && errorMsg) {
-        errorMsg.textContent = message;
-        errorDiv.style.display = 'block';
+function showLoadingError(msg) {
+    const el = document.getElementById('loadingError');
+    const msgEl = document.getElementById('errorMessage');
+    if (el && msgEl) {
+        msgEl.textContent = msg;
+        el.style.display = 'block';
     }
 }
 
 function hideLoadingError() {
-    const errorDiv = document.getElementById('loadingError');
-    if (errorDiv) {
-        errorDiv.style.display = 'none';
-    }
+    const el = document.getElementById('loadingError');
+    if (el) el.style.display = 'none';
 }
 </script>
 
