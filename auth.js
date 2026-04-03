@@ -1,16 +1,16 @@
 /**
  * ============================================
- * 🗄️ AXENTRO SUPABASE CLIENT v4.0
- * ✅ Database Connection & Operations
+ * 🔐 AXENTRO AUTHENTICATION v4.0
+ * ✅ Login, Register & Session Management
  * ============================================
  */
 
-class SupabaseClient {
+class AuthManager {
     constructor() {
-        this.client = null;
-        this.isConnected = false;
         this.currentUser = null;
-        this.retryCount = 0;
+        this.sessionTimeout = null;
+        this.loginAttempts = 0;
+        this.lockoutUntil = null;
         
         this.init();
     }
@@ -20,839 +20,667 @@ class SupabaseClient {
     // ============================================
 
     /**
-     * Initialize Supabase client
+     * Initialize authentication manager
      */
     init() {
-        try {
-            // Create Supabase client
-            this.client = window.supabase.createClient(
-                AppConfig.supabase.url,
-                AppConfig.supabase.anonKey,
-                {
-                    auth: {
-                        autoRefreshToken: true,
-                        persistSession: true,
-                        detectSessionInUrl: false
-                    },
-                    db: {
-                        schema: 'public'
-                    },
-                    global: {
-                        headers: {
-                            'x-app-name': 'axentro-attendance',
-                            'x-app-version': AppConfig.app.version
-                        }
-                    }
-                }
-            );
-
-            this.setupAuthListeners();
-            this.isConnected = true;
-            
-            console.log('✅ Supabase client initialized successfully');
-            
-        } catch (error) {
-            console.error('❌ Failed to initialize Supabase client:', error);
-            this.isConnected = false;
-        }
+        // Check for existing session
+        this.checkExistingSession();
+        
+        // Setup activity tracking
+        this.setupActivityTracking();
+        
+        console.log('✅ Auth Manager initialized');
     }
 
     /**
-     * Setup authentication state listeners
+     * Check for existing valid session
      */
-    setupAuthListeners() {
-        if (!this.client) return;
-
-        // Listen for auth changes
-        this.client.auth.onAuthStateChange((event, session) => {
-            console.log(`🔐 Auth event: ${event}`);
+    async checkExistingSession() {
+        const sessionData = Utils.loadFromStorage(Constants.storageKeys.USER_SESSION);
+        
+        if (sessionData?.user) {
+            const expiresAt = new Date(sessionData.expiresAt);
             
-            switch (event) {
-                case 'SIGNED_IN':
-                    this.handleSignIn(session);
-                    break;
-                    
-                case 'SIGNED_OUT':
-                    this.handleSignOut();
-                    break;
-                    
-                case 'TOKEN_REFRESHED':
-                    console.log('✅ Token refreshed');
-                    break;
-                    
-                case 'USER_UPDATED':
-                    console.log('👤 User updated');
-                    break;
+            if (expiresAt > new Date()) {
+                // Session still valid
+                this.currentUser = sessionData.user;
+                db.currentUser = sessionData.user;
+                
+                console.log(`✅ Session restored for: ${this.currentUser.name}`);
+                return true;
+            } else {
+                // Session expired
+                this.clearSession();
+                return false;
             }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Setup user activity tracking for session timeout
+     */
+    setupActivityTracking() {
+        // Track various user activities
+        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+        
+        events.forEach(event => {
+            document.addEventListener(event, () => this.updateLastActivity(), { passive: true });
         });
+
+        // Check session periodically (every minute)
+        setInterval(() => this.checkSessionTimeout(), 60000);
     }
 
     /**
-     * Handle sign in event
-     * @param {object} session - Auth session
+     * Update last activity timestamp
      */
-    handleSignIn(session) {
-        if (session?.user) {
-            this.currentUser = session.user;
-            Utils.saveToStorage(Constants.storageKeys.USER_SESSION, {
-                user: session.user,
-                accessToken: session.access_token,
-                expiresAt: session.expires_at
-            });
+    updateLastActivity() {
+        Utils.saveToStorage(Constants.storageKeys.LAST_ACTIVITY, Date.now());
+    }
+
+    /**
+     * Check if session has timed out
+     */
+    checkSessionTimeout() {
+        if (!this.currentUser) return;
+
+        const lastActivity = Utils.loadFromStorage(Constants.storageKeys.LAST_ACTIVITY);
+        const timeout = AppConfig.security.session.timeout;
+        
+        if (lastActivity && (Date.now() - lastActivity) > timeout) {
+            console.log('⏰ Session timed out');
+            this.logout();
+            ui.showWarning('انتهت الجلسة - يرجى تسجيل الدخول مجدداً');
+            
+            // Redirect to login
+            ui.navigateTo('loginPage');
         }
     }
 
-    /**
-     * Handle sign out event
-     */
-    handleSignOut() {
-        this.currentUser = null;
-        Utils.removeFromStorage(Constants.storageKeys.USER_SESSION);
-    }
-
     // ============================================
-    // 🔐 AUTHENTICATION OPERATIONS
+    // 🔑 LOGIN OPERATIONS
     // ============================================
 
     /**
-     * Sign in with employee code and password
-     * @param {string} code - Employee code
-     * @param {string} password - Password
-     * @returns {Promise<object>} Result with user data or error
+     * Handle login form submission
+     * @param {Event} e - Form submit event
      */
-    async signIn(code, password) {
+    async handleLogin(e) {
+        e.preventDefault();
+        
+        const form = e.target;
+        const code = document.getElementById('loginCode').value;
+        const password = document.getElementById('loginPassword').value;
+        const rememberMe = document.getElementById('rememberMe').checked;
+
+        // Validate form
+        const validation = validator.validateForm(form, {
+            code: ['required', 'employeeCode'],
+            password: ['required', 'password']
+        });
+
+        if (!validation.isValid) return;
+
+        // Check if account is locked out
+        if (this.isAccountLocked()) {
+            const remainingTime = Math.ceil((this.lockoutUntil - Date.now()) / 1000 / 60);
+            ui.showError(`الحساب مغلق مؤقتاً - حاول بعد ${remainingTime} دقيقة`);
+            return;
+        }
+
+        // Show loading state
+        ui.showButtonLoading(document.getElementById('loginBtn'), 'جاري تسجيل الدخول...');
+
         try {
-            // Custom sign in using RPC or direct query
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*')
-                .eq('code', code.toUpperCase().trim())
-                .eq('password', password)
-                .eq('is_deleted', false)
-                .single();
+            // Attempt sign in
+            const result = await db.signIn(code, password);
 
-            if (error) throw error;
+            if (result.success) {
+                // Reset login attempts on success
+                this.resetLoginAttempts();
 
-            if (!data) {
-                return {
-                    success: false,
-                    error: ErrorCodes.AUTH_INVALID_CREDENTIALS.message,
-                    code: ErrorCodes.AUTH_INVALID_CREDENTIALS.code
-                };
+                // Handle first-time login (password change required)
+                if (result.requiresPasswordChange) {
+                    this.handleFirstTimeLogin(result.user);
+                    return;
+                }
+
+                // Successful login
+                await this.onLoginSuccess(result.user, rememberMe);
+                
+                ui.playSuccessFeedback();
+                ui.showSuccess(SuccessMessages.LOGIN_SUCCESS);
+                
+                // Navigate to dashboard
+                setTimeout(() => {
+                    ui.navigateTo('dashboardPage');
+                    app.initializeDashboard();
+                }, 1000);
+
+            } else {
+                // Failed login
+                this.handleLoginFailure(result.error);
             }
-
-            // Check if password change is required
-            if (data.is_first_login && !data.is_admin) {
-                return {
-                    success: true,
-                    requiresPasswordChange: true,
-                    user: data
-                };
-            }
-
-            // Set current user context for RLS
-            await this.setUserContext(data);
-
-            return {
-                success: true,
-                user: data
-            };
 
         } catch (error) {
-            console.error('Sign in error:', error);
-            return {
-                success: false,
-                error: ErrorCodes.AUTH_INVALID_CREDENTIALS.message,
-                details: error.message
-            };
+            console.error('Login error:', error);
+            ui.showError(ErrorCodes.UNKNOWN_ERROR.message);
+        } finally {
+            ui.hideButtonLoading(document.getElementById('loginBtn'));
         }
     }
 
     /**
-     * Set user context for Row Level Security
+     * Handle successful login
+     * @param {object} user - User data
+     * @param {boolean} rememberMe - Remember me option
+     */
+    async onLoginSuccess(user, rememberMe) {
+        this.currentUser = user;
+        db.currentUser = user;
+
+        // Save session
+        const sessionDuration = rememberMe 
+            ? AppConfig.security.session.rememberMeDuration 
+            : AppConfig.security.session.timeout;
+
+        Utils.saveToStorage(Constants.storageKeys.USER_SESSION, {
+            user: user,
+            accessToken: 'local_session',
+            expiresAt: new Date(Date.now() + sessionDuration).toISOString()
+        });
+
+        // Save remember me preference
+        Utils.saveToStorage(Constants.storageKeys.REMEMBER_ME, rememberMe);
+
+        // Update last activity
+        this.updateLastActivity();
+    }
+
+    /**
+     * Handle login failure
+     * @param {string} errorMessage - Error message
+     */
+    handleLoginFailure(errorMessage) {
+        this.incrementLoginAttempts();
+        
+        ui.playErrorFeedback();
+        ui.showError(errorMessage);
+
+        // Shake the form
+        const form = document.getElementById('loginForm');
+        form.style.animation = 'shake 0.5s ease';
+        setTimeout(() => form.style.animation = '', 500);
+    }
+
+    /**
+     * Handle first-time login (force password change)
      * @param {object} user - User data
      */
-    async setUserContext(user) {
+    handleFirstTimeLogin(user) {
+        this.currentUser = user;
+        ui.openModal('forcePasswordModal');
+    }
+
+    // ============================================
+    // 📝 REGISTRATION OPERATIONS
+    // ============================================
+
+    /**
+     * Handle registration form submission
+     * @param {Event} e - Form submit event
+     */
+    async handleRegister(e) {
+        e.preventDefault();
+
+        const form = e.target;
+        const name = document.getElementById('regName').value;
+        const email = document.getElementById('regEmail').value;
+        const password = document.getElementById('regPassword').value;
+
+        // Get captured face descriptor from session
+        const faceDescriptor = Utils.loadFromSession(Constants.sessionKeys.TEMP_FACE_DESCRIPTOR);
+
+        // Validate form
+        const validation = validator.validateForm(form, {
+            name: ['required', 'name'],
+            email: ['email'], // Optional
+            password: ['required', 'password']
+        });
+
+        if (!validation.isValid) return;
+
+        // Check if face was captured
+        if (!faceDescriptor) {
+            ui.showWarning('يرجى التقاط الوجه أولاً');
+            return;
+        }
+
+        // Show loading state
+        ui.showButtonLoading(document.getElementById('registerBtn'), 'جاري إنشاء الحساب...');
+
         try {
-            // This would typically be done via a server-side function
-            // For now, we'll store the context locally
-            this.currentUser = user;
-            
-            // Store in session for API calls
-            Utils.saveToSession('current_user', {
-                code: user.code,
-                isAdmin: user.is_admin
+            // Register employee
+            const result = await db.registerEmployee({
+                name,
+                email: email || null,
+                password,
+                faceDescriptor
             });
 
-        } catch (error) {
-            console.error('Error setting user context:', error);
-        }
-    }
+            if (result.success) {
+                ui.playSuccessFeedback();
+                ui.showSuccess(SuccessMessages.REGISTER_SUCCESS);
+                
+                // Clear temporary face descriptor
+                Utils.removeFromSession(Constants.sessionKeys.TEMP_FACE_DESCRIPTOR);
 
-    /**
-     * Sign out current user
-     * @returns {Promise<boolean>} Success status
-     */
-    async signOut() {
-        try {
-            // Clear local storage
-            Utils.removeFromStorage(Constants.storageKeys.USER_SESSION);
-            Utils.removeFromStorage(Constants.storageKeys.REMEMBER_ME);
-            Utils.removeFromSession('current_user');
-            
-            this.currentUser = null;
-            
-            ui.playSound('logoutSound', 0.6);
-            
-            return true;
+                // Show generated credentials
+                await ui.showConfirmation({
+                    title: '✅ تم إنشاء الحساب بنجاح',
+                    message: `
+                        <div style="text-align: left; direction: ltr;">
+                            <p><strong>الكود:</strong> <span style="color: var(--primary-400); font-size: 18px;">${result.employee.code}</span></p>
+                            <p><strong>كلمة السر:</strong> <span style="color: var(--success-500); font-size: 18px;">${result.generatedPassword}</span></p>
+                            <p style="margin-top: 10px; color: var(--text-muted); font-size: 12px;">
+                                ⚠️ تم إرسال هذه البيانات إلى بريدك الإلكتروني
+                            </p>
+                        </div>
+                    `,
+                    confirmText: 'حسناً، سجل دخولي الآن',
+                    type: 'success'
+                }).then(() => {
+                    // Navigate to login
+                    ui.navigateTo('loginPage');
+                    
+                    // Pre-fill the code field
+                    document.getElementById('loginCode').value = result.employee.code;
+                });
 
-        } catch (error) {
-            console.error('Sign out error:', error);
-            return false;
-        }
-    }
-
-    /**
-     * Register new employee
-     * @param {object} employeeData - Employee data
-     * @returns {Promise<object>} Result with new employee or error
-     */
-    async registerEmployee(employeeData) {
-        try {
-            // Generate unique code if not provided
-            const code = employeeData.code || this.generateEmployeeCode();
-            
-            // Generate secure password if not provided
-            const password = employeeData.password || Utils.generatePassword(10);
-
-            const newEmployee = {
-                code: code.toUpperCase(),
-                name: employeeData.name.trim(),
-                email: employeeData.email || null,
-                password: password,
-                face_descriptor: employeeData.faceDescriptor || null,
-                is_admin: false,
-                is_first_login: true
-            };
-
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .insert(newEmployee)
-                .select()
-                .single();
-
-            if (error) {
-                // Check for unique constraint violation
-                if (error.code === '23505') {
-                    return {
-                        success: false,
-                        error: 'هذا الكود مسجل مسبقاً',
-                        code: 'DUPLICATE_CODE'
-                    };
-                }
-                throw error;
+            } else {
+                ui.showError(result.error || 'فشل في إنشاء الحساب');
             }
-
-            // Send welcome emails via Google Apps Script
-            await this.sendNewEmployeeEmails({
-                ...newEmployee,
-                password: password // Send generated password to email service
-            });
-
-            return {
-                success: true,
-                employee: data,
-                generatedPassword: password
-            };
 
         } catch (error) {
             console.error('Registration error:', error);
-            return {
-                success: false,
-                error: 'فشل في إنشاء الحساب',
-                details: error.message
-            };
+            ui.showError(ErrorCodes.UNKNOWN_ERROR.message);
+        } finally {
+            ui.hideButtonLoading(document.getElementById('registerBtn'));
         }
-    }
-
-    /**
-     * Generate unique employee code
-     * @returns {string} Generated code
-     */
-    generateEmployeeCode() {
-        const prefix = 'AX';
-        const year = new Date().getFullYear().toString().slice(-2);
-        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-        return `${prefix}${year}${random}`;
     }
 
     // ============================================
-    // 👤 EMPLOYEE OPERATIONS
+    // 🔐 PASSWORD MANAGEMENT
     // ============================================
 
     /**
-     * Get employee by code
-     * @param {string} code - Employee code
-     * @returns {Promise<object|null>} Employee data or null
+     * Handle force password change (first time login)
+     * @param {Event} e - Form submit event
      */
-    async getEmployeeByCode(code) {
-        try {
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*')
-                .eq('code', code.toUpperCase().trim())
-                .eq('is_deleted', false)
-                .single();
+    async handleForcePasswordChange(e) {
+        e.preventDefault();
 
-            if (error) throw error;
-            return data;
+        const newPassword = document.getElementById('forceNewPassword').value;
+        const confirmPassword = document.getElementById('confirmForcePassword')?.value || newPassword;
 
-        } catch (error) {
-            console.error('Get employee error:', error);
-            return null;
+        // Validate password
+        const validation = validator.validateField(newPassword, ['required', 'password']);
+        if (!validation.valid) {
+            ui.showError(validation.message);
+            return;
         }
-    }
 
-    /**
-     * Get all employees (admin only)
-     * @returns {Promise<Array>} Array of employees
-     */
-    async getAllEmployees() {
-        try {
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*')
-                .eq('is_deleted', false)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            return data || [];
-
-        } catch (error) {
-            console.error('Get all employees error:', error);
-            return [];
+        if (newPassword !== confirmPassword) {
+            ui.showError(ErrorCodes.VALIDATION_PASSWORD_MISMATCH.message);
+            return;
         }
-    }
 
-    /**
-     * Get total employees count
-     * @returns {Promise<number>} Count
-     */
-    async getEmployeesCount() {
+        ui.showButtonLoading(e.target.querySelector('.btn'));
+
         try {
-            const { count, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*', { count: 'exact', head: true })
-                .eq('is_deleted', false);
+            const result = await db.changePassword(
+                this.currentUser.code,
+                this.currentUser.password, // Current temporary password
+                newPassword
+            );
 
-            if (error) throw error;
-            return count || 0;
-
-        } catch (error) {
-            console.error('Count error:', error);
-            return 0;
-        }
-    }
-
-    /**
-     * Update employee profile
-     * @param {string} code - Employee code
-     * @param {object} updates - Fields to update
-     * @returns {Promise<object>} Result
-     */
-    async updateEmployee(code, updates) {
-        try {
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .update(updates)
-                .eq('code', code.toUpperCase().trim())
-                .select()
-                .single();
-
-            if (error) throw error;
-            
-            return { success: true, data };
-
-        } catch (error) {
-            console.error('Update employee error:', error);
-            return { 
-                success: false, 
-                error: error.message 
-            };
-        }
-    }
-
-    /**
-     * Change employee password
-     * @param {string} code - Employee code
-     * @param {string} currentPassword - Current password
-     * @param {string} newPassword - New password
-     * @returns {Promise<object>} Result
-     */
-    async changePassword(code, currentPassword, newPassword) {
-        try {
-            // Verify current password first
-            const { data: employee, error: verifyError } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .select('*')
-                .eq('code', code.toUpperCase().trim())
-                .eq('password', currentPassword)
-                .single();
-
-            if (verifyError || !employee) {
-                return {
-                    success: false,
-                    error: 'كلمة المرور الحالية غير صحيحة'
-                };
+            if (result.success) {
+                ui.playSuccessFeedback();
+                ui.showSuccess(SuccessMessages.PASSWORD_CHANGED);
+                
+                ui.closeModal('forcePasswordModal');
+                
+                // Complete login with new password
+                const loginResult = await db.signIn(this.currentUser.code, newPassword);
+                if (loginResult.success) {
+                    await this.onLoginSuccess(loginResult.user, true);
+                    ui.navigateTo('dashboardPage');
+                    app.initializeDashboard();
+                }
+            } else {
+                ui.showError(result.error);
             }
 
-            // Update password
-            const { error: updateError } = await this.client
-                .from(AppConfig.supabase.tables.employees)
-                .update({ 
-                    password: newPassword,
-                    is_first_login: false,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('code', code);
+        } catch (error) {
+            console.error('Password change error:', error);
+            ui.showError('فشل تغيير كلمة المرور');
+        } finally {
+            ui.hideButtonLoading(e.target.querySelector('.btn'));
+        }
+    }
 
-            if (updateError) throw updateError;
+    /**
+     * Handle normal password change
+     * @param {Event} e - Form submit event
+     */
+    async handleChangePassword(e) {
+        e.preventDefault();
 
-            return { success: true };
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        // Validate all fields
+        const validation = validator.validateForm(e.target, {
+            currentPassword: ['required'],
+            newPassword: ['required', 'password'],
+            confirmPassword: [`match:newPassword`]
+        });
+
+        if (!validation.isValid) return;
+
+        ui.showButtonLoading(document.getElementById('changePasswordBtn'));
+
+        try {
+            const result = await db.changePassword(
+                this.currentUser.code,
+                currentPassword,
+                newPassword
+            );
+
+            if (result.success) {
+                ui.playSuccessFeedback();
+                ui.showSuccess(SuccessMessages.PASSWORD_CHANGED);
+                
+                // Clear form
+                e.target.reset();
+                
+                // Update current user's password locally
+                this.currentUser.password = newPassword;
+
+            } else {
+                ui.showError(result.error);
+                ui.playErrorFeedback();
+            }
 
         } catch (error) {
             console.error('Change password error:', error);
-            return {
-                success: false,
-                error: 'فشل تغيير كلمة المرور'
-            };
+            ui.showError('فشل تغيير كلمة المرور');
+        } finally {
+            ui.hideButtonLoading(document.getElementById('changePasswordBtn'));
         }
     }
 
     /**
-     * Request password reset
-     * @param {string} code - Employee code
-     * @returns {Promise<object>} Result
+     * Handle forgot password request
+     * @param {Event} e - Form submit event
      */
-    async requestPasswordReset(code) {
+    async handleForgotPassword(e) {
+        e.preventDefault();
+
+        const code = document.getElementById('forgotCode').value.trim().toUpperCase();
+
+        // Validate
+        const validation = validator.validateField(code, ['required', 'employeeCode']);
+        if (!validation.valid) {
+            ui.showError(validation.message);
+            return;
+        }
+
+        ui.showButtonLoading(document.getElementById('forgotPasswordBtn'));
+
         try {
-            const employee = await this.getEmployeeByCode(code);
+            const result = await db.requestPasswordReset(code);
+
+            if (result.success) {
+                ui.playSuccessFeedback();
+                ui.showSuccess(SuccessMessages.PASSWORD_RESET_SENT);
+                
+                // Go back to login after delay
+                setTimeout(() => {
+                    ui.navigateTo('loginPage');
+                }, 2000);
+            } else {
+                ui.showError(result.error);
+            }
+
+        } catch (error) {
+            console.error('Forgot password error:', error);
+            ui.showError('فشل في طلب استعادة كلمة المرور');
+        } finally {
+            ui.hideButtonLoading(document.getElementById('forgotPasswordBtn'));
+        }
+    }
+
+    // ============================================
+    // 🚪 LOGOUT
+    // ============================================
+
+    /**
+     * Handle logout
+     */
+    async logout() {
+        const confirmed = await ui.showConfirmation({
+            title: 'تسجيل الخروج',
+            message: 'هل أنت متأكد من تسجيل الخروج؟',
+            confirmText: 'نعم، خروج',
+            cancelText: 'إلغاء',
+            type: 'danger'
+        });
+
+        if (confirmed) {
+            await this.performLogout();
+        }
+    }
+
+    /**
+     * Perform logout operations
+     */
+    async performLogout() {
+        try {
+            // Sign out from database client
+            await db.signOut();
             
-            if (!employee) {
-                return {
-                    success: false,
-                    error: 'الكود غير موجود'
-                };
-            }
-
-            if (!employee.email) {
-                return {
-                    success: false,
-                    error: 'لا يوجد بريد إلكتروني مسجل لهذا الكود'
-                };
-            }
-
-            // Generate new password
-            const newPassword = Utils.generatePassword(10);
-
-            // Update password in database
-            await this.updateEmployee(code, { password: newPassword });
-
-            // Send email with new password
-            await this.sendPasswordResetEmail({
-                code: code,
-                name: employee.name,
-                email: employee.email,
-                password: newPassword
-            });
-
-            return { success: true };
-
-        } catch (error) {
-            console.error('Password reset error:', error);
-            return {
-                success: false,
-                error: 'فشل في إرسال كلمة المرور الجديدة'
-            };
-        }
-    }
-
-    // ============================================
-    // 📊 ATTENDANCE OPERATIONS
-    // ============================================
-
-    /**
-     * Record attendance (check-in/check-out)
-     * @param {object} attendanceData - Attendance record data
-     * @returns {Promise<object>} Result
-     */
-    async recordAttendance(attendanceData) {
-        try {
-            // Validate attendance data
-            const validation = validator.validateAttendanceData(attendanceData);
-            if (!validation.isValid) {
-                return {
-                    success: false,
-                    error: 'بيانات الحضور غير صحيحة',
-                    details: validation.errors
-                };
-            }
-
-            // Prepare attendance record
-            const record = {
-                employee_code: attendanceData.employee_code.toUpperCase(),
-                employee_name: attendanceData.employee_name,
-                type: attendanceData.type, // 'حضور' or 'انصراف'
-                location_link: attendanceData.locationLink || null,
-                shift: attendanceData.shift || 'لم يتم التحديد',
-                hours_worked: attendanceData.hoursWorked || null,
-                overtime: attendanceData.overtime || '0 دقيقة',
-                ip_address: await this.getClientIP(),
-                user_agent: navigator.userAgent,
-                gps_accuracy: attendanceData.gpsAccuracy || null,
-                attendance_image_url: attendanceData.imageUrl || null
-            };
-
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.attendance)
-                .insert(record)
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            // Send notification email
-            await this.sendAttendanceAlert({
-                ...record,
-                datetime: Utils.formatDate(new Date(), 'datetime')
-            });
-
-            return {
-                success: true,
-                record: data
-            };
-
-        } catch (error) {
-            console.error('Record attendance error:', error);
-            return {
-                success: false,
-                error: 'فشل تسجيل الحضور',
-                details: error.message
-            };
-        }
-    }
-
-    /**
-     * Get today's attendance for employee
-     * @param {string} employeeCode - Employee code
-     * @returns {Promise<Array>} Today's records
-     */
-    async getTodayAttendance(employeeCode) {
-        try {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            // Clear local session
+            this.clearSession();
             
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.attendance)
-                .select('*')
-                .eq('employee_code', employeeCode.toUpperCase())
-                .gte('created_at', today.toISOString())
-                .lt('created_at', tomorrow.toISOString())
-                .order('created_at', { ascending: true });
-
-            if (error) throw error;
-            return data || [];
+            // UI feedback
+            ui.playSound('logoutSound', 0.6);
+            ui.showInfo(SuccessMessages.LOGOUT_SUCCESS);
+            
+            // Navigate to login
+            ui.navigateTo('loginPage');
+            
+            // Reset forms
+            document.getElementById('loginForm')?.reset();
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById('loginPage')?.classList.add('active');
 
         } catch (error) {
-            console.error('Get today attendance error:', error);
-            return [];
+            console.error('Logout error:', error);
+            // Force clear anyway
+            this.clearSession();
+            ui.navigateTo('loginPage');
         }
     }
 
     /**
-     * Get attendance history with date range
-     * @param {string} employeeCode - Employee code
-     * @param {Date} startDate - Start date
-     * @param {Date} endDate - End date
-     * @returns {Promise<Array>} Attendance records
+     * Clear all session data
      */
-    async getAttendanceHistory(employeeCode, startDate, endDate) {
-        try {
-            const { data, error } = await this.client
-                .from(AppConfig.supabase.tables.attendance)
-                .select('*')
-                .eq('employee_code', employeeCode.toUpperCase())
-                .gte('created_at', startDate.toISOString())
-                .lte('created_at', endDate.toISOString())
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            return data || [];
-
-        } catch (error) {
-            console.error('Get attendance history error:', error);
-            return [];
-        }
-    }
-
-    /**
-     * Get monthly summary for employee
-     * @param {string} employeeCode - Employee code
-     * @param {number} month - Month (1-12)
-     * @param {number} year - Year
-     * @returns {object} Summary statistics
-     */
-    async getMonthlySummary(employeeCode, month, year) {
-        try {
-            const startDate = new Date(year, month - 1, 1);
-            const endDate = new Date(year, month, 0, 23, 59, 59);
-
-            const records = await this.getAttendanceHistory(
-                employeeCode, 
-                startDate, 
-                endDate
-            );
-
-            // Calculate statistics
-            let totalHours = 0;
-            let totalOvertime = 0;
-            let daysPresent = 0;
-            let checkIns = 0;
-            let checkOuts = 0;
-
-            records.forEach(record => {
-                if (record.type === 'حضور') {
-                    checkIns++;
-                    daysPresent++;
-                } else {
-                    checkOuts++;
-                }
-
-                // Parse hours
-                const hours = parseFloat(record.hours_worked) || 0;
-                totalHours += hours;
-
-                // Parse overtime
-                const overtimeMatch = record.overtime?.match(/[\d.]+/);
-                const overtime = overtimeMatch ? parseFloat(overtimeMatch[0]) : 0;
-                totalOvertime += overtime;
-            });
-
-            return {
-                records,
-                summary: {
-                    totalRecords: records.length,
-                    daysPresent,
-                    totalHours: parseFloat(totalHours.toFixed(2)),
-                    totalOvertime: parseFloat(totalOvertime.toFixed(2)),
-                    averageHoursPerDay: daysPresent > 0 ? parseFloat((totalHours / daysPresent).toFixed(2)) : 0,
-                    checkIns,
-                    checkOuts
-                }
-            };
-
-        } catch (error) {
-            console.error('Monthly summary error:', error);
-            return { records: [], summary: {} };
-        }
+    clearSession() {
+        this.currentUser = null;
+        db.currentUser = null;
+        
+        Utils.removeFromStorage(Constants.storageKeys.USER_SESSION);
+        Utils.removeFromStorage(Constants.storageKeys.REMEMBER_ME);
+        Utils.removeFromStorage(Constants.storageKeys.LAST_ACTIVITY);
+        Utils.removeFromSession(Constants.sessionKeys.TEMP_FACE_DESCRIPTOR);
+        Utils.removeFromSession(Constants.sessionKeys.LOGIN_ATTEMPTS);
+        Utils.removeFromSession(Constants.sessionKeys.LOCKOUT_UNTIL);
     }
 
     // ============================================
-    // 📧 EMAIL OPERATIONS (via Google Apps Script)
+    // 🔒 SECURITY METHODS
     // ============================================
 
     /**
-     * Send new employee emails
-     * @param {object} data - Employee data
+     * Increment failed login attempts
      */
-    async sendNewEmployeeEmails(data) {
-        try {
-            const response = await fetch(AppConfig.emailService.url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'sendNewEmpEmails',
-                    name: data.name,
-                    code: data.code,
-                    email: data.email || '',
-                    password: data.password
-                })
-            });
+    incrementLoginAttempts() {
+        this.loginAttempts++;
+        
+        // Store attempts in session storage
+        Utils.saveToSession(Constants.sessionKeys.LOGIN_ATTEMPTS, this.loginAttempts);
 
-            const result = await response.json();
-            console.log('Email result:', result);
-            return result.success;
-
-        } catch (error) {
-            console.error('Send email error:', error);
-            return false;
+        // Check if should lock account
+        if (this.loginAttempts >= AppConfig.security.rateLimit.maxLoginAttempts) {
+            this.lockAccount();
         }
     }
 
     /**
-     * Send attendance alert email
-     * @param {object} data - Attendance data
+     * Reset login attempts on successful login
      */
-    async sendAttendanceAlert(data) {
-        try {
-            const response = await fetch(AppConfig.emailService.url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'sendAttAlert',
-                    ...data
-                })
-            });
-
-            const result = await response.json();
-            return result.success;
-
-        } catch (error) {
-            console.error('Send attendance alert error:', error);
-            return false;
-        }
+    resetLoginAttempts() {
+        this.loginAttempts = 0;
+        this.lockoutUntil = null;
+        Utils.removeFromSession(Constants.sessionKeys.LOGIN_ATTEMPTS);
+        Utils.removeFromSession(Constants.sessionKeys.LOCKOUT_UNTIL);
     }
 
     /**
-     * Send password reset email
-     * @param {object} data - Reset data
+     * Lock account after too many failed attempts
      */
-    async sendPasswordResetEmail(data) {
-        try {
-            const response = await fetch(AppConfig.emailService.url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'sendForgotPw',
-                    ...data
-                })
-            });
+    lockAccount() {
+        this.lockoutUntil = Date.now() + AppConfig.security.rateLimit.lockoutDuration;
+        Utils.saveToSession(Constants.sessionKeys.LOCKOUT_UNTIL, this.lockoutUntil);
+        
+        console.warn(`🔒 Account locked until ${new Date(this.lockoutUntil)}`);
+    }
 
-            const result = await response.json();
-            return result.success;
-
-        } catch (error) {
-            console.error('Send password reset error:', error);
-            return false;
+    /**
+     * Check if account is currently locked
+     * @returns {boolean} Locked status
+     */
+    isAccountLocked() {
+        if (!this.lockoutUntil) {
+            // Check session storage
+            const storedLockout = Utils.loadFromSession(Constants.sessionKeys.LOCKOUT_UNTIL);
+            if (storedLockout) {
+                this.lockoutUntil = storedLockout;
+            }
         }
+
+        if (this.lockoutUntil && Date.now() < this.lockoutUntil) {
+            return true;
+        }
+
+        // Lockout period expired
+        if (this.lockoutUntil && Date.now() >= this.lockoutUntil) {
+            this.resetLoginAttempts();
+        }
+
+        return false;
     }
 
     // ============================================
-    // 🖼️ STORAGE OPERATIONS (Face Images)
+    // 👤 BIOMETRIC AUTH (Fingerprint)
     // ============================================
 
     /**
-     * Upload face image to Supabase Storage
-     * @param {string} base64Image - Base64 image string
-     * @param {string} fileName - File name
-     * @returns {Promise<string|null>} Public URL or null
+     * Attempt biometric authentication
      */
-    async uploadFaceImage(base64Image, fileName) {
-        try {
-            // Convert base64 to blob
-            const base64Response = await fetch(base64Image);
-            const blob = await base64Response.blob();
+    async attemptBiometricAuth() {
+        // Check if Web Authentication API is available
+        if (!window.PublicKeyCredential) {
+            ui.showWarning('متصفحك لا يدعم المصادقة البيومترية');
+            return;
+        }
 
-            // Check file size
-            if (blob.size > AppConfig.supabase.storage.maxFileSize) {
-                throw new Error('File too large');
+        try {
+            // Check for platform authenticator availability
+            const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+            
+            if (!available) {
+                ui.showWarning('لم يتم العثور على قارئ بصمة');
+                return;
             }
 
-            const filePath = `faces/${fileName}_${Date.now()}.jpg`;
+            ui.showInfo('ضع إصبعك على قارئ البصمة...');
 
-            const { data, error } = await this.client.storage
-                .from(AppConfig.supabase.storage.bucketName)
-                .upload(filePath, blob, {
-                    cacheControl: '3600',
-                    upsert: false
-                });
+            // In a real implementation, you would create and use WebAuthn credentials
+            // For now, we'll simulate with a prompt
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
-            if (error) throw error;
-
-            // Get public URL
-            const { publicURL, error: urlError } = this.client.storage
-                .from(AppConfig.supabase.storage.bucketName)
-                .getPublicUrl(filePath);
-
-            if (urlError) throw urlError;
-
-            return publicURL;
-
+            // For demo purposes, fall back to regular login with pre-filled code
+            ui.showInfo('سيتم استخدام تسجيل الدخول العادي');
+            
         } catch (error) {
-            console.error('Upload face image error:', error);
-            return null;
+            console.error('Biometric auth error:', error);
+            ui.showError('فشل المصادقة البيومترية');
         }
     }
 
     // ============================================
-    // 🛠️ UTILITY METHODS
+    // 📊 GETTERS & HELPERS
     // ============================================
 
     /**
-     * Get client IP address (approximate)
-     * @returns {Promise<string>} IP address
-     */
-    async getClientIP() {
-        try {
-            // Using a free IP service
-            const response = await fetch('https://api.ipify.org?format=json');
-            const data = await response.json();
-            return data.ip;
-        } catch {
-            return 'unknown';
-        }
-    }
-
-    /**
-     * Check connection status
-     * @returns {boolean} Connected status
-     */
-    isConnectedToSupabase() {
-        return this.isConnected && this.client !== null;
-    }
-
-    /**
-     * Get current user
-     * @returns {object|null} Current user object
+     * Get current authenticated user
+     * @returns {object|null} Current user or null
      */
     getCurrentUser() {
         return this.currentUser;
     }
 
     /**
-     * Execute query with retry logic
-     * @param {Function} queryFn - Query function
-     * @param {number} maxRetries - Max retry attempts
-     * @returns {Promise<*>} Query result
+     * Check if user is authenticated
+     * @returns {boolean} Authentication status
      */
-    async executeWithRetry(queryFn, maxRetries = 3) {
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-            try {
-                return await queryFn();
-            } catch (error) {
-                console.warn(`Query attempt ${attempt + 1} failed:`, error.message);
-                
-                if (attempt === maxRetries - 1) throw error;
-                
-                // Exponential backoff
-                await Utils.sleep(1000 * Math.pow(2, attempt));
-            }
-        }
+    isAuthenticated() {
+        return this.currentUser !== null;
+    }
+
+    /**
+     * Check if current user is admin
+     * @returns {boolean} Admin status
+     */
+    isAdmin() {
+        return this.currentUser?.is_admin === true;
+    }
+
+    /**
+     * Get user display name
+     * @returns {string} User name or default
+     */
+    getUserName() {
+        return this.currentUser?.name || 'موظف';
+    }
+
+    /**
+     * Get user code
+     * @returns {string} User code
+     */
+    getUserCode() {
+        return this.currentUser?.code || '';
     }
 }
 
 // Create global instance
-const db = new SupabaseClient();
+const auth = new AuthManager();
 
 // Export for use in other modules
-window.SupabaseClient = SupabaseClient;
-window.db = db;
+window.AuthManager = AuthManager;
+window.auth = auth;
