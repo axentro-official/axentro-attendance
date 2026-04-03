@@ -1,16 +1,16 @@
 /**
  * ============================================
- * 🎨 AXENTRO UI MANAGER v4.0
- * ✅ User Interface Management System
+ * 🗄️ AXENTRO SUPABASE CLIENT v4.0
+ * ✅ Database Connection & Operations
  * ============================================
  */
 
-class UIManager {
+class SupabaseClient {
     constructor() {
-        this.toastContainer = null;
-        this.loadingOverlay = null;
-        this.activeModals = [];
-        this.activePanels = [];
+        this.client = null;
+        this.isConnected = false;
+        this.currentUser = null;
+        this.retryCount = 0;
         
         this.init();
     }
@@ -20,719 +20,777 @@ class UIManager {
     // ============================================
 
     /**
-     * Initialize UI Manager
+     * Initialize Supabase client
      */
     init() {
-        // Create toast container if not exists
-        this.toastContainer = document.getElementById('toastContainer');
-        if (!this.toastContainer) {
-            this.toastContainer = document.createElement('div');
-            this.toastContainer.id = 'toastContainer';
-            this.toastContainer.className = 'toast-container';
-            document.body.appendChild(this.toastContainer);
+        try {
+            // Create Supabase client
+            this.client = window.supabase.createClient(
+                AppConfig.supabase.url,
+                AppConfig.supabase.anonKey,
+                {
+                    auth: {
+                        autoRefreshToken: true,
+                        persistSession: true,
+                        detectSessionInUrl: false
+                    },
+                    db: {
+                        schema: 'public'
+                    },
+                    global: {
+                        headers: {
+                            'x-app-name': 'axentro-attendance',
+                            'x-app-version': AppConfig.app.version
+                        }
+                    }
+                }
+            );
+
+            this.setupAuthListeners();
+            this.isConnected = true;
+            
+            console.log('✅ Supabase client initialized successfully');
+            
+        } catch (error) {
+            console.error('❌ Failed to initialize Supabase client:', error);
+            this.isConnected = false;
         }
-
-        // Initialize loading screen manager
-        this.initLoadingScreen();
-
-        // Setup global event listeners
-        this.setupGlobalListeners();
     }
 
     /**
-     * Initialize loading screen
+     * Setup authentication state listeners
      */
-    initLoadingScreen() {
-        this.loadingScreen = document.getElementById('loadingScreen');
-        this.loadProgress = document.getElementById('loadProgress');
-        this.loadStatus = document.getElementById('loadStatus');
-    }
+    setupAuthListeners() {
+        if (!this.client) return;
 
-    /**
-     * Setup global event listeners
-     */
-    setupGlobalListeners() {
-        // Handle escape key for modals/panels
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this.closeAllModals();
-                this.closeAllPanels();
+        // Listen for auth changes
+        this.client.auth.onAuthStateChange((event, session) => {
+            console.log(`🔐 Auth event: ${event}`);
+            
+            switch (event) {
+                case 'SIGNED_IN':
+                    this.handleSignIn(session);
+                    break;
+                    
+                case 'SIGNED_OUT':
+                    this.handleSignOut();
+                    break;
+                    
+                case 'TOKEN_REFRESHED':
+                    console.log('✅ Token refreshed');
+                    break;
+                    
+                case 'USER_UPDATED':
+                    console.log('👤 User updated');
+                    break;
             }
         });
-
-        // Handle click outside to close panels
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal-overlay')) {
-                this.closeModal(e.target);
-            }
-        });
     }
 
-    // ============================================
-    // 🍞 TOAST NOTIFICATIONS
-    // ============================================
-
     /**
-     * Show toast notification
-     * @param {string} message - Toast message
-     * @param {string} type - Toast type: success, error, warning, info
-     * @param {object} options - Additional options
-     * @returns {HTMLElement} Toast element
+     * Handle sign in event
+     * @param {object} session - Auth session
      */
-    showToast(message, type = 'info', options = {}) {
-        const {
-            title = '',
-            duration = AppConfig.ui.toast.defaultDuration,
-            closable = true,
-            action = null,
-            icon = true
-        } = options;
-
-        // Limit max visible toasts
-        const existingToasts = this.toastContainer.querySelectorAll('.toast:not(.removing)');
-        if (existingToasts.length >= AppConfig.ui.toast.maxVisible) {
-            this.removeToast(existingToasts[0]);
-        }
-
-        // Create toast element
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-
-        // Icon mapping
-        const icons = {
-            success: 'fas fa-check-circle',
-            error: 'fas fa-exclamation-circle',
-            warning: 'fas fa-exclamation-triangle',
-            info: 'fas fa-info-circle'
-        };
-
-        toast.innerHTML = `
-            ${icon ? `<i class="${icons[type] || icons.info}"></i>` : ''}
-            <div class="toast-content">
-                ${title ? `<div class="toast-title">${title}</div>` : ''}
-                <div class="toast-message">${message}</div>
-            </div>
-            ${action ? `<button class="btn btn-sm btn-primary toast-action">${action.text}</button>` : ''}
-            ${closable ? '<button class="toast-close"><i class="fas fa-times"></i></button>' : ''}
-        `;
-
-        // Add to container
-        this.toastContainer.appendChild(toast);
-
-        // Event listeners
-        const closeBtn = toast.querySelector('.toast-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.removeToast(toast));
-        }
-
-        const actionBtn = toast.querySelector('.toast-action');
-        if (actionBtn && action?.onClick) {
-            actionBtn.addEventListener('click', () => {
-                action.onClick();
-                this.removeToast(toast);
+    handleSignIn(session) {
+        if (session?.user) {
+            this.currentUser = session.user;
+            Utils.saveToStorage(Constants.storageKeys.USER_SESSION, {
+                user: session.user,
+                accessToken: session.access_token,
+                expiresAt: session.expires_at
             });
         }
-
-        // Auto-remove after duration
-        if (duration > 0) {
-            setTimeout(() => this.removeToast(toast), duration);
-        }
-
-        return toast;
     }
 
     /**
-     * Remove toast with animation
-     * @param {HTMLElement} toast - Toast element
+     * Handle sign out event
      */
-    removeToast(toast) {
-        if (!toast || toast.classList.contains('removing')) return;
+    handleSignOut() {
+        this.currentUser = null;
+        Utils.removeFromStorage(Constants.storageKeys.USER_SESSION);
+    }
 
-        toast.classList.add('removing');
-        setTimeout(() => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
+    // ============================================
+    // 🔐 AUTHENTICATION OPERATIONS
+    // ============================================
+
+    /**
+     * Sign in with employee code and password
+     * @param {string} code - Employee code
+     * @param {string} password - Password
+     * @returns {Promise<object>} Result with user data or error
+     */
+    async signIn(code, password) {
+        try {
+            // Custom sign in using RPC or direct query
+            const { data, error } = await this.client
+                .from(AppConfig.supabase.tables.employees)
+                .select('*')
+                .eq('code', code.toUpperCase().trim())
+                .eq('password', password)
+                .eq('is_deleted', false)
+                .single();
+
+            if (error) throw error;
+
+            if (!data) {
+                return {
+                    success: false,
+                    error: ErrorCodes.AUTH_INVALID_CREDENTIALS.message,
+                    code: ErrorCodes.AUTH_INVALID_CREDENTIALS.code
+                };
             }
-        }, 300);
-    }
 
-    /**
-     * Show success toast
-     * @param {string} message - Success message
-     */
-    showSuccess(message) {
-        return this.showToast(message, 'success', {
-            duration: AppConfig.ui.toast.successDuration
-        });
-    }
+            // Check if password change is required
+            if (data.is_first_login && !data.is_admin) {
+                return {
+                    success: true,
+                    requiresPasswordChange: true,
+                    user: data
+                };
+            }
 
-    /**
-     * Show error toast
-     * @param {string} message - Error message
-     */
-    showError(message) {
-        return this.showToast(message, 'error', {
-            duration: AppConfig.ui.toast.errorDuration
-        });
-    }
+            // Set current user context for RLS
+            await this.setUserContext(data);
 
-    /**
-     * Show warning toast
-     * @param {string} message - Warning message
-     */
-    showWarning(message) {
-        return this.showToast(message, 'warning', {
-            duration: AppConfig.ui.toast.warningDuration
-        });
-    }
-
-    /**
-     * Show info toast
-     * @param {string} message - Info message
-     */
-    showInfo(message) {
-        return this.showToast(message, 'info');
-    }
-
-    /**
-     * Clear all toasts
-     */
-    clearAllToasts() {
-        const toasts = this.toastContainer.querySelectorAll('.toast');
-        toasts.forEach(toast => this.removeToast(toast));
-    }
-
-    // ============================================
-    // ⏳ LOADING STATES
-    // ============================================
-
-    /**
-     * Update loading screen progress
-     * @param {number} percent - Progress percentage (0-100)
-     * @param {string} status - Status text
-     */
-    updateLoadingProgress(percent, status = '') {
-        if (this.loadProgress) {
-            this.loadProgress.style.width = `${Math.min(percent, 100)}%`;
-        }
-        if (this.loadStatus && status) {
-            this.loadStatus.textContent = status;
-        }
-    }
-
-    /**
-     * Hide loading screen with fade out
-     */
-    hideLoadingScreen() {
-        if (this.loadingScreen) {
-            this.loadingScreen.classList.add('fade-out');
-            setTimeout(() => {
-                this.loadingScreen.style.display = 'none';
-            }, 500);
-        }
-    }
-
-    /**
-     * Show loading overlay on an element
-     * @param {HTMLElement|string} element - Element or selector
-     * @param {string} message - Loading message
-     */
-    showElementLoading(element, message = 'جاري التحميل...') {
-        const el = typeof element === 'string' 
-            ? document.querySelector(element)
-            : element;
-        
-        if (!el) return;
-
-        el.dataset.originalContent = el.innerHTML;
-        el.innerHTML = `
-            <div class="element-loader">
-                <div class="spinner"></div>
-                <p>${message}</p>
-            </div>
-        `;
-        el.disabled = true;
-        el.classList.add('loading');
-    }
-
-    /**
-     * Hide loading overlay from element
-     * @param {HTMLElement|string} element - Element or selector
-     */
-    hideElementLoading(element) {
-        const el = typeof element === 'string'
-            ? document.querySelector(element)
-            : element;
-        
-        if (!el || !el.dataset.originalContent) return;
-
-        el.innerHTML = el.dataset.originalContent;
-        delete el.dataset.originalContent;
-        el.disabled = false;
-        el.classList.remove('loading');
-    }
-
-    /**
-     * Show button loading state
-     * @param {HTMLButtonElement} btn - Button element
-     * @param {string} loadingText - Text while loading
-     */
-    showButtonLoading(btn, loadingText = '') {
-        if (!btn) return;
-
-        const originalText = btn.querySelector('span:not(.btn-loader))')?.textContent || btn.textContent;
-        btn.dataset.originalText = originalText;
-        btn.disabled = true;
-
-        const textSpan = btn.querySelector('span:not(.btn-loader)');
-        const loaderSpan = btn.querySelector('.btn-loader');
-
-        if (textSpan && loadingText) {
-            textSpan.textContent = loadingText;
-        }
-        if (loaderSpan) {
-            loaderSpan.classList.remove('hidden');
-        }
-    }
-
-    /**
-     * Hide button loading state
-     * @param {HTMLButtonElement} btn - Button element
-     */
-    hideButtonLoading(btn) {
-        if (!btn) return;
-
-        btn.disabled = false;
-        const textSpan = btn.querySelector('span:not(.btn-loader)');
-        const loaderSpan = btn.querySelector('.btn-loader');
-
-        if (textSpan && btn.dataset.originalText) {
-            textSpan.textContent = btn.dataset.originalText;
-        }
-        if (loaderSpan) {
-            loaderSpan.classList.add('hidden');
-        }
-    }
-
-    // ============================================
-    // 🪟 MODALS
-    // ============================================
-
-    /**
-     * Open modal
-     * @param {string} modalId - Modal ID or selector
-     */
-    openModal(modalId) {
-        let modal;
-        
-        if (typeof modalId === 'string') {
-            modal = document.getElementById(modalId) || 
-                    document.querySelector(modalId);
-        } else {
-            modal = modalId;
-        }
-
-        if (!modal) {
-            console.error(`Modal not found: ${modalId}`);
-            return;
-        }
-
-        modal.classList.remove('hidden');
-        this.activeModals.push(modal);
-        
-        // Prevent body scroll
-        document.body.style.overflow = 'hidden';
-
-        // Focus trap
-        this.setupFocusTrap(modal);
-
-        // Animation
-        requestAnimationFrame(() => {
-            modal.style.opacity = '1';
-        });
-    }
-
-    /**
-     * Close modal
-     * @param {HTMLElement|string} modal - Modal element or ID
-     */
-    closeModal(modal) {
-        if (typeof modal === 'string') {
-            modal = document.getElementById(modal);
-        }
-
-        if (!modal) return;
-
-        modal.classList.add('hidden');
-        this.activeModals = this.activeModals.filter(m => m !== modal);
-
-        // Restore body scroll if no more modals
-        if (this.activeModals.length === 0) {
-            document.body.style.overflow = '';
-        }
-    }
-
-    /**
-     * Close all open modals
-     */
-    closeAllModals() {
-        [...this.activeModals].forEach(modal => this.closeModal(modal));
-    }
-
-    /**
-     * Setup focus trap for accessibility
-     * @param {HTMLElement} modal - Modal element
-     */
-    setupFocusTrap(modal) {
-        const focusableElements = modal.querySelectorAll(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        
-        if (focusableElements.length > 0) {
-            focusableElements[0].focus();
-        }
-    }
-
-    /**
-     * Show confirmation dialog
-     * @param {object} options - Dialog options
-     * @returns {Promise<boolean>} User's choice
-     */
-    async showConfirmation(options = {}) {
-        const {
-            title = 'تأكيد',
-            message = 'هل أنت متأكد؟',
-            confirmText = 'نعم',
-            cancelText = 'إلغاء',
-            type = 'warning', // success, warning, danger, info
-            icon = null
-        } = options;
-
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay';
-            
-            const icons = {
-                success: 'fas fa-check-circle text-success',
-                warning: 'fas fa-exclamation-triangle text-warning',
-                danger: 'fas fa-exclamation-circle text-danger',
-                info: 'fas fa-info-circle text-primary'
+            return {
+                success: true,
+                user: data
             };
 
-            overlay.innerHTML = `
-                <div class="modal" style="max-width: 400px;">
-                    <div class="modal-header">
-                        ${icon ? `<i class="${icon}" style="font-size: 24px;"></i>` : ''}
-                        <h3>${title}</h3>
-                    </div>
-                    <div class="modal-body">
-                        <p>${message}</p>
-                        <div style="display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end;">
-                            <button class="btn btn-secondary" id="confirmCancel">${cancelText}</button>
-                            <button class="btn btn-${type}" id="confirmOk">${confirmText}</button>
-                        </div>
-                    </div>
-                </div>
-            `;
+        } catch (error) {
+            console.error('Sign in error:', error);
+            return {
+                success: false,
+                error: ErrorCodes.AUTH_INVALID_CREDENTIALS.message,
+                details: error.message
+            };
+        }
+    }
 
-            document.body.appendChild(overlay);
-
-            // Event listeners
-            overlay.querySelector('#confirmCancel').addEventListener('click', () => {
-                overlay.remove();
-                resolve(false);
+    /**
+     * Set user context for Row Level Security
+     * @param {object} user - User data
+     */
+    async setUserContext(user) {
+        try {
+            // This would typically be done via a server-side function
+            // For now, we'll store the context locally
+            this.currentUser = user;
+            
+            // Store in session for API calls
+            Utils.saveToSession('current_user', {
+                code: user.code,
+                isAdmin: user.is_admin
             });
 
-            overlay.querySelector('#confirmOk').addEventListener('click', () => {
-                overlay.remove();
-                resolve(true);
-            });
+        } catch (error) {
+            console.error('Error setting user context:', error);
+        }
+    }
 
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    overlay.remove();
-                    resolve(false);
+    /**
+     * Sign out current user
+     * @returns {Promise<boolean>} Success status
+     */
+    async signOut() {
+        try {
+            // Clear local storage
+            Utils.removeFromStorage(Constants.storageKeys.USER_SESSION);
+            Utils.removeFromStorage(Constants.storageKeys.REMEMBER_ME);
+            Utils.removeFromSession('current_user');
+            
+            this.currentUser = null;
+            
+            ui.playSound('logoutSound', 0.6);
+            
+            return true;
+
+        } catch (error) {
+            console.error('Sign out error:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Register new employee
+     * @param {object} employeeData - Employee data
+     * @returns {Promise<object>} Result with new employee or error
+     */
+    async registerEmployee(employeeData) {
+        try {
+            // Generate unique code if not provided
+            const code = employeeData.code || this.generateEmployeeCode();
+            
+            // Generate secure password if not provided
+            const password = employeeData.password || Utils.generatePassword(10);
+
+            const newEmployee = {
+                code: code.toUpperCase(),
+                name: employeeData.name.trim(),
+                email: employeeData.email || null,
+                password: password,
+                face_descriptor: employeeData.faceDescriptor || null,
+                is_admin: false,
+                is_first_login: true
+            };
+
+            const { data, error } = await this.client
+                .from(AppConfig.supabase.tables.employees)
+                .insert(newEmployee)
+                .select()
+                .single();
+
+            if (error) {
+                // Check for unique constraint violation
+                if (error.code === '23505') {
+                    return {
+                        success: false,
+                        error: 'هذا الكود مسجل مسبقاً',
+                        code: 'DUPLICATE_CODE'
+                    };
                 }
+                throw error;
+            }
+
+            // Send welcome emails via Google Apps Script
+            await this.sendNewEmployeeEmails({
+                ...newEmployee,
+                password: password // Send generated password to email service
             });
-        });
-    }
 
-    // ============================================
-    // 📋 PANELS (Side Panels)
-    // ============================================
+            return {
+                success: true,
+                employee: data,
+                generatedPassword: password
+            };
 
-    /**
-     * Open side panel
-     * @param {string} panelId - Panel ID
-     */
-    openPanel(panelId) {
-        const panel = document.getElementById(panelId);
-        if (!panel) return;
-
-        panel.classList.remove('hidden');
-        this.activePanels.push(panel);
-        document.body.style.overflow = 'hidden';
-    }
-
-    /**
-     * Close side panel
-     * @param {string} panelId - Panel ID
-     */
-    closePanel(panelId) {
-        const panel = document.getElementById(panelId);
-        if (!panel) return;
-
-        panel.classList.add('hidden');
-        this.activePanels = this.activePanels.filter(p => p !== panel);
-
-        if (this.activePanels.length === 0) {
-            document.body.style.overflow = '';
+        } catch (error) {
+            console.error('Registration error:', error);
+            return {
+                success: false,
+                error: 'فشل في إنشاء الحساب',
+                details: error.message
+            };
         }
     }
 
     /**
-     * Close all panels
+     * Generate unique employee code
+     * @returns {string} Generated code
      */
-    closeAllPanels() {
-        [...this.activePanels].forEach(panel => this.closePanel(panel.id));
+    generateEmployeeCode() {
+        const prefix = 'AX';
+        const year = new Date().getFullYear().toString().slice(-2);
+        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        return `${prefix}${year}${random}`;
     }
 
     // ============================================
-    // 📄 PAGE NAVIGATION
+    // 👤 EMPLOYEE OPERATIONS
     // ============================================
 
     /**
-     * Navigate to a page with animation
-     * @param {string} pageId - Target page ID
+     * Get employee by code
+     * @param {string} code - Employee code
+     * @returns {Promise<object|null>} Employee data or null
      */
-    navigateTo(pageId) {
-        // Hide all pages
-        const pages = document.querySelectorAll('.page');
-        pages.forEach(page => {
-            page.classList.remove('active');
-        });
+    async getEmployeeByCode(code) {
+        try {
+            const { data, error } = await this.client
+                .from(AppConfig.supabase.tables.employees)
+                .select('*')
+                .eq('code', code.toUpperCase().trim())
+                .eq('is_deleted', false)
+                .single();
 
-        // Show target page
-        const targetPage = document.getElementById(pageId);
-        if (targetPage) {
-            targetPage.classList.add('active');
+            if (error) throw error;
+            return data;
+
+        } catch (error) {
+            console.error('Get employee error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Get all employees (admin only)
+     * @returns {Promise<Array>} Array of employees
+     */
+    async getAllEmployees() {
+        try {
+            const { data, error } = await this.client
+                .from(AppConfig.supabase.tables.employees)
+                .select('*')
+                .eq('is_deleted', false)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+
+        } catch (error) {
+            console.error('Get all employees error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get total employees count
+     * @returns {Promise<number>} Count
+     */
+    async getEmployeesCount() {
+        try {
+            const { count, error } = await this.client
+                .from(AppConfig.supabase.tables.employees)
+                .select('*', { count: 'exact', head: true })
+                .eq('is_deleted', false);
+
+            if (error) throw error;
+            return count || 0;
+
+        } catch (error) {
+            console.error('Count error:', error);
+            return 0;
+        }
+    }
+
+    /**
+     * Update employee profile
+     * @param {string} code - Employee code
+     * @param {object} updates - Fields to update
+     * @returns {Promise<object>} Result
+     */
+    async updateEmployee(code, updates) {
+        try {
+            const { data, error } = await this.client
+                .from(AppConfig.supabase.tables.employees)
+                .update(updates)
+                .eq('code', code.toUpperCase().trim())
+                .select()
+                .single();
+
+            if (error) throw error;
             
-            // Scroll to top
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return { success: true, data };
 
-            // Update nav buttons
-            this.updateNavigation(pageId);
+        } catch (error) {
+            console.error('Update employee error:', error);
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
     /**
-     * Update bottom navigation active state
-     * @param {string} pageId - Current page ID
+     * Change employee password
+     * @param {string} code - Employee code
+     * @param {string} currentPassword - Current password
+     * @param {string} newPassword - New password
+     * @returns {Promise<object>} Result
      */
-    updateNavigation(pageId) {
-        const navBtns = document.querySelectorAll('.nav-btn');
-        navBtns.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.page === pageId);
-        });
-    }
+    async changePassword(code, currentPassword, newPassword) {
+        try {
+            // Verify current password first
+            const { data: employee, error: verifyError } = await this.client
+                .from(AppConfig.supabase.tables.employees)
+                .select('*')
+                .eq('code', code.toUpperCase().trim())
+                .eq('password', currentPassword)
+                .single();
 
-    // ============================================
-    // 🔊 AUDIO & HAPTICS
-    // ============================================
-
-    /**
-     * Play sound effect
-     * @param {string} soundId - Audio element ID
-     * @param {number} volume - Volume level (0-1)
-     */
-    playSound(soundId, volume = 0.5) {
-        // Check if sounds are enabled in settings
-        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
-        if (settings.soundEnabled === false) return;
-
-        const audio = document.getElementById(soundId);
-        if (audio) {
-            audio.volume = volume;
-            audio.currentTime = 0;
-            audio.play().catch(e => console.log('Audio play failed:', e));
-        }
-    }
-
-    /**
-     * Trigger device vibration
-     * @param {number|Array} pattern - Vibration pattern
-     */
-    vibrate(pattern = 100) {
-        // Check if vibration is enabled
-        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
-        if (settings.vibrationEnabled === false) return;
-
-        if ('vibrate' in navigator) {
-            navigator.vibrate(pattern);
-        }
-    }
-
-    /**
-     * Play success feedback (sound + vibration)
-     */
-    playSuccessFeedback() {
-        this.playSound('successSound', 0.6);
-        this.vibrate([50, 50, 50]);
-    }
-
-    /**
-     * Play error feedback
-     */
-    playErrorFeedback() {
-        this.playSound('errorSound', 0.6);
-        this.vibrate(200);
-    }
-
-    /**
-     * Play face recognition success feedback
-     */
-    playFaceSuccessFeedback() {
-        this.playSound('faceSuccessSound', 0.7);
-        this.vibrate([100, 50, 100]);
-    }
-
-    /**
-     * Play face recognition error feedback
-     */
-    playFaceErrorFeedback() {
-        this.playSound('faceErrorSound', 0.7);
-        this.vibrate([100, 100, 100]);
-    }
-
-    // ============================================
-    // 🎯 FORM HELPERS
-    // ============================================
-
-    /**
-     * Toggle password visibility
-     * @param {Event} e - Click event
-     */
-    togglePasswordVisibility(e) {
-        const btn = e.currentTarget;
-        const inputId = btn.dataset.target;
-        const input = document.getElementById(inputId);
-        const icon = btn.querySelector('i');
-
-        if (input) {
-            const isPassword = input.type === 'password';
-            input.type = isPassword ? 'text' : 'password';
-            
-            if (icon) {
-                icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+            if (verifyError || !employee) {
+                return {
+                    success: false,
+                    error: 'كلمة المرور الحالية غير صحيحة'
+                };
             }
+
+            // Update password
+            const { error: updateError } = await this.client
+                .from(AppConfig.supabase.tables.employees)
+                .update({ 
+                    password: newPassword,
+                    is_first_login: false,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('code', code);
+
+            if (updateError) throw updateError;
+
+            return { success: true };
+
+        } catch (error) {
+            console.error('Change password error:', error);
+            return {
+                success: false,
+                error: 'فشل تغيير كلمة المرور'
+            };
         }
     }
 
     /**
-     * Update password strength indicator
-     * @param {string} password - Password value
-     * @param {string} containerId - Strength container ID
+     * Request password reset
+     * @param {string} code - Employee code
+     * @returns {Promise<object>} Result
      */
-    updatePasswordStrength(password, containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        const strength = Utils.checkPasswordStrength(password);
-        
-        container.innerHTML = `
-            <div class="strength-bar ${strength.level}">
-                <div class="fill"></div>
-            </div>
-            <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">
-                ${strength.level === 'weak' ? '🔴 ضعيفة' : 
-                  strength.level === 'medium' ? '🟡 متوسطة' : '🟢 قوية'}
-                (${strength.percentage}%)
-            </small>
-        `;
-    }
-
-    // ============================================
-    // 📊 DATA DISPLAY HELPERS
-    // ============================================
-
-    /**
-     * Format and display attendance record
-     * @param {object} record - Attendance record
-     * @returns {HTMLElement} Formatted row element
-     */
-    formatAttendanceRow(record) {
-        const tr = document.createElement('tr');
-        
-        const typeClass = record.type === 'حضور' ? 'badge-in' : 'badge-out';
-        const typeBgColor = record.type === 'حضور' ? '#dcfce7' : '#fee2e2';
-        const typeTextColor = record.type === 'حضور' ? '#166534' : '#991b1b';
-
-        tr.innerHTML = `
-            <td>${Utils.formatDate(record.created_at, 'short')}</td>
-            <td>
-                <span style="
-                    background: ${typeBgColor};
-                    color: ${typeTextColor};
-                    padding: 4px 12px;
-                    border-radius: 20px;
-                    font-size: 12px;
-                    font-weight: bold;
-                ">
-                    ${record.type}
-                </span>
-            </td>
-            <td>${Utils.formatDate(record.created_at, 'time')}</td>
-            <td>${record.shift || '-'}</td>
-            <td style="color: var(--primary-400); font-weight: bold;">
-                ${record.hours_worked || '-'}
-            </td>
-            <td>${record.overtime || 'لا يوجد'}</td>
-        `;
-
-        return tr;
-    }
-
-    /**
-     * Display empty state for lists/tables
-     * @param {HTMLElement} container - Container element
-     * @param {string} message - Empty message
-     * @param {string} icon - Font Awesome icon class
-     */
-    showEmptyState(container, message = 'لا توجد بيانات', icon = 'fas fa-inbox') {
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="${icon}"></i>
-                <p>${message}</p>
-            </div>
-        `;
-    }
-
-    /**
-     * Update stat card value with animation
-     * @param {string} elementId - Element ID
-     * @param {*} value - New value
-     */
-    animateStatValue(elementId, value) {
-        const el = document.getElementById(elementId);
-        if (!el) return;
-
-        const currentValue = parseInt(el.textContent) || 0;
-        const newValue = parseInt(value) || 0;
-        const diff = newValue - currentValue;
-        const duration = 500;
-        const steps = 30;
-        const stepValue = diff / steps;
-        let step = 0;
-
-        const animate = setInterval(() => {
-            step++;
-            el.textContent = Math.round(currentValue + (stepValue * step));
+    async requestPasswordReset(code) {
+        try {
+            const employee = await this.getEmployeeByCode(code);
             
-            if (step >= steps) {
-                clearInterval(animate);
-                el.textContent = newValue;
+            if (!employee) {
+                return {
+                    success: false,
+                    error: 'الكود غير موجود'
+                };
             }
-        }, duration / steps);
+
+            if (!employee.email) {
+                return {
+                    success: false,
+                    error: 'لا يوجد بريد إلكتروني مسجل لهذا الكود'
+                };
+            }
+
+            // Generate new password
+            const newPassword = Utils.generatePassword(10);
+
+            // Update password in database
+            await this.updateEmployee(code, { password: newPassword });
+
+            // Send email with new password
+            await this.sendPasswordResetEmail({
+                code: code,
+                name: employee.name,
+                email: employee.email,
+                password: newPassword
+            });
+
+            return { success: true };
+
+        } catch (error) {
+            console.error('Password reset error:', error);
+            return {
+                success: false,
+                error: 'فشل في إرسال كلمة المرور الجديدة'
+            };
+        }
+    }
+
+    // ============================================
+    // 📊 ATTENDANCE OPERATIONS
+    // ============================================
+
+    /**
+     * Record attendance (check-in/check-out)
+     * @param {object} attendanceData - Attendance record data
+     * @returns {Promise<object>} Result
+     */
+    async recordAttendance(attendanceData) {
+        try {
+            // Validate attendance data
+            const validation = validator.validateAttendanceData(attendanceData);
+            if (!validation.isValid) {
+                return {
+                    success: false,
+                    error: 'بيانات الحضور غير صحيحة',
+                    details: validation.errors
+                };
+            }
+
+            // Prepare attendance record
+            const record = {
+                employee_code: attendanceData.employee_code.toUpperCase(),
+                employee_name: attendanceData.employee_name,
+                type: attendanceData.type, // 'حضور' or 'انصراف'
+                location_link: attendanceData.locationLink || null,
+                shift: attendanceData.shift || 'لم يتم التحديد',
+                hours_worked: attendanceData.hoursWorked || null,
+                overtime: attendanceData.overtime || '0 دقيقة',
+                ip_address: await this.getClientIP(),
+                user_agent: navigator.userAgent,
+                gps_accuracy: attendanceData.gpsAccuracy || null,
+                attendance_image_url: attendanceData.imageUrl || null
+            };
+
+            const { data, error } = await this.client
+                .from(AppConfig.supabase.tables.attendance)
+                .insert(record)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            // Send notification email
+            await this.sendAttendanceAlert({
+                ...record,
+                datetime: Utils.formatDate(new Date(), 'datetime')
+            });
+
+            return {
+                success: true,
+                record: data
+            };
+
+        } catch (error) {
+            console.error('Record attendance error:', error);
+            return {
+                success: false,
+                error: 'فشل تسجيل الحضور',
+                details: error.message
+            };
+        }
+    }
+
+    /**
+     * Get today's attendance for employee
+     * @param {string} employeeCode - Employee code
+     * @returns {Promise<Array>} Today's records
+     */
+    async getTodayAttendance(employeeCode) {
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            const { data, error } = await this.client
+                .from(AppConfig.supabase.tables.attendance)
+                .select('*')
+                .eq('employee_code', employeeCode.toUpperCase())
+                .gte('created_at', today.toISOString())
+                .lt('created_at', tomorrow.toISOString())
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
+
+        } catch (error) {
+            console.error('Get today attendance error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get attendance history with date range
+     * @param {string} employeeCode - Employee code
+     * @param {Date} startDate - Start date
+     * @param {Date} endDate - End date
+     * @returns {Promise<Array>} Attendance records
+     */
+    async getAttendanceHistory(employeeCode, startDate, endDate) {
+        try {
+            const { data, error } = await this.client
+                .from(AppConfig.supabase.tables.attendance)
+                .select('*')
+                .eq('employee_code', employeeCode.toUpperCase())
+                .gte('created_at', startDate.toISOString())
+                .lte('created_at', endDate.toISOString())
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
+
+        } catch (error) {
+            console.error('Get attendance history error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get monthly summary for employee
+     * @param {string} employeeCode - Employee code
+     * @param {number} month - Month (1-12)
+     * @param {number} year - Year
+     * @returns {object} Summary statistics
+     */
+    async getMonthlySummary(employeeCode, month, year) {
+        try {
+            const startDate = new Date(year, month - 1, 1);
+            const endDate = new Date(year, month, 0, 23, 59, 59);
+
+            const records = await this.getAttendanceHistory(
+                employeeCode, 
+                startDate, 
+                endDate
+            );
+
+            // Calculate statistics
+            let totalHours = 0;
+            let totalOvertime = 0;
+            let daysPresent = 0;
+            let checkIns = 0;
+            let checkOuts = 0;
+
+            records.forEach(record => {
+                if (record.type === 'حضور') {
+                    checkIns++;
+                    daysPresent++;
+                } else {
+                    checkOuts++;
+                }
+
+                // Parse hours
+                const hours = parseFloat(record.hours_worked) || 0;
+                totalHours += hours;
+
+                // Parse overtime
+                const overtimeMatch = record.overtime?.match(/[\d.]+/);
+                const overtime = overtimeMatch ? parseFloat(overtimeMatch[0]) : 0;
+                totalOvertime += overtime;
+            });
+
+            return {
+                records,
+                summary: {
+                    totalRecords: records.length,
+                    daysPresent,
+                    totalHours: parseFloat(totalHours.toFixed(2)),
+                    totalOvertime: parseFloat(totalOvertime.toFixed(2)),
+                    averageHoursPerDay: daysPresent > 0 ? parseFloat((totalHours / daysPresent).toFixed(2)) : 0,
+                    checkIns,
+                    checkOuts
+                }
+            };
+
+        } catch (error) {
+            console.error('Monthly summary error:', error);
+            return { records: [], summary: {} };
+        }
+    }
+
+    // ============================================
+    // 📧 EMAIL OPERATIONS (via Google Apps Script)
+    // ============================================
+
+    /**
+     * Send new employee emails
+     * @param {object} data - Employee data
+     */
+    async sendNewEmployeeEmails(data) {
+        try {
+            const response = await fetch(AppConfig.emailService.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'sendNewEmpEmails',
+                    name: data.name,
+                    code: data.code,
+                    email: data.email || '',
+                    password: data.password
+                })
+            });
+
+            const result = await response.json();
+            console.log('Email result:', result);
+            return result.success;
+
+        } catch (error) {
+            console.error('Send email error:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Send attendance alert email
+     * @param {object} data - Attendance data
+     */
+    async sendAttendanceAlert(data) {
+        try {
+            const response = await fetch(AppConfig.emailService.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'sendAttAlert',
+                    ...data
+                })
+            });
+
+            const result = await response.json();
+            return result.success;
+
+        } catch (error) {
+            console.error('Send attendance alert error:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Send password reset email
+     * @param {object} data - Reset data
+     */
+    async sendPasswordResetEmail(data) {
+        try {
+            const response = await fetch(AppConfig.emailService.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'sendForgotPw',
+                    ...data
+                })
+            });
+
+            const result = await response.json();
+            return result.success;
+
+        } catch (error) {
+            console.error('Send password reset error:', error);
+            return false;
+        }
+    }
+
+    // ============================================
+    // 🖼️ STORAGE OPERATIONS (Face Images)
+    // ============================================
+
+    /**
+     * Upload face image to Supabase Storage
+     * @param {string} base64Image - Base64 image string
+     * @param {string} fileName - File name
+     * @returns {Promise<string|null>} Public URL or null
+     */
+    async uploadFaceImage(base64Image, fileName) {
+        try {
+            // Convert base64 to blob
+            const base64Response = await fetch(base64Image);
+            const blob = await base64Response.blob();
+
+            // Check file size
+            if (blob.size > AppConfig.supabase.storage.maxFileSize) {
+                throw new Error('File too large');
+            }
+
+            const filePath = `faces/${fileName}_${Date.now()}.jpg`;
+
+            const { data, error } = await this.client.storage
+                .from(AppConfig.supabase.storage.bucketName)
+                .upload(filePath, blob, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (error) throw error;
+
+            // Get public URL
+            const { publicURL, error: urlError } = this.client.storage
+                .from(AppConfig.supabase.storage.bucketName)
+                .getPublicUrl(filePath);
+
+            if (urlError) throw urlError;
+
+            return publicURL;
+
+        } catch (error) {
+            console.error('Upload face image error:', error);
+            return null;
+        }
     }
 
     // ============================================
@@ -740,57 +798,61 @@ class UIManager {
     // ============================================
 
     /**
-     * Debounce function calls
-     * @param {Function} func - Function to debounce
-     * @param {number} wait - Wait time
-     * @returns {Function} Debounced function
+     * Get client IP address (approximate)
+     * @returns {Promise<string>} IP address
      */
-    debounce(func, wait = 300) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
+    async getClientIP() {
+        try {
+            // Using a free IP service
+            const response = await fetch('https://api.ipify.org?format=json');
+            const data = await response.json();
+            return data.ip;
+        } catch {
+            return 'unknown';
+        }
     }
 
     /**
-     * Get current timestamp formatted
-     * @returns {string} Formatted timestamp
+     * Check connection status
+     * @returns {boolean} Connected status
      */
-    getTimestamp() {
-        return new Date().toLocaleTimeString('ar-EG', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
+    isConnectedToSupabase() {
+        return this.isConnected && this.client !== null;
     }
 
     /**
-     * Show network offline indicator
+     * Get current user
+     * @returns {object|null} Current user object
      */
-    showOfflineIndicator() {
-        this.showWarning('أنت غير متصل بالإنترنت - سيتم حفظ البيانات محلياً');
-        
-        // Add offline class to body
-        document.body.classList.add('offline');
+    getCurrentUser() {
+        return this.currentUser;
     }
 
     /**
-     * Hide network offline indicator
+     * Execute query with retry logic
+     * @param {Function} queryFn - Query function
+     * @param {number} maxRetries - Max retry attempts
+     * @returns {Promise<*>} Query result
      */
-    hideOfflineIndicator() {
-        document.body.classList.remove('offline');
-        this.showSuccess('تم استعادة الاتصال بالإنترنت ✓');
+    async executeWithRetry(queryFn, maxRetries = 3) {
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                return await queryFn();
+            } catch (error) {
+                console.warn(`Query attempt ${attempt + 1} failed:`, error.message);
+                
+                if (attempt === maxRetries - 1) throw error;
+                
+                // Exponential backoff
+                await Utils.sleep(1000 * Math.pow(2, attempt));
+            }
+        }
     }
 }
 
 // Create global instance
-const ui = new UIManager();
+const db = new SupabaseClient();
 
 // Export for use in other modules
-window.UIManager = UIManager;
-window.ui = ui;
+window.SupabaseClient = SupabaseClient;
+window.db = db;
