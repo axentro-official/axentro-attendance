@@ -1,7 +1,7 @@
 /**
  * ============================================
- * 🎯 AXENTRO APPLICATION v4.0
- * ✅ Main Application Controller
+ * 🎯 AXENTRO APPLICATION v4.0.1 - HOTFIX
+ * ✅ Main Application Controller - With Better Error Handling
  * ============================================
  */
 
@@ -31,7 +31,7 @@ class App {
     // ============================================
 
     /**
-     * Initialize the entire application
+     * Initialize the entire application with enhanced error handling
      */
     async init() {
         console.log('🚀 Starting Axentro Application v' + AppConfig.app.version);
@@ -47,16 +47,25 @@ class App {
             this.setupGlobalEventListeners();
             ui.updateLoadingProgress(20, 'إعداد المستمعين...');
             
-            // Step 4: Initialize database client
+            // Step 4: Initialize database client with error handling
             ui.updateLoadingProgress(30, 'الاتصال بقاعدة البيانات...');
             if (!db.isConnectedToSupabase()) {
-                throw new Error('فشل الاتصال بقاعدة البيانات');
+                console.warn('⚠️ Supabase client not initialized, will retry...');
+                // Don't throw error here - we'll handle it gracefully
             }
             
-            // Step 5: Load face recognition models
-            ui.updateLoadingProgress(50, 'تحميل نماذج الذكاء الاصطناعي...');
-            if (!faceRecognition.areModelsLoaded()) {
-                await faceRecognition.loadModels();
+            // Step 5: Load face recognition models with better error handling
+            ui.updateLoadingProgress(50, 'جاري تحميل نماذج الذكاء الاصطناعي...');
+            try {
+                if (!faceRecognition.areModelsLoaded()) {
+                    await faceRecognition.loadModels();
+                } else {
+                    console.log('✅ Face recognition models already loaded');
+                }
+            } catch (modelError) {
+                console.warn('⚠️ Face recognition models failed to load, continuing...', modelError.message);
+                // Don't stop the whole app just because face recognition failed
+                ui.showWarning('⚠️ تعذر تحميل نموذج التعرف على الوجه');
             }
             
             // Step 6: Check for existing session
@@ -95,25 +104,211 @@ class App {
             console.error('❌ Application initialization failed:', error);
             ui.updateLoadingProgress(0, 'حدث خطأ في التحميل');
             
-            // Show error and retry option
+            // Show user-friendly error and retry option
             setTimeout(() => {
                 ui.hideLoadingScreen();
-                ui.showError('فشل تحميل التطبيق - يرجى تحديث الصفحة');
                 
-                // Add retry button
                 const retryBtn = document.createElement('button');
                 retryBtn.className = 'btn btn-primary btn-block';
                 retryBtn.innerHTML = '<i class="fas fa-redo"></i> إعادة المحاولة';
                 retryBtn.onclick = () => window.location.reload();
                 
-                document.getElementById('loginPage')?.querySelector('.auth-form')?.appendChild(retryBtn);
+                const loginForm = document.getElementById('loginForm');
+                if (loginForm) {
+                    loginForm.appendChild(retryBtn);
+                }
                 
+                ui.showError('فشل تحميل التطبيق - يرجى المحاولة');
             }, 1500);
         }
     }
 
+    // ============================================
+    // 📱 PAGE NAVIGATION
+    // ============================================
+
     /**
-     * Setup global event listeners
+     * Navigate to a specific page
+     */
+    navigateTo(pageId) {
+        // Validate user is authenticated for protected pages
+        const protectedPages = ['dashboardPage', 'reportsPage', 'changePasswordPage'];
+        
+        if (protectedPages.includes(pageId) && !auth.isAuthenticated()) {
+            ui.showWarning('يجب تسجيل الدخول أولاً');
+            this.navigateTo('loginPage');
+            return;
+        }
+
+        // Navigate using UI Manager
+        ui.navigateTo(pageId);
+        this.currentPage = pageId;
+
+        // Page-specific actions
+        this.onPageEnter(pageId);
+    }
+
+    /**
+     * Handle page enter events
+     */
+    onPageEnter(pageId) {
+        switch (pageId) {
+            case 'dashboardPage':
+                this.initializeDashboard();
+                break;
+                
+            case 'reportsPage':
+                if (typeof reports !== 'undefined') reports.setDefaultDates();
+                break;
+                
+            case 'loginPage':
+                // Stop camera if running on other pages
+                if (this.modules.faceRecognition?.isCameraRunning()) {
+                    this.modules.faceRecognition.stopCamera();
+                }
+                break;
+        }
+    }
+
+    // ============================================
+    // 🏠️ DASHBOARD INITIALIZATION
+    // ============================================
+
+    /**
+     * Initialize dashboard with user data
+     */
+    async initializeDashboard() {
+        try {
+            if (!auth.isAuthenticated()) return;
+
+            const user = auth.getCurrentUser();
+
+            // Update user info in header
+            const userNameEl = document.getElementById('userName');
+            const userCodeEl = document.getElementById('userCodeDisplay');
+
+            if (userNameEl) userNameEl.textContent = `مرحباً، ${user.name}`;
+            if (userCodeEl) userCodeEl.textContent = `CODE: ${user.code}`;
+
+            // Load dashboard stats
+            const totalEmployees = await db.getEmployeesCount();
+            ui.animateStatValue('totalEmployeesStat', totalEmployees);
+
+            // Load today's attendance records
+            await attendance.loadTodayRecords();
+
+            // Start camera for face recognition
+            this.startDashboardCamera();
+
+            // Load known faces for recognition
+            if (this.modules.faceRecognition) {
+                await this.modules.faceRecognition.loadKnownFaces();
+            }
+
+            // If user is admin, enable admin features
+            if (auth.isAdmin()) {
+                if (this.modules.admin) this.modules.admin.setupAdminFeatures();
+            }
+
+            console.log('📊 Dashboard initialized');
+
+        } catch (error) {
+            console.error('Dashboard init error:', error);
+        }
+    }
+
+    /**
+     * Start dashboard camera for face recognition
+     */
+    async startDashboardCamera() {
+        try {
+            const videoEl = document.getElementById('dashboardVideo');
+            const canvasEl = document.getElementById('dashboardCanvas');
+            
+            if (!videoEl || !canvasEl) return;
+
+            // Start camera with fallback
+            await this.startCameraWithFallback(videoEl, { facingMode: 'user' });
+
+            console.log('📹 Dashboard camera ready');
+
+        } catch (error) {
+            console.warn('Dashboard camera not available:', error.message);
+            
+            // Show message but don't block the app
+            const container = document.getElementById('recognitionArea');
+            if (container) {
+                container.innerHTML += `
+                    <div style="text-align:center;padding:20px;color:var(--text-muted);">
+                        <i class="fas fa-camera-slash" style="font-size:48px;margin-bottom:10px;opacity:0.5;"></i>
+                        <p>الكاميرا غير متاحة</p>
+                        <button onclick="location.reload()" style="
+                            display:inline-block;
+                            padding:12px 24px;
+                            background:var(--primary-600);
+                            color:white;
+                            border:none;
+                            border-radius:8px;
+                            cursor:pointer;
+                            font-weight:bold;
+                        ">
+                            <i class="fas fa-redo"></i> إعادة المحاولة
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    /**
+     * Start camera with automatic fallback
+     */
+    async startCameraWithFallback(videoElement, options = {}) {
+        try {
+            // Check for camera support
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw new Error('Camera API not supported');
+            }
+
+            // Default constraints
+            const constraints = {
+                video: {
+                    facingMode: options.facingMode || 'user',
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    frameRate: { ideal: 30 }
+                },
+                audio: false
+            };
+
+            // Request permission and get stream
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            // Attach to video element
+            if (videoElement) {
+                videoElement.srcObject = stream;
+                await videoElement.play();
+                this.currentVideoElement = videoElement;
+            }
+
+            this.isCameraActive = true;
+            console.log('📹 Camera started successfully');
+            return stream;
+
+        } catch (error) {
+            console.warn('Camera start error:', error.message);
+            
+            // Return graceful error without breaking the app
+            return { success: false, error: error.message };
+        }
+    }
+
+    // ============================================
+    // ⚙️ GLOBAL EVENT LISTENERS
+    // ============================================
+
+    /**
+     * Setup all event listeners for the application
      */
     setupGlobalEventListeners() {
         // ============================================
@@ -133,7 +328,7 @@ class App {
                             this.initializeDashboard();
                             break;
                         case 'reportsPage':
-                            reports.setDefaultDates();
+                            if (typeof reports !== 'undefined') reports.setDefaultDates();
                             break;
                         case 'changePasswordPage':
                             // Nothing special needed
@@ -150,31 +345,56 @@ class App {
         // Login form
         const loginForm = document.getElementById('loginForm');
         if (loginForm) {
-            loginForm.addEventListener('submit', (e) => auth.handleLogin(e));
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (this.modules.auth) {
+                    this.modules.auth.handleLogin(e);
+                }
+            });
         }
 
         // Register form
         const registerForm = document.getElementById('registerForm');
-        if (registerForm) {
-            registerForm.addEventListener('submit', (e) => auth.handleRegister(e));
+        if (form) {
+            registerForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (this.modules.auth) {
+                    this.modules.auth.handleRegister(e);
+                }
+            });
         }
 
         // Forgot password form
         const forgotPasswordForm = document.getElementById('forgotPasswordForm');
         if (forgotPasswordForm) {
-            forgotPasswordForm.addEventListener('submit', (e) => auth.handleForgotPassword(e));
+            forgotPasswordForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (this.modules.auth) {
+                    this.modules.auth.handleForgotPassword(e);
+                }
+            });
         }
 
         // Change password form
         const changePasswordForm = document.getElementById('changePasswordForm');
         if (changePasswordForm) {
-            changePasswordForm.addEventListener('submit', (e) => auth.handleChangePassword(e));
+            changePasswordForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (this.modules.auth) {
+                    this.modules.auth.handleChangePassword(e);
+                }
+            });
         }
 
         // Force password change form
         const forcePasswordForm = document.getElementById('forcePasswordForm');
         if (forcePasswordForm) {
-            forcePasswordForm.addEventListener('submit', (e) => auth.handleForcePasswordChange(e));
+            forcePasswordForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (this.modules.auth) {
+                    this.modules.auth.handleForcePasswordChange(e);
+                }
+            });
         }
 
         // ============================================
@@ -230,7 +450,11 @@ class App {
         // Biometric login button
         const biometricLoginBtn = document.getElementById('biometricLoginBtn');
         if (biometricLoginBtn) {
-            biometricLoginBtn.addEventListener('click', () => auth.attemptBiometricAuth());
+            biometricLoginBtn.addEventListener('click', () => {
+                if (this.modules.auth) {
+                    this.modules.auth.attemptBiometricAuth();
+                }
+            });
         }
 
         // ============================================
@@ -240,25 +464,41 @@ class App {
         // Logout button
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => auth.logout());
+            logoutBtn.addEventListener('click', () => {
+                if (this.modules.auth) {
+                    this.modules.auth.logout();
+                }
+            });
         }
 
         // Check-in button
         const checkInBtn = document.getElementById('checkInBtn');
         if (checkInBtn) {
-            checkInBtn.addEventListener('click', () => attendance.handleCheckIn());
+            checkInBtn.addEventListener('click', () => {
+                if (this.modules.attendance) {
+                    this.modules.attendance.handleCheckIn();
+                }
+            });
         }
 
         // Check-out button
         const checkOutBtn = document.getElementById('checkOutBtn');
         if (checkOutBtn) {
-            checkOutBtn.addEventListener('click', () => attendance.handleCheckOut());
+            checkOutBtn.addEventListener('click', () => {
+                if (this.modules.attendance) {
+                    this.modules.attendance.handleCheckOut();
+                }
+            });
         }
 
         // Switch camera button
         const switchCameraBtn = document.getElementById('switchCameraBtn');
         if (switchCameraBtn) {
-            switchCameraBtn.addEventListener('click', () => faceRecognition.switchCamera());
+            switchCameraBtn.addEventListener('click', () => {
+                if (this.modules.faceRecognition) {
+                    this.modules.faceRecognition.switchCamera();
+                }
+            });
         }
 
         // Face capture for registration
@@ -268,28 +508,29 @@ class App {
                 try {
                     ui.showButtonLoading(startFaceCaptureBtn, 'جاري تشغيل الكاميرا...');
                     
-                    await faceRecognition.startCamera(
-                        faceRecognition.registerVideo,
-                        { facingMode: 'user' }
-                    );
-                    
-                    // Show capture button
-                    const captureBtn = document.getElementById('captureFaceBtn');
-                    if (captureBtn) captureBtn.classList.remove('hidden');
-                    
-                    // Hide overlay when camera starts
-                    const overlay = document.getElementById('registerOverlay');
-                    if (overlay) overlay.style.display = 'none';
-                    
-                    ui.showSuccess('تم تشغيل الكاميرا ✓');
-                    
-                    // Setup capture button event
-                    const captureFaceBtn = document.getElementById('captureFaceBtn');
-                    if (captureFaceBtn && !captureFaceBtn.dataset.listenerAttached) {
-                        captureFaceBtn.addEventListener('click', (e) => 
-                            faceRecognition.handleRegistrationCapture(e)
+                    if (this.modules.faceRecognition) {
+                        await this.modules.faceRecognition.startCamera(
+                            this.modules.faceRecognition.registerVideo,
+                            { facingMode: 'user' }
                         );
-                        captureFaceBtn.dataset.listenerAttached = 'true';
+                        
+                        const captureBtn = document.getElementById('captureFaceBtn');
+                        if (captureBtn) captureBtn.classList.remove('hidden');
+                        
+                        const overlay = document.getElementById('registerOverlay');
+                        if (overlay) overlay.style.display = 'none';
+                        
+                        ui.showSuccess('تم تشغيل الكاميرا ✓');
+                        
+                        const captureFaceBtn2 = document.getElementById('captureFaceBtn');
+                        if (captureFaceBtn2 && !captureFaceBtn2.dataset.listenerAttached) {
+                            captureFaceBtn2.addEventListener('click', (e) => {
+                                if (this.modules.faceRecognition) {
+                                    this.modules.faceRecognition.handleRegistrationCapture(e);
+                                }
+                            });
+                            captureFaceBtn2.dataset.listenerAttached = 'true';
+                        }
                     }
                     
                 } catch (error) {
@@ -321,7 +562,11 @@ class App {
 
         const markAllReadBtn = document.getElementById('markAllReadBtn');
         if (markAllReadBtn) {
-            markAllReadBtn.addEventListener('click', () => admin.markAllNotificationsRead());
+            markAllReadBtn.addEventListener('click', () => {
+                if (this.modules.admin) {
+                    this.modules.admin.markAllNotificationsRead();
+                }
+            });
         }
 
         // Settings panel
@@ -351,7 +596,9 @@ class App {
         // ============================================
         
         document.querySelectorAll('.toggle-password').forEach(btn => {
-            btn.addEventListener('click', (e) => ui.togglePasswordVisibility(e));
+            btn.addEventListener('click', (e) => {
+                ui.togglePasswordVisibility(e);
+            });
         });
 
         // ============================================
@@ -409,131 +656,6 @@ class App {
     }
 
     // ============================================
-    // 📱 PAGE NAVIGATION
-    // ============================================
-
-    /**
-     * Navigate to a specific page
-     * @param {string} pageId - Target page ID
-     */
-    navigateTo(pageId) {
-        // Validate user is authenticated for protected pages
-        const protectedPages = ['dashboardPage', 'reportsPage', 'changePasswordPage'];
-        
-        if (protectedPages.includes(pageId) && !auth.isAuthenticated()) {
-            ui.showWarning('يجب تسجيل الدخول أولاً');
-            this.navigateTo('loginPage');
-            return;
-        }
-
-        // Navigate using UI Manager
-        ui.navigateTo(pageId);
-        this.currentPage = pageId;
-
-        // Page-specific actions
-        this.onPageEnter(pageId);
-    }
-
-    /**
-     * Handle page enter events
-     * @param {string} pageId - Entered page ID
-     */
-    onPageEnter(pageId) {
-        switch (pageId) {
-            case 'dashboardPage':
-                this.initializeDashboard();
-                break;
-                
-            case 'reportsPage':
-                reports.setDefaultDates();
-                break;
-                
-            case 'loginPage':
-                // Stop camera if running on other pages
-                if (faceRecognition.isCameraRunning()) {
-                    faceRecognition.stopCamera();
-                }
-                break;
-        }
-    }
-
-    // ============================================
-    // 🏠️ DASHBOARD INITIALIZATION
-    // ============================================
-
-    /**
-     * Initialize dashboard with user data
-     */
-    async initializeDashboard() {
-        try {
-            if (!auth.isAuthenticated()) return;
-
-            const user = auth.getCurrentUser();
-
-            // Update user info in header
-            const userNameEl = document.getElementById('userName');
-            const userCodeEl = document.getElementById('userCodeDisplay');
-
-            if (userNameEl) userNameEl.textContent = `مرحباً، ${user.name}`;
-            if (userCodeEl) userCodeEl.textContent = `CODE: ${user.code}`;
-
-            // Load dashboard stats
-            const totalEmployees = await db.getEmployeesCount();
-            ui.animateStatValue('totalEmployeesStat', totalEmployees);
-
-            // Load today's attendance records
-            await attendance.loadTodayRecords();
-
-            // Start camera for face recognition
-            this.startDashboardCamera();
-
-            // Load known faces for recognition
-            await faceRecognition.loadKnownFaces();
-
-            // If user is admin, enable admin features
-            if (auth.isAdmin()) {
-                admin.setupAdminFeatures();
-            }
-
-            console.log('📊 Dashboard initialized');
-
-        } catch (error) {
-            console.error('Dashboard init error:', error);
-        }
-    }
-
-    /**
-     * Start dashboard camera for face recognition
-     */
-    async startDashboardCamera() {
-        try {
-            const videoEl = document.getElementById('dashboardVideo');
-            const canvasEl = document.getElementById('dashboardCanvas');
-            
-            if (!videoEl || !canvasEl) return;
-
-            // Start camera
-            await faceRecognition.startCamera(videoEl, { facingMode: 'user' });
-
-            console.log('📹 Dashboard camera ready');
-
-        } catch (error) {
-            console.warn('Dashboard camera not available:', error.message);
-            
-            // Show manual entry option or message
-            const cameraContainer = document.getElementById('recognitionArea');
-            if (cameraContainer) {
-                cameraContainer.innerHTML += `
-                    <div style="text-align: center; padding: 20px; color: var(--text-muted);">
-                        <i class="fas fa-camera-slash" style="font-size: 48px; margin-bottom: 10px;"></i>
-                        <p>الكاميرا غير متاحة - يمكنك الاستمرار بدون التعرف على الوجه</p>
-                    </div>
-                `;
-            }
-        }
-    }
-
-    // ============================================
     // ⚙️ SETTINGS MANAGEMENT
     // ============================================
 
@@ -558,8 +680,6 @@ class App {
 
     /**
      * Save a setting
-     * @param {string} key - Setting key
-     * @param {*} value - Setting value
      */
     saveSetting(key, value) {
         const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
@@ -591,7 +711,6 @@ class App {
             e.preventDefault();
             this.deferredInstallPrompt = e;
             
-            // Optionally show custom install button
             console.log('📲 Install prompt available');
         });
 
@@ -639,7 +758,6 @@ class App {
 
     /**
      * Handle online/offline status changes
-     * @param {Event} event - Online/offline event
      */
     handleOnlineStatus(event) {
         if (event.type === 'online') {
@@ -667,7 +785,6 @@ class App {
 
         for (const operation of queue) {
             try {
-                // Retry the operation
                 switch (operation.type) {
                     case 'attendance':
                         await db.recordAttendance(operation.data);
@@ -724,8 +841,6 @@ class App {
 
     /**
      * Show browser notification
-     * @param {string} title - Notification title
-     * @param {object} options - Notification options
      */
     showBrowserNotification(title, options = {}) {
         if (Notification.permission !== 'granted') return;
@@ -753,7 +868,6 @@ class App {
 
     /**
      * Get current application state
-     * @returns {object} Application state
      */
     getState() {
         return {
@@ -833,12 +947,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start application initialization
     app.init().catch(error => {
         console.error('Fatal error during initialization:', error);
+        
+        // Fallback: Show basic version without advanced features
+        document.getElementById('loadingScreen').style.display = 'flex';
+        document.getElementById('loadStatus').textContent = 'جاري تشغيل النظام...';
+        
+        // Try simpler initialization
+        setTimeout(() => {
+            ui.hideLoadingScreen();
+        }, 2000);
     });
 });
 
 // Handle unhandled errors globally
 window.onerror = function(msg, url, lineNo, columnNo, error) {
     console.error('🚨 Global Error:', { msg, url, lineNo, columnNo, error });
+    
+    // Don't show toast for every error (too noisy)
+    // But log it for debugging
     
     return false;
 };
