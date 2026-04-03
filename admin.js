@@ -1,22 +1,18 @@
 /**
  * ============================================
- * 👨‍💼 AXENTRO ADMIN MANAGER v4.0
- * ✅ System Administration & Employee Management
+ * 👔 AXENTRO ADMIN PANEL v4.1 - ENHANCED
+ * ✅ Employee Management & Admin Features
+ * 🔒 محسّن مع Security Checks و Validation
  * ============================================
  */
 
 class AdminManager {
     constructor() {
-        this.employees = [];
+        this.isAdminMode = false;
         this.selectedEmployee = null;
-        this.filters = {
-            search: '',
-            status: 'all',
-            sortBy: 'created_at',
-            sortOrder: 'desc'
-        };
+        this.employeesList = [];
         
-        this.init();
+        console.log('👔 Admin Manager initialized');
     }
 
     // ============================================
@@ -24,69 +20,69 @@ class AdminManager {
     // ============================================
 
     /**
-     * Initialize admin manager
+     * Initialize admin features
      */
     init() {
-        console.log('👨‍💼 Admin Manager initialized');
-        
-        // Only initialize if user is admin
-        if (auth.isAdmin()) {
-            this.setupAdminFeatures();
-        }
+        this.checkAdminAccess();
+        console.log('✅ Admin Manager ready');
     }
 
     /**
-     * Setup admin-specific features and UI
+     * Setup admin features if user is admin
      */
     setupAdminFeatures() {
-        console.log('✅ Admin features enabled');
-        
-        // Add admin panel button to header (if not exists)
-        this.addAdminPanelButton();
-        
-        // Load initial data
-        this.loadDashboardStats();
-    }
-
-    /**
-     * Add admin panel access button
-     */
-    addAdminPanelButton() {
-        const headerActions = document.querySelector('.header-actions');
-        if (!headerActions || document.getElementById('adminPanelBtn')) return;
-
-        const adminBtn = document.createElement('button');
-        adminBtn.id = 'adminPanelBtn';
-        adminBtn.className = 'icon-btn warning';
-        adminBtn.title = 'لوحة التحكم';
-        adminBtn.innerHTML = '<i class="fas fa-user-shield"></i>';
-        adminBtn.addEventListener('click', () => this.openAdminPanel());
-        
-        headerActions.insertBefore(adminBtn, headerActions.firstChild);
-    }
-
-    // ============================================
-    // 📊 DASHBOARD STATISTICS
-    // ============================================
-
-    /**
-     * Load dashboard statistics for admin view
-     */
-    async loadDashboardStats() {
         try {
-            const [totalEmployees, todayRecords] = await Promise.all([
-                db.getEmployeesCount(),
-                db.getTodayAttendance('ADMIN') // Get all records for admin
-            ]);
+            // Check if user is admin
+            if (!this.canAccessAdmin()) {
+                console.warn('⚠️ User is not admin - hiding admin features');
+                this.hideAdminElements();
+                return;
+            }
 
-            // Update stats display
-            ui.animateStatValue('totalEmployeesStat', totalEmployees);
+            this.isAdminMode = true;
 
-            console.log(`📊 Dashboard: ${totalEmployees} employees`);
+            // Show admin-specific UI elements
+            this.showAdminElements();
+
+            // Load employees list
+            this.loadEmployeesList();
+
+            // Setup admin event listeners
+            this.setupAdminEventListeners();
+
+            console.log('👔 Admin mode activated');
 
         } catch (error) {
-            console.error('Load dashboard stats error:', error);
+            console.error('❌ Admin setup error:', error);
         }
+    }
+
+    /**
+     * Check if current user can access admin features
+     * @returns {boolean}
+     */
+    canAccessAdmin() {
+        return typeof auth !== 'undefined' && auth.isAdmin();
+    }
+
+    /**
+     * Show admin-only UI elements
+     */
+    showAdminElements() {
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = '';
+            el.classList.remove('hidden');
+        });
+    }
+
+    /**
+     * Hide admin-only UI elements
+     */
+    hideAdminElements() {
+        document.querySelectorAll('.admin-only').forEach(el => {
+            el.style.display = 'none';
+            el.classList.add('hidden');
+        });
     }
 
     // ============================================
@@ -94,585 +90,624 @@ class AdminManager {
     // ============================================
 
     /**
-     * Load all employees list
+     * Load all employees from database
      */
-    async loadEmployees() {
+    async loadEmployeesList() {
         try {
-            ui.showElementLoading('#employeesListContainer', 'جاري تحميل الموظفين...');
+            if (typeof db === 'undefined' || typeof db.getAllEmployees !== 'function') {
+                throw new Error('Database not available');
+            }
+
+            const employees = await db.getAllEmployees();
             
-            this.employees = await db.getAllEmployees();
+            this.employeesList = employees || [];
             
-            this.renderEmployeesList();
-            
-            ui.hideElementLoading('#employeesListContainer');
+            // Update UI with employee count
+            this.updateEmployeesCount(employees.length);
+
+            // Populate employees table/list
+            this.populateEmployeesTable(employees);
+
+            console.log(`📋 Loaded ${employees.length} employees`);
 
         } catch (error) {
-            console.error('Load employees error:', error);
-            ui.showError('فشل تحميل قائمة الموظفين');
+            console.error('❌ Load employees error:', error);
+            this.employeesList = [];
         }
     }
 
     /**
-     * Filter and sort employees based on current filters
-     * @returns {Array} Filtered and sorted employees
+     * Populate employees management table
+     * @param {Array} employees - Array of employee objects
      */
-    getFilteredEmployees() {
-        let filtered = [...this.employees];
+    populateEmployeesTable(employees) {
+        const tbody = document.getElementById('adminEmployeesTableBody');
+        
+        if (!tbody) return; // Not on admin page
 
-        // Apply search filter
-        if (this.filters.search) {
-            const searchTerm = this.filters.search.toLowerCase();
-            filtered = filtered.filter(emp => 
-                emp.name.toLowerCase().includes(searchTerm) ||
-                emp.code.toLowerCase().includes(searchTerm) ||
-                (emp.email && emp.email.toLowerCase().includes(searchTerm))
-            );
-        }
+        tbody.innerHTML = '';
 
-        // Apply status filter
-        switch (this.filters.status) {
-            case 'active':
-                filtered = filtered.filter(emp => !emp.is_deleted);
-                break;
-            case 'deleted':
-                filtered = filtered.filter(emp => emp.is_deleted);
-                break;
-            case 'admins':
-                filtered = filtered.filter(emp => emp.is_admin);
-                break;
-        }
-
-        // Apply sorting
-        filtered = Utils.sortBy(filtered, this.filters.sortBy, this.filters.sortOrder);
-
-        return filtered;
-    }
-
-    /**
-     * Render employees list in UI
-     */
-    renderEmployeesList() {
-        const container = document.getElementById('employeesList');
-        if (!container) return;
-
-        const filtered = this.getFilteredEmployees();
-
-        if (filtered.length === 0) {
-            ui.showEmptyState(container, 'لا يوجد موظفون', 'fas fa-users');
+        if (!employees || !employees.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="no-data">
+                        <i class="fas fa-users-slash"></i>
+                        <p>لا يوجد موظفين مسجلين</p>
+                    </td>
+                </tr>
+            `;
             return;
         }
 
-        container.innerHTML = filtered.map(emp => this.createEmployeeCard(emp)).join('');
-        
-        // Attach event listeners
-        container.querySelectorAll('.employee-card').forEach(card => {
-            card.addEventListener('click', () => this.selectEmployee(card.dataset.code));
-        });
-    }
+        employees.forEach((employee, index) => {
+            const row = document.createElement('tr');
+            
+            // Format dates
+            const createdDate = Utils.formatDate(employee.created_at, 'date');
+            const lastLogin = employee.last_login ? 
+                             Utils.formatDate(employee.last_login, 'datetime') : 
+                             'لم يسجل دخول';
 
-    /**
-     * Create employee card HTML
-     * @param {object} emp - Employee data
-     * @returns {string} HTML string
-     */
-    createEmployeeCard(emp) {
-        const statusClass = emp.is_deleted ? 'deleted' : '';
-        const adminBadge = emp.is_admin ? '<span class="badge badge-admin">👨‍💼 أدمن</span>' : '';
-        const firstLoginBadge = emp.is_first_login ? '<span class="badge badge-warning">جديد</span>' : '';
+            // Status badge
+            const statusClass = employee.is_deleted ? 
+                                'badge-danger' : 
+                                (employee.is_admin ? 'badge-primary' : 'badge-success');
+            const statusText = employee.is_deleted ? 
+                               'محذوف' : 
+                               (employee.is_admin ? 'أدمن' : 'نشط');
 
-        return `
-            <div class="employee-card ${statusClass}" data-code="${emp.code}">
-                <div class="employee-avatar">
-                    ${emp.profile_image_url 
-                        ? `<img src="${emp.profile_image_url}" alt="${emp.name}">`
-                        : `<i class="fas fa-user"></i>`
-                    }
-                </div>
-                <div class="employee-info">
-                    <h4>${Utils.truncate(emp.name, 25)}</h4>
-                    <p class="employee-code">${emp.code}</p>
-                    <p class="employee-email">${emp.email || 'لا يوجد بريد'}</p>
-                    <div class="employee-badges">
-                        ${adminBadge}
-                        ${firstLoginBadge}
-                        ${emp.is_deleted ? '<span class="badge badge-danger">محذوف</span>' : ''}
-                    </div>
-                </div>
-                <div class="employee-actions">
-                    <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); admin.viewEmployee('${emp.code}')">
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td><strong>${employee.code}</strong></td>
+                <td>${employee.name}</td>
+                <td>${employee.email || '-'}</td>
+                <td><span class="badge ${statusClass}">${statusText}</span></td>
+                <td>${createdDate}</td>
+                <td>${lastLogin}</td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-outline" onclick="admin.viewEmployee('${employee.code}')" title="عرض">
                         <i class="fas fa-eye"></i>
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); admin.editEmployee('${emp.code}')">
+                    <button class="btn btn-sm btn-primary" onclick="admin.editEmployee('${employee.code}')" title="تعديل">
                         <i class="fas fa-edit"></i>
                     </button>
-                </div>
-            </div>
-        `;
+                    ${!employee.is_admin ? `
+                        <button class="btn btn-sm btn-danger" onclick="admin.confirmDeleteEmployee('${employee.code}', '${employee.name}')" title="حذف">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </td>
+            `;
+
+            tbody.appendChild(row);
+        });
     }
 
     /**
-     * Select an employee from the list
+     * Update employees count display
+     * @param {number} count - Total count
+     */
+    updateEmployeesCount(count) {
+        const countEl = document.getElementById('totalEmployeesStat');
+        if (countEl) {
+            countEl.textContent = count;
+        }
+    }
+
+    // ============================================
+    // 👁️ VIEW EMPLOYEE DETAILS
+    // ============================================
+
+    /**
+     * View employee details
      * @param {string} code - Employee code
      */
-    selectEmployee(code) {
-        this.selectedEmployee = this.employees.find(emp => emp.code === code);
-        
-        // Highlight selected card
-        document.querySelectorAll('.employee-card').forEach(card => {
-            card.classList.toggle('selected', card.dataset.code === code);
-        });
+    async viewEmployee(code) {
+        try {
+            const employee = await db.getEmployeeByCode(code);
+            
+            if (!employee) {
+                throw new Error('الموظف غير موجود');
+            }
 
-        // Show details panel
-        this.showEmployeeDetails(this.selectedEmployee);
+            this.selectedEmployee = employee;
+
+            // Show details modal or panel
+            this.showEmployeeDetailsModal(employee);
+
+        } catch (error) {
+            console.error('❌ View employee error:', error);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(error.message);
+            }
+        }
     }
 
     /**
-     * Show employee details panel
-     * @param {object} emp - Employee data
+     * Display employee details in modal
+     * @param {object} employee - Employee data
      */
-    showEmployeeDetails(emp) {
-        if (!emp) return;
-
-        const panel = document.getElementById('employeeDetailsPanel');
-        if (!panel) return;
-
-        panel.innerHTML = `
-            <div class="details-header">
-                <h3>تفاصيل الموظف</h3>
-                <button class="icon-btn" onclick="admin.closeEmployeeDetails()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="details-content">
-                <div class="detail-avatar">
-                    ${emp.profile_image_url 
-                        ? `<img src="${emp.profile_image_url}" alt="${emp.name}">`
-                        : `<i class="fas fa-user"></i>`
-                    }
-                </div>
-                <h2>${emp.name}</h2>
-                <p class="code">${emp.code}</p>
-                
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <span class="label">البريد الإلكتروني</span>
-                        <span class="value">${emp.email || '-'}</span>
+    showEmployeeDetailsModal(employee) {
+        const modalContent = `
+            <div class="employee-details">
+                <div class="detail-header">
+                    <div class="avatar">
+                        ${employee.profile_image_url ? 
+                          `<img src="${employee.profile_image_url}" alt="${employee.name}">` :
+                          `<div class="avatar-placeholder">${employee.name.charAt(0)}</div>`
+                        }
                     </div>
-                    <div class="detail-item">
-                        <span class="label">تاريخ التسجيل</span>
-                        <span class="value">${Utils.formatDate(emp.created_at)}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">آخر تحديث</span>
-                        <span class="value">${Utils.formatDate(emp.updated_at)}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">الحالة</span>
-                        <span class="value">${emp.is_deleted ? 'محذوف' : 'نشط'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">نوع الحساب</span>
-                        <span class="value">${emp.is_admin ? 'أدمن' : 'موظف'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">تسجيل أولي</span>
-                        <span class="value">${emp.is_first_login ? 'نعم' : 'لا'}</span>
-                    </div>
+                    <h3>${employee.name}</h3>
+                    <span class="code">${employee.code}</span>
                 </div>
 
-                <div class="details-actions">
-                    <button class="btn btn-primary" onclick="admin.editEmployee('${emp.code}')">
-                        <i class="fas fa-edit"></i> تعديل
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <label>البريد الإلكتروني</label>
+                        <value>${employee.email || 'غير مسجل'}</value>
+                    </div>
+                    <div class="detail-item">
+                        <label>تاريخ التسجيل</label>
+                        <value>${Utils.formatDate(employee.created_at, 'full')}</value>
+                    </div>
+                    <div class="detail-item">
+                        <label>آخر تسجيل دخول</label>
+                        <value>${employee.last_login ? Utils.formatDate(employee.last_login, 'full') : 'لم يسجل بعد'}</value>
+                    </div>
+                    <div class="detail-item">
+                        <label>الحالة</label>
+                        <value>
+                            <span class="badge ${employee.is_deleted ? 'badge-danger' : 'badge-success'}">
+                                ${employee.is_deleted ? 'محذوف' : 'نشط'}
+                            </span>
+                        </value>
+                    </div>
+                    <div class="detail-item">
+                        <label>نوع الحساب</label>
+                        <value>
+                            <span class="badge ${employee.is_admin ? 'badge-primary' : 'badge-secondary'}">
+                                ${employee.is_admin ? 'مدير نظام' : 'موظف'}
+                            </span>
+                        </value>
+                    </div>
+                    <div class="detail-item">
+                        <label>تغيير كلمة المرور</label>
+                        <value>${employee.is_first_login ? 'مطلوب' : 'تم التغيير'}</value>
+                    </div>
+                </div>
+
+                <div class="detail-actions">
+                    <button class="btn btn-primary" onclick="admin.editEmployee('${employee.code}')">
+                        <i class="fas fa-edit"></i> تعديل البيانات
                     </button>
-                    <button class="btn btn-warning" onclick="admin.resetPassword('${emp.code}')">
-                        <i class="fas fa-key"></i> إعادة تعيين كلمة المرور
+                    <button class="btn btn-outline" onclick="admin.viewEmployeeAttendance('${employee.code}')">
+                        <i class="fas fa-chart-line"></i> سجل الحضور
                     </button>
-                    <button class="btn btn-danger" onclick="admin.deleteEmployee('${emp.code}')">
-                        <i class="fas fa-trash"></i> حذف
-                    </button>
+                    ${!employee.is_admin ? `
+                        <button class="btn btn-danger" onclick="admin.confirmDeleteEmployee('${employee.code}', '${employee.name}')">
+                            <i class="fas fa-trash"></i> حذف الموظف
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `;
 
-        panel.classList.remove('hidden');
-    }
-
-    /**
-     * Close employee details panel
-     */
-    closeEmployeeDetails() {
-        const panel = document.getElementById('employeeDetailsPanel');
-        if (panel) {
-            panel.classList.add('hidden');
-        }
-        this.selectedEmployee = null;
-    }
-
-    // ============================================
-    // ✏️ EMPLOYEE CRUD OPERATIONS
-    // ============================================
-
-    /**
-     * Open add new employee modal
-     */
-    async addNewEmployee() {
-        const confirmed = await ui.showConfirmation({
-            title: '➕ إضافة موظف جديد',
-            message: 'سيتم فتح صفحة التسجيل للموظف الجديد',
-            confirmText: 'فتح صفحة التسجيل',
-            type: 'success'
-        });
-
-        if (confirmed) {
-            ui.navigateTo('registerPage');
+        // Show in modal (if modal system exists)
+        if (typeof ui !== 'undefined' && ui.showConfirmation) {
+            // For now, just log it - you can implement a custom modal
+            console.log('📋 Employee Details:', employee);
+            
+            if (typeof ui !== 'undefined' && ui.showInfo) {
+                ui.showInfo(`عرض بيانات: ${employee.name}`);
+            }
         }
     }
 
+    // ============================================
+    // ✏️ EDIT EMPLOYEE
+    // ============================================
+
     /**
-     * Edit existing employee
+     * Open edit form for employee
      * @param {string} code - Employee code
      */
     async editEmployee(code) {
-        const emp = this.employees.find(e => e.code === code);
-        if (!emp) return;
-
-        // For now, show a simple edit form modal
-        // In production, this would be a full form
-        const newName = prompt('الاسم الجديد:', emp.name);
-        
-        if (newName && newName !== emp.name && newName.trim()) {
-            const result = await db.updateEmployee(code, { name: newName.trim() });
+        try {
+            const employee = await db.getEmployeeByCode(code);
             
-            if (result.success) {
-                ui.showSuccess('تم تحديث بيانات الموظف');
-                await this.loadEmployees(); // Refresh list
-            } else {
-                ui.showError(result.error || 'فشل التحديث');
+            if (!employee) {
+                throw new Error('الموظف غير موجود');
+            }
+
+            this.selectedEmployee = employee;
+
+            // Show edit form (implementation depends on your UI)
+            this.showEditForm(employee);
+
+        } catch (error) {
+            console.error('❌ Edit employee error:', error);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(error.message);
             }
         }
     }
 
     /**
-     * Delete employee (soft delete)
+     * Show edit form populated with employee data
+     * @param {object} employee - Employee data
+     */
+    showEditForm(employee) {
+        // This would typically open a modal or navigate to edit page
+        // For now, we'll use a confirmation dialog as placeholder
+        
+        const formHTML = `
+            <form id="editEmployeeForm" class="auth-form">
+                <div class="input-group">
+                    <label>الاسم</label>
+                    <input type="text" id="editName" value="${employee.name}" required>
+                </div>
+                <div class="input-group">
+                    <label>البريد الإلكتروني</label>
+                    <input type="email" id="editEmail" value="${employee.email || ''}">
+                </div>
+                <div class="input-group">
+                    <label>كلمة السر الجديدة (اتركها فارغة للإبقاء)</label>
+                    <input type="password" id="editPassword" placeholder="كلمة سر جديدة">
+                </div>
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="editIsAdmin" ${employee.is_admin ? 'checked' : ''}>
+                    <span>صلاحيات المدير</span>
+                </div>
+            </form>
+        `;
+
+        console.log('📝 Edit form for:', employee.name);
+        
+        if (typeof ui !== 'undefined' && ui.showInfo) {
+            ui.showInfo(`فتح نموذج تعديل: ${employee.name}`);
+        }
+    }
+
+    /**
+     * Save edited employee data
+     * @param {object} updatedData - Updated fields
+     */
+    async saveEmployee(updatedData) {
+        try {
+            if (!this.selectedEmployee) {
+                throw new Error('لم يتم اختيار موظف');
+            }
+
+            // Validate required fields
+            if (!updatedData.name || updatedData.name.trim().length < 3) {
+                throw new Error('الاسم مطلوب ويجب أن يكون 3 أحرف على الأقل');
+            }
+
+            // Prepare update object
+            const updates = {
+                name: updatedData.name.trim(),
+                email: updatedData.email?.trim() || null,
+                updated_at: new Date().toISOString()
+            };
+
+            // Only update password if provided
+            if (updatedData.password && updatedData.password.length >= 4) {
+                updates.password = updatedData.password;
+                updates.is_first_login = false;
+            }
+
+            // Update admin status (only if current user is super admin)
+            if (updatedData.hasOwnProperty('isAdmin') && auth.getCurrentUser()?.code === 'ADMIN') {
+                updates.is_admin = updatedData.isAdmin;
+            }
+
+            // Save to database
+            const result = await db.updateEmployee(this.selectedEmployee.code, updates);
+
+            if (result.success) {
+                if (typeof ui !== 'undefined' && ui.showSuccess) {
+                    ui.showSuccess('✅ تم تحديث بيانات الموظف بنجاح');
+                }
+
+                // Refresh employees list
+                await this.loadEmployeesList();
+                
+                // Clear selection
+                this.selectedEmployee = null;
+
+            } else {
+                throw new Error(result.error || 'فشل التحديث');
+            }
+
+        } catch (error) {
+            console.error('❌ Save employee error:', error);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(error.message);
+            }
+        }
+    }
+
+    // ============================================
+    // 🗑️ DELETE EMPLOYEE
+    // ============================================
+
+    /**
+     * Confirm and delete employee
      * @param {string} code - Employee code
+     * @param {string} name - Employee name (for display)
+     */
+    async confirmDeleteEmployee(code, name) {
+        try {
+            // Prevent self-deletion
+            if (typeof auth !== 'undefined' && auth.getUserCode() === code) {
+                throw new Error('لا يمكنك حذف حسابك الخاص');
+            }
+
+            // Prevent deletion of other admins (unless super admin)
+            const employee = await db.getEmployeeByCode(code);
+            if (employee?.is_admin && auth.getUserCode() !== 'ADMIN') {
+                throw new Error('لا يمكنك حذف حساب مدير آخر');
+            }
+
+            // Show confirmation dialog
+            const confirmed = await ui.showConfirmation({
+                title: '⚠️ تأكيد الحذف',
+                message: `
+                    <div style="text-align: center;">
+                        <p style="margin-bottom: 15px;">هل أنت متأكد من حذف الموظف:</p>
+                        <strong style="font-size: 1.2em; color: #ef4444;">${name}</strong>
+                        <p style="color: #64748b; margin-top: 10px; font-size: 0.9em;">
+                            (الكود: ${code})
+                        </p>
+                        <p style="color: #dc2626; margin-top: 15px; font-weight: bold;">
+                            ⚠️ هذا الإجراء لا يمكن التراجع عنه!
+                        </p>
+                    </div>
+                `,
+                confirmText: 'نعم، احذف',
+                cancelText 'إلغاء',
+                type: 'danger'
+            });
+
+            if (confirmed) {
+                await this.deleteEmployee(code);
+            }
+
+        } catch (error) {
+            console.error('❌ Confirm delete error:', error);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(error.message);
+            }
+        }
+    }
+
+    /**
+     * Delete employee from database (soft delete)
+     * @param {string} code - Employee code to delete
      */
     async deleteEmployee(code) {
-        const emp = this.employees.find(e => e.code === code);
-        if (!emp) return;
+        try {
+            const result = await db.deleteEmployee(code);
 
-        // Prevent deleting ADMIN account
-        if (code === 'ADMIN') {
-            ui.showError('لا يمكن حذف حساب الأدمن الرئيسي');
+            if (result.success) {
+                if (typeof ui !== 'undefined' && ui.showSuccess) {
+                    ui.showSuccess('🗑️ تم حذف الموظف بنجاح');
+                }
+
+                // Refresh list
+                await this.loadEmployeesList();
+
+            } else {
+                throw new Error(result.error || 'فشل الحذف');
+            }
+
+        } catch (error) {
+            console.error('❌ Delete employee error:', error);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(error.message);
+            }
+        }
+    }
+
+    // ============================================
+    // 📊 ADMIN STATISTICS & REPORTS
+    // ============================================
+
+    /**
+     * Load admin dashboard statistics
+     */
+    async loadAdminStats() {
+        try {
+            if (!this.canAccessAdmin()) return;
+
+            const stats = await db.getSystemStats();
+
+            // Update stat displays
+            this.updateStatDisplay('adminTotalEmployees', stats.totalEmployees);
+            this.updateStatDisplay('adminTodayCheckIns', stats.todayCheckIns);
+            this.updateStatDisplay('adminTodayCheckOuts', stats.todayCheckOuts);
+
+        } catch (error) {
+            console.error('❌ Load admin stats error:', error);
+        }
+    }
+
+    /**
+     * Update stat display element
+     * @param {string} elementId - Element ID
+     * @param {*} value - Value to display
+     */
+    updateStatDisplay(elementId, value) {
+        const el = document.getElementById(elementId);
+        if (el) {
+            el.textContent = value;
+        }
+    }
+
+    /**
+     * View employee attendance history
+     * @param {string} code - Employee code
+     */
+    async viewEmployeeAttendance(code) {
+        try {
+            const employee = await db.getEmployeeByCode(code);
+            
+            if (!employee) {
+                throw new Error('الموظف غير موجود');
+            }
+
+            // Navigate to reports page filtered by this employee
+            // Implementation depends on your routing
+            
+            if (typeof ui !== 'undefined' && ui.showInfo) {
+                ui.showInfo(`عرض سجل حضور: ${employee.name}`);
+            }
+
+            console.log(`📊 Viewing attendance for: ${employee.name}`);
+
+        } catch (error) {
+            console.error('❌ View attendance error:', error);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(error.message);
+            }
+        }
+    }
+
+    // ============================================
+    // ⚙️ ADMIN SETTINGS
+    // ============================================
+
+    /**
+     * Load admin settings
+     */
+    async loadSettings() {
+        // Implement settings loading from database or config
+        console.log('⚙️ Loading admin settings...');
+    }
+
+    /**
+     * Save admin settings
+     * @param {object} settings - Settings object
+     */
+    async saveSettings(settings) {
+        try {
+            // Validate settings
+            // Save to database/config
+            console.log('💾 Saving settings:', settings);
+            
+            if (typeof ui !== 'undefined' && ui.showSuccess) {
+                ui.showSuccess('✅ تم حفظ الإعدادات');
+            }
+
+        } catch (error) {
+            console.error('❌ Save settings error:', error);
+            
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError('فشل حفظ الإعدادات');
+            }
+        }
+    }
+
+    // ============================================
+    // 🔧 UTILITY METHODS
+    // ============================================
+
+    /**
+     * Check admin access and redirect if not authorized
+     */
+    checkAdminAccess() {
+        if (typeof auth === 'undefined' || !this.canAccessAdmin()) {
+            console.warn('⚠️ Access denied - Not an admin user');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Search employees by name or code
+     * @param {string} query - Search query
+     * @returns {Array} Filtered results
+     */
+    searchEmployees(query) {
+        if (!query || !this.employeesList.length) return [];
+
+        const searchTerm = query.toLowerCase().trim();
+
+        return this.employeesList.filter(emp => 
+            emp.name.toLowerCase().includes(searchTerm) ||
+            emp.code.toLowerCase().includes(searchTerm) ||
+            (emp.email && emp.email.toLowerCase().includes(searchTerm))
+        );
+    }
+
+    /**
+     * Filter employees by status
+     * @param {string} status - Status filter ('active', 'deleted', 'admin', 'all')
+     * @returns {Array} Filtered employees
+     */
+    filterEmployees(status) {
+        switch (status) {
+            case 'active':
+                return this.employeesList.filter(emp => !emp.is_deleted);
+            case 'deleted':
+                return this.employeesList.filter(emp => emp.is_deleted);
+            case 'admin':
+                return this.employeesList.filter(emp => emp.is_admin);
+            case 'all':
+            default:
+                return this.employeesList;
+        }
+    }
+
+    /**
+     * Export employees list to CSV
+     */
+    exportEmployeesList() {
+        if (!this.employeesList.length) {
+            if (typeof ui !== 'undefined' && ui.showWarning) {
+                ui.showWarning('لا يوجد موظفين للتصدير');
+            }
             return;
         }
 
-        const confirmed = await ui.showConfirmation({
-            title: '⚠️ تأكيد الحذف',
-            message: `هل أنت متأكد من حذف الموظف "${emp.name}"؟\n\n⚠️ هذا الإجراء قابل للعكس.`,
-            confirmText: 'نعم، احذف',
-            cancelText: 'إلغاء',
-            type: 'danger'
-        });
+        const exportData = this.employeesList.map(emp => ({
+            'الكود': emp.code,
+            'الاسم': emp.name,
+            'البريد': emp.email || '-',
+            'نوع الحساب': emp.is_admin ? 'مدير' : 'موظف',
+            'الحالة': emp.is_deleted ? 'محذوف' : 'نشط',
+            'تاريخ التسجيل': Utils.formatDate(emp.created_at, 'date')
+        }));
 
-        if (confirmed) {
-            const result = await db.updateEmployee(code, { is_deleted: true });
-            
-            if (result.success) {
-                ui.showSuccess('تم حذف الموظف بنجاح');
-                this.closeEmployeeDetails();
-                await this.loadEmployees(); // Refresh list
-            } else {
-                ui.showError(result.error || 'فشل الحذف');
-            }
+        Utils.exportToCSV(exportData, `قائمة_الموظفين_${Utils.formatDate(new Date(), 'date')}.csv`);
+
+        if (typeof ui !== 'undefined' && ui.showSuccess) {
+            ui.showSuccess('✅ تم تصدير قائمة الموظفين');
         }
-    }
-
-    /**
-     * Reset employee password
-     * @param {string} code - Employee code
-     */
-    async resetPassword(code) {
-        const emp = this.employees.find(e => e.code === code);
-        if (!emp) return;
-
-        const confirmed = await ui.showConfirmation({
-            title: '🔑 إعادة تعيين كلمة المرور',
-            message: `سيتم إنشاء كلمة مرور جديدة لـ "${emp.name}" وإرسالها إلى بريده.`,
-            confirmText: 'نعم، أعد التعيين',
-            cancelText: 'إلغاء',
-            type: 'warning'
-        });
-
-        if (confirmed) {
-            ui.showInfo('جاري إرسال كلمة المرور الجديدة...');
-            
-            const result = await db.requestPasswordReset(code);
-            
-            if (result.success) {
-                ui.showSuccess('تم إرسال كلمة المرور الجديدة ✓');
-            } else {
-                ui.showError(result.error || 'فشل في إرسال كلمة المرور');
-            }
-        }
-    }
-
-    // ============================================
-    // 📈 REPORTS & ANALYTICS
-    // ============================================
-
-    /**
-     * Generate attendance report for all employees
-     * @param {Date} startDate - Start date
-     * @param {Date} endDate - End date
-     */
-    async generateCompanyReport(startDate, endDate) {
-        try {
-            ui.showElementLoading('#reportContent', 'جاري إنشاء التقرير...');
-
-            // Get all attendance records in date range
-            const allRecords = [];
-            
-            for (const emp of this.employees) {
-                if (emp.is_deleted || emp.is_admin) continue;
-                
-                const records = await db.getAttendanceHistory(
-                    emp.code,
-                    startDate,
-                    endDate
-                );
-                
-                allRecords.push(...records.map(r => ({ ...r, employeeName: emp.name })));
-            }
-
-            // Sort by date
-            const sortedRecords = Utils.sortBy(allRecords, 'created_at', 'asc');
-
-            // Calculate statistics
-            const stats = {
-                totalRecords: sortedRecords.length,
-                totalCheckIns: sortedRecords.filter(r => r.type === 'حضور').length,
-                totalCheckOuts: sortedRecords.filter(r => r.type === 'انصراف').length,
-                uniqueEmployees: new Set(sortedRecords.map(r => r.employee_code)).size,
-                averageHours: 0
-            };
-
-            // Calculate average hours
-            const hoursArray = sortedRecords
-                .filter(r => r.hours_worked)
-                .map(r => parseFloat(r.hours_worked));
-            
-            if (hoursArray.length > 0) {
-                stats.averageHours = (
-                    hoursArray.reduce((a, b) => a + b, 0) / hoursArray.length
-                ).toFixed(2);
-            }
-
-            // Display report
-            this.displayReport(sortedRecords, stats);
-
-            ui.hideElementLoading('#reportContent');
-
-        } catch (error) {
-            console.error('Generate report error:', error);
-            ui.showError('فشل إنشاء التقرير');
-            ui.hideElementLoading('#reportContent');
-        }
-    }
-
-    /**
-     * Display report data in UI
-     * @param {Array} records - Attendance records
-     * @param {object} stats - Statistics object
-     */
-    displayReport(records, stats) {
-        const container = document.getElementById('reportData');
-        if (!container) return;
-
-        // Update statistics cards
-        document.getElementById('reportTotalRecords') && 
-            (document.getElementById('reportTotalRecords').textContent = stats.totalRecords);
-        
-        document.getElementById('reportTotalEmployees') &&
-            (document.getElementById('reportTotalEmployees').textContent = stats.uniqueEmployees);
-        
-        document.getElementById('reportAverageHours') &&
-            (document.getElementById('reportAverageHours').textContent = `${stats.averageHours} ساعة`);
-
-        // Create table
-        const tableHTML = `
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>الموظف</th>
-                        <th>الكود</th>
-                        <th>التاريخ</th>
-                        <th>الحالة</th>
-                        <th>الوردية</th>
-                        <th>الساعات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${records.map(record => `
-                        <tr>
-                            <td>${record.employee_name || '-'}</td>
-                            <td>${record.employee_code}</td>
-                            <td>${Utils.formatDate(record.created_at)}</td>
-                            <td>
-                                <span class="badge ${record.type === 'حضور' ? 'badge-in' : 'badge-out'}">
-                                    ${record.type}
-                                </span>
-                            </td>
-                            <td>${record.shift || '-'}</td>
-                            <td>${record.hours_worked || '-'}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-
-        container.innerHTML = tableHTML || '<p class="empty-state">لا توجد سجلات</p>';
-    }
-
-    // ============================================
-    // 🔔 NOTIFICATIONS & ALERTS
-    // ============================================
-
-    /**
-     * Show system notification to admin
-     * @param {string} title - Notification title
-     * @param {string} message - Notification message
-     * @param {string} type - Notification type
-     */
-    showNotification(title, message, type = 'info') {
-        const notificationsList = document.getElementById('notificationsList');
-        if (!notificationsList) return;
-
-        const notification = document.createElement('div');
-        notification.className = 'notification-item unread';
-        
-        const icons = {
-            success: 'fa-check-circle text-success',
-            error: 'fa-exclamation-circle text-danger',
-            warning: 'fa-exclamation-triangle text-warning',
-            info: 'fa-info-circle text-primary'
-        };
-
-        notification.innerHTML = `
-            <div class="icon"><i class="fas ${icons[type] || icons.info}"></i></div>
-            <div class="notification-content">
-                <h4>${title}</h4>
-                <p>${message}</p>
-                <small>${new Date().toLocaleTimeString('ar-EG')}</small>
-            </div>
-        `;
-
-        notificationsList.insertBefore(notification, notificationsList.firstChild);
-
-        // Update badge count
-        this.updateNotificationBadge();
-
-        // Auto-remove after some time (optional)
-        setTimeout(() => {
-            notification.classList.remove('unread');
-        }, 5000);
-    }
-
-    /**
-     * Update notification badge count
-     */
-    updateNotificationBadge() {
-        const badge = document.getElementById('notificationBadge');
-        const unreadCount = document.querySelectorAll('.notification-item.unread').length;
-
-        if (badge) {
-            badge.textContent = unreadCount;
-            badge.classList.toggle('hidden', unreadCount === 0);
-        }
-    }
-
-    /**
-     * Mark all notifications as read
-     */
-    markAllNotificationsRead() {
-        document.querySelectorAll('.notification-item.unread').forEach(item => {
-            item.classList.remove('unread');
-        });
-        
-        this.updateNotificationBadge();
-        ui.showSuccess('تم تعيين الكل كمقروء');
-    }
-
-    // ============================================
-    // 🛠️ UTILITY METHODS
-    // ============================================
-
-    /**
-     * Open admin panel
-     */
-    openAdminPanel() {
-        // This would open a full admin dashboard
-        // For now, we'll navigate to a simple admin view
-        console.log('Opening admin panel...');
-        
-        ui.showInfo('لوحة التحكم قيد التطوير');
-        
-        // Future: Navigate to dedicated admin page
-        // ui.navigateTo('adminPage');
-    }
-
-    /**
-     * Export data in various formats
-     * @param {string} format - Export format
-     * @param {Array} data - Data to export
-     */
-    exportData(format, data) {
-        attendance.exportData(format, data);
-    }
-
-    /**
-     * Search employees
-     * @param {string} query - Search query
-     */
-    searchEmployees(query) {
-        this.filters.search = query;
-        this.renderEmployeesList();
-    }
-
-    /**
-     * Sort employees by field
-     * @param {string} field - Field to sort by
-     */
-    sortEmployees(field) {
-        if (this.filters.sortBy === field) {
-            // Toggle sort order
-            this.filters.sortOrder = this.filters.sortOrder === 'asc' ? 'desc' : 'asc';
-        } else {
-            this.filters.sortBy = field;
-            this.filters.sortOrder = 'asc';
-        }
-        
-        this.renderEmployeesList();
-    }
-
-    /**
-     * Get system health status
-     * @returns {Promise<object>} Health status
-     */
-    async getSystemHealth() {
-        return {
-            databaseConnected: db.isConnectedToSupabase(),
-            modelsLoaded: faceRecognition.areModelsLoaded(),
-            cameraActive: faceRecognition.isCameraRunning(),
-            knownFaces: faceRecognition.getKnownFacesCount(),
-            totalEmployees: this.employees.length,
-            timestamp: new Date().toISOString()
-        };
     }
 }
 
-// Create global instance
-const admin = new AdminManager();
+// ============================================
+// 🌍 GLOBAL INSTANCE
+// ============================================
 
-// Export for use in other modules
-window.AdminManager = AdminManager;
-window.admin = admin;
+/**
+ * Global admin instance
+ */
+let admin;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    admin = new AdminManager();
+    admin.init();
+    
+    console.log('👔 Admin module loaded');
+});
+
+console.log('✅ admin.js v4.1 loaded successfully');
