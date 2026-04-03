@@ -37,7 +37,6 @@
         @keyframes scanLine { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
         @keyframes matchPop { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
         
-        /* ✅ إصلاح Responsive Design - دعم اللاب توب */
         .app-container { flex: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: 15px; position: relative; z-index: 1; animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
         h1 { font-size: 26px; text-align: center; background: linear-gradient(135deg, #fff, #93c5fd); -webkit-background-clip: text; color: transparent; margin-bottom: 20px; font-weight: 800; letter-spacing: -0.5px; }
 
@@ -137,7 +136,6 @@
         .stat-card p { color: #93c5fd; font-size: 14px; font-weight: 600; }
 
         .emp-profile-card { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; background: var(--card-bg); backdrop-filter: blur(20px); padding: 15px 20px; border-radius: 20px; border: 1px solid var(--glass); }
-        /* ✅ إصلاح: صورة الموظف مع placeholder واضح */
         .emp-profile-img { 
             width: 60px; 
             height: 60px; 
@@ -145,7 +143,6 @@
             border: 2px solid var(--primary); 
             object-fit: cover; 
             background: linear-gradient(135deg, #1e293b, #334155);
-            /* ✅ إضافة تأثير loading */
             animation: pulseGreen 2s infinite;
         }
         .emp-profile-img.loaded {
@@ -423,13 +420,25 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-    const SUPABASE_URL = 'https://qgbokzzynieoedhloxqt.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc';
+    // ==========================================
+    // ✅ SUPABASE CLIENT INITIALIZATION
+    // ==========================================
     const { createClient } = window.supabase; 
-    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY); 
+    const db = createClient(
+        'https://qgbokzzynieoedhloxqt.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc'
+    ); 
     const EMAIL_API_URL = 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec';
 
+    // ==========================================
+    // ✅ GLOBAL VARIABLES
+    // ==========================================
+    let regData = {};
+    let employeesList = [];
+
+    // ==========================================
     // ✅ ثوابت محسنة
+    // ==========================================
     const OFFICE_LAT = 30.1407941, OFFICE_LON = 31.3800838, MAX_DISTANCE_METERS = 500;
     const MATCH_THRESHOLD = 0.55, AUTO_REFRESH_INTERVAL = 30000, STABLE_FRAMES_REQUIRED = 5;
     const MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
@@ -1055,6 +1064,7 @@
                 
             if(emps) { 
                 employees = emps.filter(emp => !emp.is_admin); // ✅ فلترة إضافية
+                employeesList = employees; // ✅ حفظ في global للبحث
                 $('empCount').textContent=employees.length; 
                 renderEmployeeList(employees); 
                 setStatus('متصل'); 
@@ -1069,7 +1079,7 @@
         if(!list.length) { $('searchResults').innerHTML='<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين</p>'; return; } 
         $('searchResults').innerHTML = list.map(e => `<div class="emp-item"><div class="emp-info"><h4>${e.name}</h4><p>${e.code}</p></div><div class="emp-actions"><button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${e.code}', '${e.name}')"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${e.code}', '${e.name}')"><i class="fas fa-times"></i></button><button class="btn btn-sm btn-report" onclick="loadEmpReport('${e.code}', '${e.name}')"><i class="fas fa-chart-bar"></i></button><button class="btn btn-sm btn-reg" onclick="adminResetFace('${e.code}', '${e.name}')" title="إعادة تسجيل بصمة"><i class="fas fa-sync-alt"></i></button><button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${e.code}', '${e.name}')" title="حذف الموظف"><i class="fas fa-trash"></i></button></div></div>`).join(''); 
     }
-    $('searchInput')?.addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); renderEmployeeList(q ? employees.filter(emp=>emp.name.toLowerCase().includes(q)||emp.code.toLowerCase().includes(q)) : employees); });
+    $('searchInput')?.addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); renderEmployeeList(q ? employeesList.filter(emp=>emp.name.toLowerCase().includes(q)||emp.code.toLowerCase().includes(q)) : employeesList); });
 
     async function adminDirectAtt(type, code, name) {
         if(!sessionDescriptor) { showToast('لا يوجد بصمة أدمن، جاري التسجيل...', 'error'); firstTimeSetupMode = true; if(!await openCamera()) { firstTimeSetupMode=false; } return; }
@@ -1422,6 +1432,9 @@
         });
     }
     init();
+
+    console.log('%c✅ Axentro System Loaded Successfully', 'color: #10b981; font-size: 16px; font-weight: bold;');
+    console.log('%c🔒 Security Note: Ensure RLS is enabled in Supabase', 'color: #f59e0b; font-size: 12px;');
 </script>
 </body>
 </html>
