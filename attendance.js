@@ -1,25 +1,23 @@
 /**
  * ============================================
- * 📷 AXENTRO FACE RECOGNITION v4.0
- * ✅ AI-Powered Face Detection & Recognition
+ * ⏰ AXENTRO ATTENDANCE MANAGER v4.0
+ * ✅ Check-in/Check-out & Time Tracking
  * ============================================
  */
 
-class FaceRecognitionManager {
+class AttendanceManager {
     constructor() {
-        this.modelsLoaded = false;
-        this.isCameraActive = false;
-        this.currentStream = null;
-        this.videoElement = null;
-        this.canvasElement = null;
-        this.detectionInterval = null;
-        this.recognizedFace = null;
+        this.currentStatus = null; // 'in' or 'out'
+        this.todayRecords = [];
+        this.lastCheckIn = null;
+        this.lastCheckOut = null;
+        this.isProcessing = false;
         
-        // Face descriptors storage (for matching)
-        this.knownFaces = new Map();
+        // Cooldown tracking
+        this.lastActionTime = 0;
         
-        // Configuration
-        this.config = AppConfig.faceRecognition;
+        // Location data
+        this.currentLocation = null;
         
         this.init();
     }
@@ -29,786 +27,587 @@ class FaceRecognitionManager {
     // ============================================
 
     /**
-     * Initialize face recognition system
+     * Initialize attendance manager
      */
-    async init() {
-        console.log('🎭 Initializing Face Recognition System...');
-        
-        try {
-            // Load face-api.js models
-            await this.loadModels();
-            
-            // Setup camera elements
-            this.setupCameraElements();
-            
-            console.log('✅ Face Recognition System Ready');
-            
-        } catch (error) {
-            console.error('❌ Face Recognition Init Error:', error);
-            ui.showError('فشل تحميل نظام التعرف على الوجوه');
-        }
-    }
-
-    /**
-     * Load required neural network models
-     */
-    async loadModels() {
-        if (this.modelsLoaded) return;
-
-        const statusEl = document.getElementById('loadStatus');
-        const progressEl = document.getElementById('loadProgress');
-
-        try {
-            // Update status
-            if (statusEl) statusEl.textContent = 'جاري تحميل نماذج الذكاء الاصطناعي...';
-            
-            // Load models sequentially with progress updates
-            const models = [
-                { name: 'tinyFaceDetector', url: this.config.models.tinyFaceDetector, progress: 20 },
-                { name: 'faceLandmark68Tiny', url: this.config.models.faceLandmark68Tiny, progress: 40 },
-                { name: 'faceRecognition', url: this.config.models.faceRecognition, progress: 70 },
-                { name: 'faceExpression', url: null, progress: 85 } // Optional
-            ];
-
-            for (const model of models) {
-                if (model.url && faceapi.nets[model.name]) {
-                    console.log(`Loading model: ${model.name}`);
-                    await faceapi.nets[model.name].loadFromUri(model.url);
-                    
-                    if (progressEl) progressEl.style.width = `${model.progress}%`;
-                    await Utils.sleep(200); // Small delay for UI update
-                }
-            }
-
-            this.modelsLoaded = true;
-            
-            if (progressEl) progressEl.style.width = '100%';
-            if (statusEl) statusEl.textContent = 'تم تحميل النماذج بنجاح ✓';
-
-        } catch (error) {
-            console.error('Model loading error:', error);
-            throw new Error(ErrorCodes.FACE_MODEL_LOAD_FAILED.message);
-        }
-    }
-
-    /**
-     * Setup camera video and canvas elements
-     */
-    setupCameraElements() {
-        // Dashboard camera
-        this.videoElement = document.getElementById('dashboardVideo');
-        this.canvasElement = document.getElementById('dashboardCanvas');
-        
-        // Register page cameras
-        this.registerVideo = document.getElementById('registerVideo');
-        this.registerCanvas = document.getElementById('registerCanvas');
+    init() {
+        console.log('⏰ Attendance Manager initialized');
     }
 
     // ============================================
-    // 📹 CAMERA OPERATIONS
+    // 📍 LOCATION TRACKING
     // ============================================
 
     /**
-     * Start camera stream
-     * @param {HTMLVideoElement} videoElement - Video element to use
-     * @param {object} options - Camera options
-     * @returns {Promise<MediaStream>} Camera stream
+     * Get current location
+     * @returns {Promise<object>} Location data
      */
-    async startCamera(videoElement, options = {}) {
+    async getCurrentLocation() {
         try {
-            // Stop any existing stream
-            this.stopCamera();
-
-            // Check for camera support
-            if (!navigator.mediaDevices?.getUserMedia) {
-                throw new Error(ErrorCodes.FACE_NO_CAMERA.message);
-            }
-
-            // Default camera constraints
-            const constraints = {
-                video: {
-                    facingMode: options.facingMode || this.config.camera.facingMode,
-                    width: { ideal: this.config.camera.width },
-                    height: { ideal: this.config.camera.height },
-                    frameRate: { ideal: this.config.camera.frameRate }
-                },
-                audio: false
-            };
-
-            // Request permission and get stream
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            // Attach to video element
-            if (videoElement) {
-                videoElement.srcObject = stream;
-                await videoElement.play();
-                
-                // Store reference
-                this.currentVideoElement = videoElement;
-            }
-
-            this.currentStream = stream;
-            this.isCameraActive = true;
-
-            console.log('📹 Camera started successfully');
-            return stream;
-
-        } catch (error) {
-            console.error('Camera start error:', error);
-            this.handleCameraError(error);
-            throw error;
-        }
-    }
-
-    /**
-     * Stop camera stream
-     */
-    stopCamera() {
-        if (this.currentStream) {
-            this.currentStream.getTracks().forEach(track => track.stop());
-            this.currentStream = null;
-        }
-
-        if (this.currentVideoElement) {
-            this.currentVideoElement.srcObject = null;
-        }
-
-        this.stopDetection();
-        this.isCameraActive = false;
-        
-        console.log('📹 Camera stopped');
-    }
-
-    /**
-     * Switch between front/back camera
-     */
-    async switchCamera() {
-        if (!this.isCameraActive || !this.currentVideoElement) return;
-
-        const currentFacingMode = this.lastFacingMode || 'user';
-        const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-
-        try {
-            ui.showInfo('جاري تبديل الكاميرا...');
-            
-            await this.startCamera(this.currentVideoElement, { 
-                facingMode: newFacingMode 
+            const location = await Utils.getLocation({
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
             });
-            
-            this.lastFacingMode = newFacingMode;
-            
-            ui.showSuccess('تم تبديل الكاميرا ✓');
-            
+
+            this.currentLocation = location;
+
+            // Update UI
+            const statusEl = document.getElementById('locationStatus');
+            if (statusEl) {
+                statusEl.textContent = `📍 دقة: ${Math.round(location.accuracy)}م`;
+                statusEl.classList.add('text-success');
+            }
+
+            return location;
+
         } catch (error) {
-            ui.showError('فشل تبديل الكاميرا');
+            console.error('Location error:', error);
+            
+            const statusEl = document.getElementById('locationStatus');
+            if (statusEl) {
+                statusEl.textContent = '❌ تعذر تحديد الموقع';
+                statusEl.classList.add('text-danger');
+            }
+
+            return null;
         }
     }
 
     /**
-     * Handle camera errors gracefully
-     * @param {Error} error - Camera error
+     * Generate Google Maps link from current location
+     * @returns {string|null} Maps URL or null
      */
-    handleCameraError(error) {
-        let userMessage = '';
+    getLocationLink() {
+        if (!this.currentLocation) return null;
 
-        switch (error.name) {
-            case 'NotAllowedError':
-            case 'PermissionDeniedError':
-                userMessage = ErrorCodes.FACE_CAMERA_PERMISSION_DENIED.message;
-                break;
-                
-            case 'NotFoundError':
-            case 'DevicesNotFoundError':
-                userMessage = ErrorCodes.FACE_NO_CAMERA.message;
-                break;
-                
-            case 'NotReadableError':
-            case 'TrackStartError':
-                userMessage = 'الكاميرا مستخدمة من قبل تطبيق آخر';
-                break;
-                
-            case 'OverconstrainedError':
-                userMessage = 'الكاميرا لا تدعم الإعدادات المطلوبة';
-                break;
-                
-            default:
-                userMessage = ErrorCodes.FACE_NO_CAMERA.message;
-        }
-
-        ui.showError(userMessage);
-        console.error('Camera error:', error.name, error.message);
+        return Utils.getMapsLink(
+            this.currentLocation.latitude,
+            this.currentLocation.longitude
+        );
     }
 
     // ============================================
-    // 🔍 FACE DETECTION
+    // 📊 TODAY'S RECORDS
     // ============================================
 
     /**
-     * Start continuous face detection
-     * @param {HTMLVideoElement} video - Video element
-     * @param {HTMLCanvasElement} canvas - Canvas for drawing
-     * @param {Function} onDetect - Callback when face detected
+     * Load today's attendance records for current user
      */
-    async startDetection(video, canvas, onDetect) {
-        if (!this.modelsLoaded) {
-            ui.showError(ErrorCodes.FACE_MODEL_LOAD_FAILED.message);
+    async loadTodayRecords() {
+        try {
+            if (!auth.isAuthenticated()) return;
+
+            const userCode = auth.getUserCode();
+            this.todayRecords = await db.getTodayAttendance(userCode);
+
+            // Determine current status
+            this.determineCurrentStatus();
+
+            // Update UI
+            this.updateTodaySummary();
+
+            console.log(`📋 Loaded ${this.todayRecords.length} today's records`);
+
+        } catch (error) {
+            console.error('Load today records error:', error);
+        }
+    }
+
+    /**
+     * Determine current check-in/check-out status
+     */
+    determineCurrentStatus() {
+        if (this.todayRecords.length === 0) {
+            this.currentStatus = 'out';
+            this.lastCheckIn = null;
+            this.lastCheckOut = null;
             return;
         }
 
-        // Stop existing detection
-        this.stopDetection();
+        // Sort by time (newest first)
+        const sortedRecords = [...this.todayRecords].sort(
+            (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
 
-        // Setup canvas dimensions
-        if (video && canvas) {
-            canvas.width = video.videoWidth || this.config.camera.width;
-            canvas.height = video.videoHeight || this.config.camera.height;
+        const lastRecord = sortedRecords[0];
+
+        if (lastRecord.type === 'حضور') {
+            this.currentStatus = 'in';
+            this.lastCheckIn = lastRecord;
+            this.lastCheckOut = sortedRecords.find(r => r.type === 'انصراف') || null;
+        } else {
+            this.currentStatus = 'out';
+            this.lastCheckIn = sortedRecords.find(r => r.type === 'حضور') || null;
+            this.lastCheckOut = lastRecord;
+        }
+    }
+
+    /**
+     * Update UI with today's summary
+     */
+    updateTodaySummary() {
+        // Update times
+        const checkInTimeEl = document.getElementById('checkInTime');
+        const checkOutTimeEl = document.getElementById('checkOutTime');
+
+        if (checkInTimeEl && this.lastCheckIn) {
+            checkInTimeEl.textContent = Utils.formatDate(this.lastCheckIn.created_at, 'time');
         }
 
-        // Create display size for detection
-        const displaySize = {
-            width: video?.videoWidth || this.config.camera.width,
-            height: video?.videoHeight || this.config.camera.height
-        };
+        if (checkOutTimeEl && this.lastCheckOut) {
+            checkOutTimeEl.textContent = Utils.formatDate(this.lastCheckOut.created_at, 'time');
+        }
 
-        faceapi.matchDimensions(canvas, displaySize);
+        // Calculate total hours and overtime
+        let totalHours = 0;
+        let overtimeHours = 0;
 
-        // Start detection loop
-        this.detectionInterval = setInterval(async () => {
-            try {
-                const detections = await this.detectFaces(video, displaySize);
-                
-                if (detections.length > 0 && onDetect) {
-                    onDetect(detections[0], canvas);
-                }
-                
-            } catch (error) {
-                console.error('Detection error:', error);
+        this.todayRecords.forEach(record => {
+            const hours = parseFloat(record.hours_worked) || 0;
+            totalHours += hours;
+
+            const overtimeMatch = record.overtime?.match(/[\d.]+/);
+            if (overtimeMatch) {
+                overtimeHours += parseFloat(overtimeMatch[0]);
             }
-        }, 200); // Detect every 200ms
-
-        console.log('🔍 Face detection started');
-    }
-
-    /**
-     * Stop face detection loop
-     */
-    stopDetection() {
-        if (this.detectionInterval) {
-            clearInterval(this.detectionInterval);
-            this.detectionInterval = null;
-        }
-    }
-
-    /**
-     * Detect faces in video frame
-     * @param {HTMLVideoElement} video - Video element
-     * @param {object} displaySize - Display dimensions
-     * @returns {Promise<Array>} Array of detections
-     */
-    async detectFaces(video, displaySize) {
-        if (!video || !this.modelsLoaded) return [];
-
-        try {
-            const options = new faceapi.TinyFaceDetectorOptions({
-                inputSize: this.config.detection.inputSize,
-                scoreThreshold: this.config.detection.scoreThreshold
-            });
-
-            const detections = await faceapi
-                .detectAllFaces(video, options)
-                .withFaceLandmarks(true);
-
-            // Resize detections to match display
-            const resizedDetections = faceapi.resizeResults(detections, displaySize);
-
-            return resizedDetections;
-
-        } catch (error) {
-            console.error('Face detection error:', error);
-            return [];
-        }
-    }
-
-    /**
-     * Draw detection box on canvas
-     * @param {Array} detections - Face detections
-     * @param {HTMLCanvasElement} canvas - Canvas element
-     */
-    drawDetections(detections, canvas) {
-        if (!canvas || !detections.length) return;
-
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Draw detection boxes
-        detections.forEach(detection => {
-            const box = detection.detection.box;
-            
-            // Draw rectangle
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(box.x, box.y, box.width, box.height);
-
-            // Draw corners
-            const cornerLength = 20;
-            ctx.lineWidth = 4;
-            
-            // Top-left corner
-            ctx.beginPath();
-            ctx.moveTo(box.x, box.y + cornerLength);
-            ctx.lineTo(box.x, box.y);
-            ctx.lineTo(box.x + cornerLength, box.y);
-            ctx.stroke();
-
-            // Top-right corner
-            ctx.beginPath();
-            ctx.moveTo(box.x + box.width - cornerLength, box.y);
-            ctx.lineTo(box.x + box.width, box.y);
-            ctx.lineTo(box.x + box.width, box.y + cornerLength);
-            ctx.stroke();
-
-            // Bottom-left corner
-            ctx.beginPath();
-            ctx.moveTo(box.x, box.y + box.height - cornerLength);
-            ctx.lineTo(box.x, box.y + box.height);
-            ctx.lineTo(box.x + cornerLength, box.y + box.height);
-            ctx.stroke();
-
-            // Bottom-right corner
-            ctx.beginPath();
-            ctx.moveTo(box.x + box.width - cornerLength, box.y + box.height);
-            ctx.lineTo(box.x + box.width, box.y + box.height);
-            ctx.lineTo(box.x + box.width, box.y + box.height - cornerLength);
-            ctx.stroke();
         });
+
+        // Update display
+        const totalHoursEl = document.getElementById('totalHoursToday');
+        const overtimeEl = document.getElementById('overtimeToday');
+        const todayHoursEl = document.getElementById('todayHours');
+
+        if (totalHoursEl) {
+            totalHoursEl.textContent = Utils.formatHoursWorked(totalHours);
+        }
+
+        if (overtimeEl) {
+            overtimeEl.textContent = overtimeHours > 0 
+                ? `${overtimeHours.toFixed(1)} ساعة` 
+                : 'لا يوجد';
+        }
+
+        if (todayHoursEl) {
+            todayHoursEl.textContent = totalHours.toFixed(1);
+        }
+
+        // Update action buttons state
+        this.updateActionButtons();
+    }
+
+    /**
+     * Update action buttons based on current status
+     */
+    updateActionButtons() {
+        const checkInBtn = document.getElementById('checkInBtn');
+        const checkOutBtn = document.getElementById('checkOutBtn');
+
+        if (!checkInBtn || !checkOutBtn) return;
+
+        if (this.currentStatus === 'in') {
+            // User is checked in - show checkout button active
+            checkInBtn.disabled = true;
+            checkInBtn.classList.add('disabled');
+            checkOutBtn.disabled = false;
+            checkOutBtn.classList.remove('disabled');
+            
+            checkInBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>✓ تم الحضور</span>';
+            checkOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span>انصراف</span>';
+
+        } else {
+            // User is checked out - show checkin button active
+            checkInBtn.disabled = false;
+            checkInBtn.classList.remove('disabled');
+            checkOutBtn.disabled = true;
+            checkOutBtn.classList.add('disabled');
+            
+            checkInBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>حضور</span>';
+            checkOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span>✓ تم الانصراف</span>';
+        }
     }
 
     // ============================================
-    // 🎯 FACE RECOGNITION
+    // ✅ CHECK-IN / CHECK-OUT OPERATIONS
     // ============================================
 
     /**
-     * Capture face descriptor from current video frame
-     * @param {HTMLVideoElement} video - Video element
-     * @returns {Promise<object|null>} Face descriptor or null
+     * Handle check-in action
      */
-    async captureFaceDescriptor(video) {
-        if (!video || !this.modelsLoaded) {
-            throw new Error(ErrorCodes.FACE_MODEL_LOAD_FAILED.message);
+    async handleCheckIn() {
+        await this.recordAttendance('حضور');
+    }
+
+    /**
+     * Handle check-out action
+     */
+    async handleCheckOut() {
+        await this.recordAttendance('انصراف');
+    }
+
+    /**
+     * Record attendance (main function)
+     * @param {string} type - 'حضور' or 'انصراف'
+     */
+    async recordAttendance(type) {
+        // Prevent double-clicks
+        if (this.isProcessing) {
+            ui.showWarning('جاري المعالجة... يرجى الانتظار');
+            return;
         }
 
-        try {
-            // Detect face with descriptor
-            const detection = await faceapi
-                .detectSingleFace(
-                    video, 
-                    new faceapi.TinyFaceDetectorOptions({
-                        inputSize: this.config.detection.inputSize,
-                        scoreThreshold: this.config.detection.scoreThreshold
-                    })
-                )
-                .withFaceLandmarks()
-                .withFaceDescriptor();
+        // Check cooldown
+        if (this.isOnCooldown()) {
+            ui.showError(ErrorCodes.ATTENDANCE_COOLDOWN_ACTIVE.message);
+            return;
+        }
 
-            if (!detection) {
-                throw new Error(ErrorCodes.FACE_NO_FACE_DETECTED.message);
+        // Validate user is authenticated
+        if (!auth.isAuthenticated()) {
+            ui.showError(ErrorCodes.AUTH_SESSION_EXPIRED.message);
+            ui.navigateTo('loginPage');
+            return;
+        }
+
+        // Validate shift selection
+        const selectedShift = this.getSelectedShift();
+        if (!selectedShift) {
+            ui.showError(ErrorCodes.ATTENDANCE_NO_SHIFT_SELECTED.message);
+            return;
+        }
+
+        // Check if opposite action already exists
+        if (type === 'حضور' && this.currentStatus === 'in') {
+            ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_IN.message);
+            return;
+        }
+
+        if (type === 'انصراف' && this.currentStatus === 'out') {
+            ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_OUT.message);
+            return;
+        }
+
+        // Start processing
+        this.isProcessing = true;
+        const btnId = type === 'حضور' ? 'checkInBtn' : 'checkOutBtn';
+        const btn = document.getElementById(btnId);
+
+        ui.showButtonLoading(btn, type === 'حضور' ? 'جاري تسجيل الحضور...' : 'جاري تسجيل الانصراف...');
+
+        try {
+            // Step 1: Recognize face (if camera available)
+            let recognizedFace = null;
+            if (faceRecognition.isCameraRunning()) {
+                try {
+                    recognizedFace = await faceRecognition.recognizeForAttendance();
+                    
+                    // Verify recognized face matches logged in user
+                    if (recognizedFace && recognizedFace.code !== auth.getUserCode()) {
+                        throw new Error('الوجه لا يتطابق مع المستخدم المسجل');
+                    }
+                } catch (faceError) {
+                    console.warn('Face recognition failed, continuing...', faceError);
+                    // Continue without face recognition (optional based on requirements)
+                }
             }
 
-            // Extract descriptor as array
-            const descriptor = Array.from(detection.descriptor);
+            // Step 2: Get location
+            await this.getCurrentLocation();
+            const locationLink = this.getLocationLink();
 
-            return {
-                descriptor,
-                detection: detection.detection,
-                landmarks: detection.landmarks,
-                confidence: detection.detection.score,
-                timestamp: Date.now()
+            // Step 3: Calculate hours worked (for check-out)
+            let hoursWorked = null;
+            let overtime = null;
+
+            if (type === 'انصراف' && this.lastCheckIn) {
+                const checkInTime = new Date(this.lastCheckIn.created_at);
+                const now = new Date();
+                const diff = Utils.calculateTimeDifference(checkInTime, now);
+                
+                hoursWorked = diff.totalHours.toFixed(2);
+                
+                // Calculate overtime
+                const overtimeCalc = Utils.calculateOvertime(
+                    parseFloat(hoursWorked),
+                    AppConfig.attendance.normalHours
+                );
+                
+                overtime = overtimeCalc.hasOvertime 
+                    ? `${overtimeCalc.overtimeHours} ساعة` 
+                    : 'لا يوجد';
+            }
+
+            // Step 4: Capture image (if camera available)
+            let imageUrl = null;
+            if (faceRecognition.currentVideoElement && faceRecognition.canvasElement) {
+                try {
+                    const photo = faceRecognition.capturePhoto(
+                        faceRecognition.currentVideoElement,
+                        faceRecognition.canvasElement
+                    );
+                    
+                    // Compress image
+                    const compressedImage = await Utils.compressImage(photo.base64, 640, 0.7);
+                    
+                    // Upload to storage
+                    imageUrl = await db.uploadFaceImage(compressedImage, `${auth.getUserCode()}_${type}`);
+                } catch (imgError) {
+                    console.warn('Image capture failed:', imgError);
+                }
+            }
+
+            // Step 5: Prepare attendance record
+            const attendanceData = {
+                employee_code: auth.getUserCode(),
+                employee_name: auth.getUserName(),
+                type: type,
+                locationLink: locationLink,
+                shift: selectedShift,
+                hoursWorked: hoursWorked,
+                overtime: overtime,
+                gpsAccuracy: this.currentLocation?.accuracy,
+                imageUrl: imageUrl
             };
 
-        } catch (error) {
-            console.error('Capture descriptor error:', error);
-            throw error;
-        }
-    }
+            // Step 6: Save to database
+            const result = await db.recordAttendance(attendanceData);
 
-    /**
-     * Recognize face against known faces database
-     * @param {Array} descriptor - Face descriptor array
-     * @returns {Promise<object|null>} Recognition result or null
-     */
-    async recognizeFace(descriptor) {
-        if (!descriptor || this.knownFaces.size === 0) {
-            return null;
-        }
-
-        try {
-            let bestMatch = null;
-            let bestDistance = Infinity;
-
-            // Compare against all known faces
-            for (const [code, faceData] of this.knownFaces) {
-                const distance = faceapi.euclideanDistance(
-                    descriptor, 
-                    faceData.descriptor
-                );
-
-                if (distance < bestDistance) {
-                    bestDistance = distance;
-                    bestMatch = {
-                        code: faceData.code,
-                        name: faceData.name,
-                        distance: distance,
-                        confidence: 1 - distance, // Convert distance to confidence
-                        imageData: faceData.imageData
-                    };
-                }
-            }
-
-            // Check if match is above threshold
-            if (bestMatch && bestMatch.distance <= this.config.recognition.labelDistance) {
-                const isHighConfidence = bestMatch.confidence >= this.config.recognition.threshold;
-                
-                return {
-                    ...bestMatch,
-                    recognized: isHighConfidence,
-                    message: isHighConfidence 
-                        ? `تم التعرف على: ${bestMatch.name}` 
-                        : `قد يكون: ${bestMatch.name} (ثقة منخفضة)`
-                };
-            }
-
-            return null;
-
-        } catch (error) {
-            console.error('Recognition error:', error);
-            return null;
-        }
-    }
-
-    /**
-     * Load known faces from database
-     */
-    async loadKnownFaces() {
-        try {
-            const employees = await db.getAllEmployees();
-            
-            this.knownFaces.clear();
-            
-            employees.forEach(emp => {
-                if (emp.face_descriptor && emp.code !== 'ADMIN') {
-                    this.knownFaces.set(emp.code, {
-                        code: emp.code,
-                        name: emp.name,
-                        descriptor: typeof emp.face_descriptor === 'string' 
-                            ? JSON.parse(emp.face_descriptor)
-                            : emp.face_descriptor,
-                        imageData: emp.profile_image_url
-                    });
-                }
-            });
-
-            console.log(`✅ Loaded ${this.knownFaces.size} known faces`);
-
-        } catch (error) {
-            console.error('Load known faces error:', error);
-        }
-    }
-
-    /**
-     * Add face to known faces database
-     * @param {string} code - Employee code
-     * @param {string} name - Employee name
-     * @param {Array} descriptor - Face descriptor
-     * @param {string} [imageData] - Optional image data URL
-     */
-    addKnownFace(code, name, descriptor, imageData = null) {
-        this.knownFaces.set(code, {
-            code,
-            name,
-            descriptor,
-            imageData
-        });
-        
-        console.log(`➕ Added face: ${name} (${code})`);
-    }
-
-    /**
-     * Remove face from known faces
-     * @param {string} code - Employee code
-     */
-    removeKnownFace(code) {
-        this.knownFaces.delete(code);
-        console.log(`➖ Removed face: ${code}`);
-    }
-
-    // ============================================
-    // 📸 CAPTURE OPERATIONS
-    // ============================================
-
-    /**
-     * Capture photo from video
-     * @param {HTMLVideoElement} video - Video element
-     * @param {HTMLCanvasElement} canvas - Canvas element
-     * @returns {object} Captured image data
-     */
-    capturePhoto(video, canvas) {
-        if (!video || !canvas) {
-            throw new Error('Video or canvas element not found');
-        }
-
-        // Set canvas size to match video
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        // Draw current video frame to canvas
-        const ctx = canvas.getContext('2d');
-        
-        // Mirror the image (selfie mode)
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Reset transform
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-        // Get base64 image
-        const base64Image = canvas.toDataURL('image/jpeg', 0.8);
-
-        return {
-            base64: base64Image,
-            width: canvas.width,
-            height: canvas.height,
-            timestamp: Date.now()
-        };
-    }
-
-    /**
-     * Handle face capture for registration
-     * @param {Event} e - Click event
-     */
-    async handleRegistrationCapture(e) {
-        try {
-            if (!this.isCameraActive) {
-                ui.showWarning('يرجى تشغيل الكاميرا أولاً');
-                return;
-            }
-
-            ui.showButtonLoading(e.target, 'جاري التقاط الوجه...');
-
-            // Capture photo
-            const photo = this.capturePhoto(this.registerVideo, this.registerCanvas);
-            
-            // Get face descriptor
-            const faceData = await this.captureFaceDescriptor(this.registerVideo);
-
-            // Save to session for registration form submission
-            Utils.saveToSession(Constants.sessionKeys.TEMP_FACE_DESCRIPTOR, faceData.descriptor);
-
-            // Show preview
-            const previewImg = document.getElementById('capturedFacePreview');
-            const previewContainer = document.getElementById('facePreviewContainer');
-            const captureBtn = document.getElementById('captureFaceBtn');
-
-            if (previewImg) {
-                previewImg.src = photo.base64;
-            }
-            if (previewContainer) {
-                previewContainer.classList.remove('hidden');
-            }
-            if (captureBtn) {
-                captureBtn.classList.add('hidden');
-            }
-
-            // Update UI
-            ui.showSuccess(SuccessMessages.FACE_CAPTURED);
-            ui.playFaceSuccessFeedback();
-
-            // Stop camera after successful capture
-            setTimeout(() => {
-                this.stopCamera();
-                this.registerVideo.style.display = 'none';
-            }, 1000);
-
-        } catch (error) {
-            console.error('Registration capture error:', error);
-            ui.showError(error.message || ErrorCodes.FACE_NO_FACE_DETECTED.message);
-            ui.playFaceErrorFeedback();
-        } finally {
-            ui.hideButtonLoading(e.target);
-        }
-    }
-
-    /**
-     * Handle face recognition for attendance
-     * @returns {Promise<object>} Recognition result
-     */
-    async recognizeForAttendance() {
-        try {
-            if (!this.isCameraActive || !this.currentVideoElement) {
-                throw new Error(ErrorCodes.FACE_NO_CAMERA.message);
-            }
-
-            // Show recognition state
-            const overlay = document.getElementById('cameraOverlay');
-            const statusText = document.getElementById('cameraStatusText');
-            
-            if (overlay) overlay.innerHTML = '<div class="face-frame"><i class="fas fa-spinner fa-spin" style="font-size: 48px; color: #3b82f6;"></i><p>جاري التحليل...</p></div>';
-            if (statusText) statusText.textContent = 'جاري التحليل...';
-
-            // Capture descriptor
-            const faceData = await this.captureFaceDescriptor(this.currentVideoElement);
-
-            // Recognize face
-            const result = await this.recognizeFace(faceData.descriptor);
-
-            if (result && result.recognized) {
+            if (result.success) {
                 // Success!
-                this.recognizedFace = result;
+                this.onAttendanceSuccess(type, result.record);
                 
-                ui.playFaceSuccessFeedback();
-                
-                // Show recognition result
-                this.showRecognitionResult(result);
-                
-                return result;
-
-            } else if (result) {
-                // Low confidence match
-                ui.showWarning(result.message);
-                ui.playFaceErrorFeedback();
-                
-                return { 
-                    ...result, 
-                    recognized: false 
-                };
-
             } else {
-                // No match found
-                throw new Error(ErrorCodes.FACE_RECOGNITION_FAILED.message);
+                throw new Error(result.error || 'فشل تسجيل الحضور');
             }
 
         } catch (error) {
-            console.error('Recognition error:', error);
+            console.error(`${type} error:`, error);
+            this.onAttendanceError(error, type);
             
-            // Reset UI
-            const overlay = document.getElementById('cameraOverlay');
-            const statusText = document.getElementById('cameraStatusText');
+        } finally {
+            this.isProcessing = false;
+            ui.hideButtonLoading(btn);
             
-            if (overlay) overlay.innerHTML = '<div class="face-frame"><i class="fas fa-user-circle"></i><p>ضع وجهك داخل الإطار</p></div>';
-            if (statusText) statusText.textContent = 'لم يتم التعرف على الوجه';
-
-            ui.showError(error.message || ErrorCodes.FACE_RECOGNITION_FAILED.message);
-            ui.playFaceErrorFeedback();
-            
-            throw error;
+            // Set cooldown
+            this.lastActionTime = Date.now();
         }
     }
 
     /**
-     * Display recognition result on screen
-     * @param {object} result - Recognition result
+     * Handle successful attendance recording
+     * @param {string} type - Attendance type
+     * @param {object} record - Saved record
      */
-    showRecognitionResult(result) {
-        const resultContainer = document.getElementById('recognitionResult');
-        const recognizedName = document.getElementById('recognizedName');
-        const recognizedCode = document.getElementById('recognizedCode');
-        const confidenceFill = document.getElementById('confidenceFill');
-        const confidenceValue = document.getElementById('confidenceValue');
-        const recognizedFaceImg = document.getElementById('recognizedFace');
+    onAttendanceSuccess(type, record) {
+        // Play success feedback
+        ui.playSuccessFeedback();
+        
+        // Show success message
+        const message = type === 'حضور' 
+            ? SuccessMessages.CHECK_IN_SUCCESS 
+            : SuccessMessages.CHECK_OUT_SUCCESS;
+        
+        ui.showSuccess(message);
 
-        if (resultContainer) {
-            resultContainer.classList.remove('hidden');
-        }
+        // Add to local records
+        this.todayRecords.push(record);
+        
+        // Update status
+        this.determineCurrentStatus();
+        this.updateTodaySummary();
 
-        if (recognizedName) {
-            recognizedName.textContent = result.name;
-        }
-
-        if (recognizedCode) {
-            recognizedCode.textContent = `CODE: ${result.code}`;
-        }
-
-        if (confidenceFill) {
-            confidenceFill.style.width = `${(result.confidence * 100)}%`;
-        }
-
-        if (confidenceValue) {
-            confidenceValue.textContent = `${Math.round(result.confidence * 100)}%`;
-        }
-
-        if (recognizedFaceImg && result.imageData) {
-            recognizedFaceImg.src = result.imageData;
-        }
-
-        // Hide camera overlay
-        const overlay = document.getElementById('cameraOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
+        // If check-out completed, show summary modal
+        if (type === 'انصراف') {
+            setTimeout(() => {
+                this.showCheckoutSummary(record);
+            }, 1000);
         }
     }
 
     /**
-     * Clear recognition result
+     * Handle attendance error
+     * @param {Error} error - Error object
+     * @param {string} type - Attempted type
      */
-    clearRecognitionResult() {
-        const resultContainer = document.getElementById('recognitionResult');
-        const overlay = document.getElementById('cameraOverlay');
+    onAttendanceError(error, type) {
+        ui.playErrorFeedback();
+        ui.showError(error.message || 'فشل في العملية');
         
-        if (resultContainer) {
-            resultContainer.classList.add('hidden');
-        }
-        
-        if (overlay) {
-            overlay.style.display = 'flex';
-            overlay.innerHTML = '<div class="face-frame"><i class="fas fa-user-circle"></i><p>ضع وجهك داخل الإطار</p></div>';
-        }
+        console.error(`Attendance ${type} error:`, error);
+    }
 
-        this.recognizedFace = null;
+    /**
+     * Show checkout summary modal
+     * @param {object} record - Checkout record
+     */
+    async showCheckoutSummary(record) {
+        const hours = parseFloat(record.hours_worked) || 0;
+        const overtimeInfo = Utils.calculateOvertime(hours);
+
+        await ui.showConfirmation({
+            title: '✅ ملخص اليوم',
+            message: `
+                <div style="text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">⏰</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0;">
+                        <div>
+                            <small style="color: var(--text-muted);">إجمالي الساعات</small>
+                            <h3 style="color: var(--primary-400);">${Utils.formatHoursWorked(hours)}</h3>
+                        </div>
+                        <div>
+                            <small style="color: var(--text-muted);">الأوفر تايم</small>
+                            <h3 style="color: ${overtimeInfo.hasOvertime ? 'var(--success-500)' : 'var(--text-muted)'}">
+                                ${overtimeInfo.overtimeFormatted}
+                            </h3>
+                        </div>
+                    </div>
+                    <p style="font-size: 14px; color: var(--text-secondary);">
+                        وقت الخروج: ${Utils.formatDate(record.created_at, 'time')}
+                    </p>
+                </div>
+            `,
+            confirmText: 'حسناً',
+            cancelText: '',
+            type: 'success',
+            icon: null
+        });
     }
 
     // ============================================
-    // 🛠️ UTILITY METHODS
+    // 🔧 UTILITY METHODS
     // ============================================
 
     /**
-     * Check if models are loaded
-     * @returns {boolean} Models loaded status
+     * Get selected shift from form
+     * @returns {string|null} Selected shift ID or null
      */
-    areModelsLoaded() {
-        return this.modelsLoaded;
+    getSelectedShift() {
+        const checkedShift = document.querySelector('input[name="shift"]:checked');
+        return checkedShift?.value || null;
     }
 
     /**
-     * Check if camera is active
-     * @returns {boolean} Camera active status
+     * Check if action is on cooldown
+     * @returns {boolean} On cooldown status
      */
-    isCameraRunning() {
-        return this.isCameraActive;
+    isOnCooldown() {
+        const timeSinceLastAction = Date.now() - this.lastActionTime;
+        return timeSinceLastAction < AppConfig.attendance.cooldownPeriod;
     }
 
     /**
-     * Get number of known faces
-     * @returns {number} Known faces count
+     * Get remaining cooldown time in seconds
+     * @returns {number} Remaining seconds
      */
-    getKnownFacesCount() {
-        return this.knownFaces.size;
+    getRemainingCooldown() {
+        const timeSinceLastAction = Date.now() - this.lastActionTime;
+        const remaining = AppConfig.attendance.cooldownPeriod - timeSinceLastAction;
+        return Math.max(0, Math.ceil(remaining / 1000));
     }
 
     /**
-     * Cleanup resources
+     * Format attendance record for display
+     * @param {object} record - Attendance record
+     * @returns {HTMLElement} Formatted row element
      */
-    destroy() {
-        this.stopCamera();
-        this.stopDetection();
-        this.knownFaces.clear();
-        this.modelsLoaded = false;
-        console.log('🗑️ Face Recognition Manager destroyed');
+    formatRecordForDisplay(record) {
+        return ui.formatAttendanceRow(record);
+    }
+
+    /**
+     * Reset daily state (call at midnight or new day)
+     */
+    resetDailyState() {
+        this.todayRecords = [];
+        this.currentStatus = 'out';
+        this.lastCheckIn = null;
+        this.lastCheckOut = null;
+        this.lastActionTime = 0;
+        
+        console.log('🔄 Daily attendance state reset');
+    }
+
+    /**
+     * Get attendance statistics for date range
+     * @param {Date} startDate - Start date
+     * @param {Date} endDate - End date
+     * @returns {Promise<object>} Statistics object
+     */
+    async getStatistics(startDate, endDate) {
+        try {
+            const userCode = auth.getUserCode();
+            const monthlyData = await db.getMonthlySummary(
+                userCode,
+                startDate.getMonth() + 1,
+                startDate.getFullYear()
+            );
+
+            return monthlyData.summary;
+
+        } catch (error) {
+            console.error('Get statistics error:', error);
+            return {};
+        }
+    }
+
+    /**
+     * Export attendance data
+     * @param {string} format - Export format ('csv', 'json')
+     * @param {Array} records - Records to export
+     * @returns {void}
+     */
+    exportData(format, records) {
+        let content = '';
+        let filename = '';
+        let mimeType = '';
+
+        switch (format.toLowerCase()) {
+            case 'csv':
+                content = this.convertToCSV(records);
+                filename = `attendance_${new Date().toISOString().split('T')[0]}.csv`;
+                mimeType = 'text/csv';
+                break;
+                
+            case 'json':
+                content = JSON.stringify(records, null, 2);
+                filename = `attendance_${new Date().toISOString().split('T')[0]}.json`;
+                mimeType = 'application/json';
+                break;
+                
+            default:
+                throw new Error('Unsupported format');
+        }
+
+        Utils.downloadFile(content, filename, mimeType);
+        ui.showSuccess(SuccessMessages.DATA_EXPORTED);
+    }
+
+    /**
+     * Convert records to CSV format
+     * @param {Array} records - Attendance records
+     * @returns {string} CSV string
+     */
+    convertToCSV(records) {
+        if (!records.length) return '';
+
+        const headers = ['التاريخ', 'الحالة', 'الوقت', 'الوردية', 'الساعات', 'الأوفر تايم'];
+        const rows = records.map(record => [
+            Utils.formatDate(record.created_at, 'short'),
+            record.type,
+            Utils.formatDate(record.created_at, 'time'),
+            record.shift,
+            record.hours_worked || '-',
+            record.overtime || '-'
+        ]);
+
+        return [headers, ...rows]
+            .map(row => row.map(cell => `"${cell}"`).join(','))
+            .join('\n');
     }
 }
 
 // Create global instance
-const faceRecognition = new FaceRecognitionManager();
+const attendance = new AttendanceManager();
 
 // Export for use in other modules
-window.FaceRecognitionManager = FaceRecognitionManager;
-window.faceRecognition = faceRecognition;
+window.AttendanceManager = AttendanceManager;
+window.attendance = attendance;
