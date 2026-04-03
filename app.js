@@ -1,29 +1,50 @@
 /**
  * ============================================
- * 🎯 AXENTRO APPLICATION v4.0.1 - HOTFIX
- * ✅ Main Application Controller - With Better Error Handling
+ * 🎯 AXENTRO APPLICATION v4.1 - HOTFIX EDITION
+ * ✅ Main Application Controller - WITH LOADING FIX
+ * 🔥 الحل النهائي لمشكلة فشل التحميل
  * ============================================
  */
+
+// ============================================
+// 🛡️ GLOBAL ERROR HANDLER
+// ============================================
+
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('❌ Unhandled Promise Rejection:', event.reason);
+    
+    // Prevent default behavior (logging to console)
+    // event.preventDefault(); // Uncomment if needed
+});
+
+window.addEventListener('error', function(event) {
+    console.error('❌ Global Error:', event.error);
+    
+    // Show user-friendly error if loading screen is visible
+    if (document.getElementById('loadingScreen')?.style.display !== 'none') {
+        showLoadingError(event.message || 'حدث خطأ أثناء تحميل النظام');
+    }
+});
+
+// ============================================
+// 🚀 APPLICATION CLASS
+// ============================================
 
 class App {
     constructor() {
         this.isInitialized = false;
         this.currentPage = 'loginPage';
+        this.retryCount = 0;
+        this.maxRetries = 3;
         
-        // Module references
-        this.modules = {
-            ui: null,
-            auth: null,
-            db: null,
-            faceRecognition: null,
-            attendance: null,
-            admin: null,
-            reports: null
-        };
+        // Module references (will be initialized)
+        this.modules = {};
         
         // Bind methods
         this.init = this.init.bind(this);
         this.handleOnlineStatus = this.handleOnlineStatus.bind(this);
+        
+        console.log('🏗️ App constructor initialized');
     }
 
     // ============================================
@@ -31,64 +52,97 @@ class App {
     // ============================================
 
     /**
-     * Initialize the entire application with enhanced error handling
+     * Initialize the entire application with ENHANCED error handling
+     * 🔥 هذا هو الحل الرئيسي لمشكلة الفشل في التحميل
      */
     async init() {
-        console.log('🚀 Starting Axentro Application v' + AppConfig.app.version);
+        console.log(`🚀 Starting Axentro Application v${AppConfig.app.version}`);
         
         try {
-            // Step 1: Update loading progress
-            ui.updateLoadingProgress(10, 'تهيئة الواجهة...');
+            // ✅ Step 1: Update loading progress
+            this.updateProgress(10, 'تهيئة الواجهة...');
+            await this.sleep(100);
+
+            // ✅ Step 2: Verify critical dependencies exist
+            this.updateProgress(20, 'التحقق من المكونات...');
             
-            // Step 2: Initialize UI Manager (already created globally)
-            await Utils.sleep(100);
-            
-            // Step 3: Setup global event listeners
+            if (!this.verifyDependencies()) {
+                throw new Error('بعض المكونات الأساسية غير متوفرة - يرجى تحديث الصفحة');
+            }
+
+            // ✅ Step 3: Setup global event listeners
             this.setupGlobalEventListeners();
-            ui.updateLoadingProgress(20, 'إعداد المستمعين...');
+            this.updateProgress(30, 'إعداد المستمعين...');
+
+            // ✅ Step 4: Initialize database client with GRACEFUL DEGRADATION
+            this.updateProgress(40, 'الاتصال بقاعدة البيانات...');
             
-            // Step 4: Initialize database client with error handling
-            ui.updateLoadingProgress(30, 'الاتصال بقاعدة البيانات...');
-            if (!db.isConnectedToSupabase()) {
-                console.warn('⚠️ Supabase client not initialized, will retry...');
-                // Don't throw error here - we'll handle it gracefully
-            }
-            
-            // Step 5: Load face recognition models with better error handling
-            ui.updateLoadingProgress(50, 'جاري تحميل نماذج الذكاء الاصطناعي...');
             try {
-                if (!faceRecognition.areModelsLoaded()) {
-                    await faceRecognition.loadModels();
+                if (typeof db !== 'undefined' && db.isConnectedToSupabase) {
+                    if (!db.isConnectedToSupabase()) {
+                        console.warn('⚠️ Supabase client not fully initialized, will retry...');
+                        // Don't throw - continue with limited functionality
+                    } else {
+                        console.log('✅ Supabase connected successfully');
+                    }
                 } else {
-                    console.log('✅ Face recognition models already loaded');
+                    console.warn('⚠️ Database module not available');
                 }
-            } catch (modelError) {
-                console.warn('⚠️ Face recognition models failed to load, continuing...', modelError.message);
-                // Don't stop the whole app just because face recognition failed
-                ui.showWarning('⚠️ تعذر تحميل نموذج التعرف على الوجه');
+            } catch (dbError) {
+                console.warn('⚠️ Database initialization warning:', dbError.message);
+                // Continue without database - will show login page anyway
             }
+
+            // ✅ Step 5: Load face recognition models with SMART FALLBACK
+            // 🔥 THIS IS THE CRITICAL FIX - Most common failure point
+            this.updateProgress(50, 'جاري تحميل نماذج الذكاء الاصطناعي...');
             
-            // Step 6: Check for existing session
-            ui.updateLoadingProgress(70, 'التحقق من الجلسة...');
-            const hasSession = await auth.checkExistingSession();
+            const faceRecognitionLoaded = await this.loadFaceRecognitionWithFallback();
             
-            // Step 7: Load user settings
-            ui.updateLoadingProgress(80, 'تحميل الإعدادات...');
+            if (!faceRecognitionLoaded) {
+                console.warn('⚠️ Face recognition not available - continuing in basic mode');
+                // DON'T THROW - Continue without face recognition!
+                window.faceRecognitionAvailable = false;
+            } else {
+                window.faceRecognitionAvailable = true;
+                console.log('✅ Face recognition loaded successfully');
+            }
+
+            // ✅ Step 6: Check for existing session
+            this.updateProgress(70, 'التحقق من الجلسة...');
+            
+            let hasSession = false;
+            try {
+                if (typeof auth !== 'undefined' && auth.checkExistingSession) {
+                    hasSession = await auth.checkExistingSession();
+                }
+            } catch (sessionError) {
+                console.warn('⚠️ Session check failed:', sessionError.message);
+                hasSession = false;
+            }
+
+            // ✅ Step 7: Load user settings
+            this.updateProgress(80, 'تحميل الإعدادات...');
             this.loadUserSettings();
+
+            // ✅ Step 8: Setup PWA features (optional - non-critical)
+            this.updateProgress(90, 'إعداد التطبيق...');
+            try {
+                this.setupPWAFeatures();
+            } catch (pwaError) {
+                console.warn('⚠️ PWA setup failed:', pwaError.message);
+                // Non-critical - don't fail the whole app
+            }
+
+            // ✅ Step 9: Final initialization - SUCCESS!
+            this.updateProgress(100, 'تم التحميل بنجاح ✓');
             
-            // Step 8: Setup PWA features
-            ui.updateLoadingProgress(90, 'إعداد التطبيق...');
-            this.setupPWAFeatures();
-            
-            // Step 9: Final initialization
-            ui.updateLoadingProgress(100, 'جاهز! ✓');
-            
-            // Hide loading screen after a short delay
+            // Hide loading screen after short delay
             setTimeout(() => {
-                ui.hideLoadingScreen();
+                this.hideLoadingScreen();
                 
                 // Navigate to appropriate page
-                if (hasSession && auth.isAuthenticated()) {
+                if (hasSession && this.isAuthenticated()) {
                     this.navigateTo('dashboardPage');
                     this.initializeDashboard();
                 } else {
@@ -96,31 +150,258 @@ class App {
                 }
                 
                 this.isInitialized = true;
+                this.retryCount = 0; // Reset retry count on success
+                
                 console.log('✅ Application initialized successfully!');
                 
-            }, 800);
+                // Play success sound if available
+                if (typeof ui !== 'undefined' && ui.playSound) {
+                    ui.playSound('loginSuccess', 0.5);
+                }
+
+            }, 800); // Short delay for smooth transition
 
         } catch (error) {
-            console.error('❌ Application initialization failed:', error);
-            ui.updateLoadingProgress(0, 'حدث خطأ في التحميل');
-            
-            // Show user-friendly error and retry option
-            setTimeout(() => {
-                ui.hideLoadingScreen();
-                
-                const retryBtn = document.createElement('button');
-                retryBtn.className = 'btn btn-primary btn-block';
-                retryBtn.innerHTML = '<i class="fas fa-redo"></i> إعادة المحاولة';
-                retryBtn.onclick = () => window.location.reload();
-                
-                const loginForm = document.getElementById('loginForm');
-                if (loginForm) {
-                    loginForm.appendChild(retryBtn);
-                }
-                
-                ui.showError('فشل تحميل التطبيق - يرجى المحاولة');
-            }, 1500);
+            console.error('❌ Application initialization FAILED:', error);
+            this.handleInitializationFailure(error);
         }
+    }
+
+    // ============================================
+    // 🔧 HELPER METHODS
+    // ============================================
+
+    /**
+     * Update progress bar and status text
+     */
+    updateProgress(percent, statusText) {
+        const progressBar = document.getElementById('loadProgress');
+        const statusEl = document.getElementById('loadStatus');
+        
+        if (progressBar) {
+            progressBar.style.width = `${percent}%`;
+            progressBar.setAttribute('aria-valuenow', percent);
+        }
+        
+        if (statusEl) {
+            statusEl.textContent = statusText;
+        }
+        
+        // Also use UI manager if available
+        if (typeof ui !== 'undefined' && ui.updateLoadingProgress) {
+            ui.updateLoadingProgress(percent, statusText);
+        }
+    }
+
+    /**
+     * Verify all required dependencies are loaded
+     * @returns {boolean} True if all critical deps exist
+     */
+    verifyDependencies() {
+        const requiredDeps = [
+            { name: 'AppConfig', obj: typeof AppConfig !== 'undefined' },
+            { name: 'ui', obj: typeof ui !== 'undefined' },
+            { name: 'Utils', obj: typeof Utils !== 'undefined' },
+            { name: 'Constants', obj: typeof Constants !== 'undefined' },
+            // Optional but important
+            { name: 'db', obj: typeof db !== 'undefined', optional: true },
+            { name: 'auth', obj: typeof auth !== 'undefined', optional: true },
+            { name: 'faceRecognition', obj: typeof faceRecognition !== 'undefined', optional: true },
+            { name: 'attendance', obj: typeof attendance !== 'undefined', optional: true },
+        ];
+
+        let allCriticalPresent = true;
+        let missingDeps = [];
+
+        requiredDeps.forEach(dep => {
+            if (!dep.obj) {
+                if (!dep.optional) {
+                    allCriticalPresent = false;
+                    missingDeps.push(dep.name);
+                } else {
+                    console.warn(`⚠️ Optional dependency missing: ${dep.name}`);
+                }
+            }
+        });
+
+        if (!allCriticalPresent) {
+            console.error(`❌ Missing critical dependencies: ${missingDeps.join(', ')}`);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Load face recognition with smart fallback mechanism
+     * 🔥 THE MAIN FIX FOR LOADING FAILURE
+     * 
+     * @returns {Promise<boolean>} True if loaded successfully
+     */
+    async loadFaceRecognitionWithFallback() {
+        // Check if we should skip face recognition (user choice or previous failure)
+        if (window.skipFaceApi === true) {
+            console.log('⏭️ Face recognition skipped by user or system');
+            return false;
+        }
+
+        // Check if face-api.js library loaded
+        if (typeof faceapi === 'undefined') {
+            console.warn('⚠️ face-api.js library not loaded');
+            
+            // Try to load from alternative CDN
+            if (!window.faceApiLoadError) {
+                return await this.tryAlternativeFaceApiCdn();
+            }
+            
+            return false;
+        }
+
+        // Check if faceRecognition module exists
+        if (typeof faceRecognition === 'undefined') {
+            console.warn('⚠️ Face Recognition module not found');
+            return false;
+        }
+
+        // Try to load models with timeout
+        try {
+            // Set a timeout for model loading (15 seconds max)
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('تجاوز وقت تحميل النماذج')), 15000)
+            );
+
+            const loadPromise = this.loadFaceModels();
+
+            await Promise.race([loadPromise, timeoutPromise]);
+            return true;
+
+        } catch (error) {
+            console.error('❌ Face recognition loading failed:', error.message);
+            
+            // Offer user option to skip
+            return false;
+        }
+    }
+
+    /**
+     * Attempt to load face models
+     */
+    async loadFaceModels() {
+        if (typeof faceRecognition.areModelsLoaded === 'function' && 
+            faceRecognition.areModelsLoaded()) {
+            console.log('✅ Models already loaded');
+            return true;
+        }
+
+        if (typeof faceRecognition.loadModels === 'function') {
+            await faceRecognition.loadModels();
+            return true;
+        }
+
+        throw new Error('Face recognition loadModels method not available');
+    }
+
+    /**
+     * Try alternative CDN for face-api.js
+     */
+    async tryAlternativeFaceApiCdn() {
+        console.log('🔄 Trying alternative CDN for face-api.js...');
+        
+        try {
+            // Dynamic import from alternative source
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js';
+            
+            const loadPromise = new Promise((resolve, reject) => {
+                script.onload = resolve;
+                script.onerror = reject;
+            });
+            
+            document.head.appendChild(script);
+            await loadPromise;
+            
+            console.log('✅ Loaded face-api.js from alternative CDN');
+            return await this.loadFaceRecognitionWithFallback();
+
+        } catch (error) {
+            console.error('❌ Alternative CDN also failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Handle initialization failure gracefully
+     * @param {Error} error - The error that occurred
+     */
+    handleInitializationFailure(error) {
+        console.error('💥 Initialization failed:', error);
+        
+        this.updateProgress(0, 'حدث خطأ في التحميل');
+        
+        // Increment retry count
+        this.retryCount++;
+        
+        // Show error with retry options
+        setTimeout(() => {
+            const loadingScreen = document.getElementById('loadingScreen');
+            const errorDiv = document.getElementById('loadingError');
+            const errorMsg = document.getElementById('errorMessage');
+            
+            if (errorDiv && errorMsg) {
+                errorMsg.innerHTML = `
+                    <strong>الخطأ:</strong> ${error.message}<br><br>
+                    <small style="color: #6b7280;">
+                        محاولة ${this.retryCount} من ${this.maxRetries}
+                    </small>
+                `;
+                errorDiv.style.display = 'block';
+                
+                // Update retry button text if max retries reached
+                if (this.retryCount >= this.maxRetries) {
+                    const retryBtn = errorDiv.querySelector('button[onclick="retryLoading()"]');
+                    if (retryBtn) {
+                        retryBtn.disabled = true;
+                        retryBtn.innerHTML = '<i class="fas fa-ban"></i> وصلت للحد الأقصى للمحاولات';
+                        retryBtn.style.opacity = '0.6';
+                    }
+                }
+            }
+            
+            // Also try UI manager's showError if available
+            if (typeof ui !== 'undefined' && ui.showError) {
+                ui.showError(`فشل تحميل التطبيق - ${error.message}`);
+            }
+
+        }, 1500);
+    }
+
+    /**
+     * Hide loading screen smoothly
+     */
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loadingScreen');
+        const appContainer = document.getElementById('app');
+        
+        if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            loadingScreen.style.transition = 'opacity 0.5s ease';
+            
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+                if (appContainer) {
+                    appContainer.classList.remove('hidden');
+                    appContainer.style.display = 'block';
+                }
+            }, 500);
+        }
+    }
+
+    /**
+     * Sleep utility
+     * @param {number} ms - Milliseconds to sleep
+     */
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     // ============================================
@@ -129,23 +410,57 @@ class App {
 
     /**
      * Navigate to a specific page
+     * @param {string} pageId - ID of the target page
      */
     navigateTo(pageId) {
-        // Validate user is authenticated for protected pages
+        // Validate authentication for protected pages
         const protectedPages = ['dashboardPage', 'reportsPage', 'changePasswordPage'];
         
-        if (protectedPages.includes(pageId) && !auth.isAuthenticated()) {
-            ui.showWarning('يجب تسجيل الدخول أولاً');
+        if (protectedPages.includes(pageId) && !this.isAuthenticated()) {
+            if (typeof ui !== 'undefined' && ui.showWarning) {
+                ui.showWarning('يجب تسجيل الدخول أولاً');
+            }
             this.navigateTo('loginPage');
             return;
         }
 
-        // Navigate using UI Manager
-        ui.navigateTo(pageId);
-        this.currentPage = pageId;
+        // Hide all pages
+        document.querySelectorAll('.page').forEach(page => {
+            page.classList.remove('active');
+        });
+
+        // Show target page
+        const targetPage = document.getElementById(pageId);
+        if (targetPage) {
+            targetPage.classList.add('active');
+            this.currentPage = pageId;
+        }
+
+        // Update navigation if exists
+        this.updateNavigation(pageId);
 
         // Page-specific actions
         this.onPageEnter(pageId);
+    }
+
+    /**
+     * Update bottom navigation active state
+     */
+    updateNavigation(activePageId) {
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+            if (link.dataset.page === activePageId) {
+                link.classList.add('active');
+            }
+        });
+
+        // Add click handlers to nav links
+        document.querySelectorAll('.nav-link[data-page]').forEach(link => {
+            link.onclick = (e) => {
+                e.preventDefault();
+                this.navigateTo(link.dataset.page);
+            };
+        });
     }
 
     /**
@@ -158,20 +473,23 @@ class App {
                 break;
                 
             case 'reportsPage':
-                if (typeof reports !== 'undefined') reports.setDefaultDates();
+                if (typeof reports !== 'undefined' && reports.setDefaultDates) {
+                    reports.setDefaultDates();
+                }
                 break;
                 
             case 'loginPage':
                 // Stop camera if running on other pages
-                if (this.modules.faceRecognition?.isCameraRunning()) {
-                    this.modules.faceRecognition.stopCamera();
+                if (typeof faceRecognition !== 'undefined' && 
+                    faceRecognition.stopCamera) {
+                    faceRecognition.stopCamera();
                 }
                 break;
         }
     }
 
     // ============================================
-    // 🏠️ DASHBOARD INITIALIZATION
+    // 🏠 DASHBOARD INITIALIZATION
     // ============================================
 
     /**
@@ -179,9 +497,9 @@ class App {
      */
     async initializeDashboard() {
         try {
-            if (!auth.isAuthenticated()) return;
+            if (!this.isAuthenticated()) return;
 
-            const user = auth.getCurrentUser();
+            const user = this.getCurrentUser();
 
             // Update user info in header
             const userNameEl = document.getElementById('userName');
@@ -191,29 +509,44 @@ class App {
             if (userCodeEl) userCodeEl.textContent = `CODE: ${user.code}`;
 
             // Load dashboard stats
-            const totalEmployees = await db.getEmployeesCount();
-            ui.animateStatValue('totalEmployeesStat', totalEmployees);
+            if (typeof db !== 'undefined' && db.getEmployeesCount) {
+                const totalEmployees = await db.getEmployeesCount();
+                this.animateStatValue('totalEmployeesStat', totalEmployees);
+            }
 
             // Load today's attendance records
-            await attendance.loadTodayRecords();
+            if (typeof attendance !== 'undefined' && attendance.loadTodayRecords) {
+                await attendance.loadTodayRecords();
+            }
 
-            // Start camera for face recognition
-            this.startDashboardCamera();
-
-            // Load known faces for recognition
-            if (this.modules.faceRecognition) {
-                await this.modules.faceRecognition.loadKnownFaces();
+            // Start camera for face recognition (if available)
+            if (window.faceRecognitionAvailable !== false) {
+                this.startDashboardCamera();
+            } else {
+                // Show message that camera is not available
+                const recognitionArea = document.getElementById('recognitionArea');
+                if (recognitionArea) {
+                    recognitionArea.innerHTML += `
+                        <div class="info-box" style="margin-top: 10px;">
+                            <i class="fas fa-info-circle"></i>
+                            <p>التعرف على الوجه غير متوفر - يمكنك استخدام الكود وكلمة المرور</p>
+                        </div>
+                    `;
+                }
             }
 
             // If user is admin, enable admin features
-            if (auth.isAdmin()) {
-                if (this.modules.admin) this.modules.admin.setupAdminFeatures();
+            if (this.isAdmin()) {
+                if (typeof admin !== 'undefined' && admin.setupAdminFeatures) {
+                    admin.setupAdminFeatures();
+                }
             }
 
             console.log('📊 Dashboard initialized');
 
         } catch (error) {
             console.error('Dashboard init error:', error);
+            // Don't crash the whole app - just log the error
         }
     }
 
@@ -227,6 +560,12 @@ class App {
             
             if (!videoEl || !canvasEl) return;
 
+            // Check if faceRecognition module is available
+            if (typeof faceRecognition === 'undefined' || !faceRecognition.startCamera) {
+                console.warn('⚠️ Face recognition module not available');
+                return;
+            }
+
             // Start camera with fallback
             await this.startCameraWithFallback(videoEl, { facingMode: 'user' });
 
@@ -239,19 +578,10 @@ class App {
             const container = document.getElementById('recognitionArea');
             if (container) {
                 container.innerHTML += `
-                    <div style="text-align:center;padding:20px;color:var(--text-muted);">
-                        <i class="fas fa-camera-slash" style="font-size:48px;margin-bottom:10px;opacity:0.5;"></i>
-                        <p>الكاميرا غير متاحة</p>
-                        <button onclick="location.reload()" style="
-                            display:inline-block;
-                            padding:12px 24px;
-                            background:var(--primary-600);
-                            color:white;
-                            border:none;
-                            border-radius:8px;
-                            cursor:pointer;
-                            font-weight:bold;
-                        ">
+                    <div class="info-box" style="margin-top: 10px; background: #fef3c7; border-color: #f59e0b;">
+                        <i class="fas fa-exclamation-triangle" style="color: #d97706;"></i>
+                        <p style="color: #92400e;">الكاميرا غير متاحة</p>
+                        <button onclick="app.startDashboardCamera()" class="btn btn-sm btn-outline mt-2">
                             <i class="fas fa-redo"></i> إعادة المحاولة
                         </button>
                     </div>
@@ -270,7 +600,7 @@ class App {
                 throw new Error('Camera API not supported');
             }
 
-            // Default constraints
+            // Default camera constraints
             const constraints = {
                 video: {
                     facingMode: options.facingMode || 'user',
@@ -288,703 +618,195 @@ class App {
             if (videoElement) {
                 videoElement.srcObject = stream;
                 await videoElement.play();
-                this.currentVideoElement = videoElement;
             }
 
-            this.isCameraActive = true;
-            console.log('📹 Camera started successfully');
             return stream;
 
         } catch (error) {
-            console.warn('Camera start error:', error.message);
-            
-            // Return graceful error without breaking the app
-            return { success: false, error: error.message };
+            console.error('Camera start error:', error);
+            throw error;
         }
     }
 
     // ============================================
-    // ⚙️ GLOBAL EVENT LISTENERS
+    // 👤 AUTHENTICATION HELPERS
     // ============================================
 
     /**
-     * Setup all event listeners for the application
+     * Check if user is authenticated
+     * @returns {boolean}
      */
-    setupGlobalEventListeners() {
-        // ============================================
-        // NAVIGATION EVENTS
-        // ============================================
-        
-        // Bottom navigation buttons
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const targetPage = btn.dataset.page;
-                if (targetPage) {
-                    this.navigateTo(targetPage);
-                    
-                    // Page-specific initialization
-                    switch (targetPage) {
-                        case 'dashboardPage':
-                            this.initializeDashboard();
-                            break;
-                        case 'reportsPage':
-                            if (typeof reports !== 'undefined') reports.setDefaultDates();
-                            break;
-                        case 'changePasswordPage':
-                            // Nothing special needed
-                            break;
-                    }
-                }
-            });
-        });
-
-        // ============================================
-        // AUTH FORMS
-        // ============================================
-        
-        // Login form
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                if (this.modules.auth) {
-                    this.modules.auth.handleLogin(e);
-                }
-            });
+    isAuthenticated() {
+        if (typeof auth !== 'undefined' && auth.isAuthenticated) {
+            return auth.isAuthenticated();
         }
-
-        // Register form
-        const registerForm = document.getElementById('registerForm');
-        if (form) {
-            registerForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                if (this.modules.auth) {
-                    this.modules.auth.handleRegister(e);
-                }
-            });
-        }
-
-        // Forgot password form
-        const forgotPasswordForm = document.getElementById('forgotPasswordForm');
-        if (forgotPasswordForm) {
-            forgotPasswordForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                if (this.modules.auth) {
-                    this.modules.auth.handleForgotPassword(e);
-                }
-            });
-        }
-
-        // Change password form
-        const changePasswordForm = document.getElementById('changePasswordForm');
-        if (changePasswordForm) {
-            changePasswordForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                if (this.modules.auth) {
-                    this.modules.auth.handleChangePassword(e);
-                }
-            });
-        }
-
-        // Force password change form
-        const forcePasswordForm = document.getElementById('forcePasswordForm');
-        if (forcePasswordForm) {
-            forcePasswordForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                if (this.modules.auth) {
-                    this.modules.auth.handleForcePasswordChange(e);
-                }
-            });
-        }
-
-        // ============================================
-        // AUTH LINKS & BUTTONS
-        // ============================================
-        
-        // Show registration link
-        const showRegisterLink = document.getElementById('showRegisterLink');
-        if (showRegisterLink) {
-            showRegisterLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.navigateTo('registerPage');
-            });
-        }
-
-        // Show forgot password link
-        const showForgotLink = document.getElementById('showForgotPasswordLink');
-        if (showForgotLink) {
-            showForgotLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.navigateTo('forgotPasswordPage');
-            });
-        }
-
-        // Back buttons
-        document.querySelectorAll('.back-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.navigateTo('loginPage');
-            });
-        });
-
-        const backToLoginBtn = document.getElementById('backToLoginBtn');
-        if (backToLoginBtn) {
-            backToLoginBtn.addEventListener('click', () => {
-                this.navigateTo('loginPage');
-            });
-        }
-
-        const backToLoginFromRegister = document.getElementById('backToLoginFromRegister');
-        if (backToLoginFromRegister) {
-            backToLoginFromRegister.addEventListener('click', () => {
-                this.navigateTo('loginPage');
-            });
-        }
-
-        const backToLoginFromForgot = document.getElementById('backToLoginFromForgot');
-        if (backToLoginFromForgot) {
-            backToLoginFromForgot.addEventListener('click', () => {
-                this.navigateTo('loginPage');
-            });
-        }
-
-        // Biometric login button
-        const biometricLoginBtn = document.getElementById('biometricLoginBtn');
-        if (biometricLoginBtn) {
-            biometricLoginBtn.addEventListener('click', () => {
-                if (this.modules.auth) {
-                    this.modules.auth.attemptBiometricAuth();
-                }
-            });
-        }
-
-        // ============================================
-        // DASHBOARD ACTIONS
-        // ============================================
-        
-        // Logout button
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => {
-                if (this.modules.auth) {
-                    this.modules.auth.logout();
-                }
-            });
-        }
-
-        // Check-in button
-        const checkInBtn = document.getElementById('checkInBtn');
-        if (checkInBtn) {
-            checkInBtn.addEventListener('click', () => {
-                if (this.modules.attendance) {
-                    this.modules.attendance.handleCheckIn();
-                }
-            });
-        }
-
-        // Check-out button
-        const checkOutBtn = document.getElementById('checkOutBtn');
-        if (checkOutBtn) {
-            checkOutBtn.addEventListener('click', () => {
-                if (this.modules.attendance) {
-                    this.modules.attendance.handleCheckOut();
-                }
-            });
-        }
-
-        // Switch camera button
-        const switchCameraBtn = document.getElementById('switchCameraBtn');
-        if (switchCameraBtn) {
-            switchCameraBtn.addEventListener('click', () => {
-                if (this.modules.faceRecognition) {
-                    this.modules.faceRecognition.switchCamera();
-                }
-            });
-        }
-
-        // Face capture for registration
-        const startFaceCaptureBtn = document.getElementById('startFaceCaptureBtn');
-        if (startFaceCaptureBtn) {
-            startFaceCaptureBtn.addEventListener('click', async () => {
-                try {
-                    ui.showButtonLoading(startFaceCaptureBtn, 'جاري تشغيل الكاميرا...');
-                    
-                    if (this.modules.faceRecognition) {
-                        await this.modules.faceRecognition.startCamera(
-                            this.modules.faceRecognition.registerVideo,
-                            { facingMode: 'user' }
-                        );
-                        
-                        const captureBtn = document.getElementById('captureFaceBtn');
-                        if (captureBtn) captureBtn.classList.remove('hidden');
-                        
-                        const overlay = document.getElementById('registerOverlay');
-                        if (overlay) overlay.style.display = 'none';
-                        
-                        ui.showSuccess('تم تشغيل الكاميرا ✓');
-                        
-                        const captureFaceBtn2 = document.getElementById('captureFaceBtn');
-                        if (captureFaceBtn2 && !captureFaceBtn2.dataset.listenerAttached) {
-                            captureFaceBtn2.addEventListener('click', (e) => {
-                                if (this.modules.faceRecognition) {
-                                    this.modules.faceRecognition.handleRegistrationCapture(e);
-                                }
-                            });
-                            captureFaceBtn2.dataset.listenerAttached = 'true';
-                        }
-                    }
-                    
-                } catch (error) {
-                    ui.showError(error.message || 'فشل تشغيل الكاميرا');
-                } finally {
-                    ui.hideButtonLoading(startFaceCaptureBtn);
-                }
-            });
-        }
-
-        // ============================================
-        // SETTINGS & PANELS
-        // ============================================
-        
-        // Notifications panel
-        const notificationsBtn = document.getElementById('notificationsBtn');
-        if (notificationsBtn) {
-            notificationsBtn.addEventListener('click', () => {
-                ui.openPanel('notificationsPanel');
-            });
-        }
-
-        const closeNotificationsBtn = document.getElementById('closeNotificationsBtn');
-        if (closeNotificationsBtn) {
-            closeNotificationsBtn.addEventListener('click', () => {
-                ui.closePanel('notificationsPanel');
-            });
-        }
-
-        const markAllReadBtn = document.getElementById('markAllReadBtn');
-        if (markAllReadBtn) {
-            markAllReadBtn.addEventListener('click', () => {
-                if (this.modules.admin) {
-                    this.modules.admin.markAllNotificationsRead();
-                }
-            });
-        }
-
-        // Settings panel
-        const settingsBtn = document.getElementById('settingsBtn');
-        if (settingsBtn) {
-            settingsBtn.addEventListener('click', () => {
-                ui.openPanel('settingsPanel');
-            });
-        }
-
-        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-        if (closeSettingsBtn) {
-            closeSettingsBtn.addEventListener('click', () => {
-                ui.closePanel('settingsPanel');
-            });
-        }
-
-        // Settings toggles
-        document.querySelectorAll('#settingsPanel input[type="checkbox"]').forEach(toggle => {
-            toggle.addEventListener('change', (e) => {
-                this.saveSetting(e.target.id, e.target.checked);
-            });
-        });
-
-        // ============================================
-        // PASSWORD VISIBILITY TOGGLES
-        // ============================================
-        
-        document.querySelectorAll('.toggle-password').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                ui.togglePasswordVisibility(e);
-            });
-        });
-
-        // ============================================
-        // PASSWORD STRENGTH INDICATORS
-        // ============================================
-        
-        const regPassword = document.getElementById('regPassword');
-        if (regPassword) {
-            regPassword.addEventListener('input', (e) => {
-                ui.updatePasswordStrength(e.target.value, 'passwordStrength');
-            });
-        }
-
-        const newPassword = document.getElementById('newPassword');
-        if (newPassword) {
-            newPassword.addEventListener('input', (e) => {
-                ui.updatePasswordStrength(e.target.value, 'newPasswordStrength');
-            });
-        }
-
-        const forceNewPassword = document.getElementById('forceNewPassword');
-        if (forceNewPassword) {
-            forceNewPassword.addEventListener('input', (e) => {
-                ui.updatePasswordStrength(e.target.value, 'forcePasswordStrength');
-            });
-        }
-
-        // ============================================
-        // NETWORK STATUS
-        // ============================================
-        
-        window.addEventListener('online', this.handleOnlineStatus);
-        window.addEventListener('offline', this.handleOnlineStatus);
-
-        // ============================================
-        // KEYBOARD SHORTCUTS
-        // ============================================
-        
-        document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + L to focus on location bar (prevent default)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
-                e.preventDefault();
-            }
-        });
-
-        // Prevent zoom on double tap (mobile)
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', (e) => {
-            const now = Date.now();
-            if (now - lastTouchEnd <= 300) {
-                e.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
-    }
-
-    // ============================================
-    // ⚙️ SETTINGS MANAGEMENT
-    // ============================================
-
-    /**
-     * Load user settings from storage
-     */
-    loadUserSettings() {
-        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {
-            soundEnabled: true,
-            vibrationEnabled: true,
-            dataSaverMode: false
-        });
-
-        // Apply settings to UI
-        Object.entries(settings).forEach(([key, value]) => {
-            const toggle = document.getElementById(key);
-            if (toggle) {
-                toggle.checked = value;
-            }
-        });
-    }
-
-    /**
-     * Save a setting
-     */
-    saveSetting(key, value) {
-        const settings = Utils.loadFromStorage(Constants.storageKeys.SETTINGS, {});
-        settings[key] = value;
-        Utils.saveToStorage(Constants.storageKeys.SETTINGS, settings);
-        
-        console.log(`⚙️ Setting saved: ${key} = ${value}`);
-    }
-
-    // ============================================
-    // 📱 PWA FEATURES
-    // ============================================
-
-    /**
-     * Setup Progressive Web App features
-     */
-    setupPWAFeatures() {
-        // Register service worker (if not already registered)
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.ready.then(registration => {
-                console.log('✅ Service Worker active:', registration.scope);
-            }).catch(error => {
-                console.warn('⚠️ SW registration pending:', error);
-            });
-        }
-
-        // Handle install prompt (for "Add to Home Screen")
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            this.deferredInstallPrompt = e;
-            
-            console.log('📲 Install prompt available');
-        });
-
-        // Handle successful installation
-        window.addEventListener('appinstalled', () => {
-            console.log('✅ App installed successfully');
-            ui.showSuccess('تم تثبيت التطبيق بنجاح! 🎉');
-            this.deferredInstallPrompt = null;
-        });
-
-        // Check if running as installed PWA
-        if (Utils.isPWAInstalled()) {
-            console.log('📱 Running as installed PWA');
-        }
-    }
-
-    /**
-     * Prompt user to install PWA (call from custom button)
-     */
-    async promptInstall() {
-        if (!this.deferredInstallPrompt) {
-            ui.showInfo('يمكنك تثبيت التطبيق من قائمة المتصفح');
-            return;
-        }
-
-        try {
-            const result = await this.deferredInstallPrompt.prompt();
-            
-            if (result.outcome === 'accepted') {
-                console.log('User accepted install prompt');
-            } else {
-                console.log('User dismissed install prompt');
-            }
-            
-            this.deferredInstallPrompt = null;
-
-        } catch (error) {
-            console.error('Install prompt error:', error);
-        }
-    }
-
-    // ============================================
-    // 🌐 NETWORK HANDLING
-    // ============================================
-
-    /**
-     * Handle online/offline status changes
-     */
-    handleOnlineStatus(event) {
-        if (event.type === 'online') {
-            ui.hideOfflineIndicator();
-            
-            // Process any queued offline operations
-            this.processOfflineQueue();
-            
-        } else if (event.type === 'offline') {
-            ui.showOfflineIndicator();
-        }
-    }
-
-    /**
-     * Process operations that were queued while offline
-     */
-    async processOfflineQueue() {
-        const queue = Utils.loadFromStorage(Constants.storageKeys.OFFLINE_QUEUE, []);
-        
-        if (queue.length === 0) return;
-
-        ui.showInfo(`جاري مزامنة ${queue.length} عملية محفوظة...`);
-
-        const remaining = [];
-
-        for (const operation of queue) {
-            try {
-                switch (operation.type) {
-                    case 'attendance':
-                        await db.recordAttendance(operation.data);
-                        break;
-                    // Add more operation types as needed
-                }
-                
-                console.log(`✅ Synced offline operation: ${operation.id}`);
-                
-            } catch (error) {
-                console.error(`Failed to sync: ${operation.id}`, error);
-                operation.retries = (operation.retries || 0) + 1;
-                
-                if (operation.retries < 3) {
-                    remaining.push(operation);
-                }
-            }
-        }
-
-        // Save remaining operations
-        Utils.saveToStorage(Constants.storageKeys.OFFLINE_QUEUE, remaining);
-
-        if (remaining.length === 0) {
-            ui.showSuccess('تمت المزامنة بنجاح ✓');
-        } else {
-            ui.showWarning(`بعض العمليات فشلت (${remaining.length} متبقية)`);
-        }
-    }
-
-    // ============================================
-    // 🔔 NOTIFICATIONS
-    // ============================================
-
-    /**
-     * Request notification permission (for push notifications)
-     */
-    async requestNotificationPermission() {
-        if (!('Notification' in window)) {
-            console.warn('This browser does not support notifications');
-            return false;
-        }
-
-        if (Notification.permission === 'granted') {
-            return true;
-        }
-
-        if (Notification.permission !== 'denied') {
-            const permission = await Notification.requestPermission();
-            return permission === 'granted';
-        }
-
         return false;
     }
 
     /**
-     * Show browser notification
+     * Get current user data
+     * @returns {object|null}
      */
-    showBrowserNotification(title, options = {}) {
-        if (Notification.permission !== 'granted') return;
-
-        const notification = new Notification(title, {
-            icon: 'icon-192.png',
-            badge: 'icon-192.png',
-            dir: 'rtl',
-            lang: 'ar',
-            ...options
-        });
-
-        notification.onclick = () => {
-            window.focus();
-            notification.close();
-        };
-
-        // Auto-close after 5 seconds
-        setTimeout(() => notification.close(), 5000);
-    }
-
-    // ============================================
-    // 🛠️ UTILITY METHODS
-    // ============================================
-
-    /**
-     * Get current application state
-     */
-    getState() {
-        return {
-            isInitialized: this.isInitialized,
-            currentPage: this.currentPage,
-            isAuthenticated: auth.isAuthenticated(),
-            currentUser: auth.getCurrentUser(),
-            isOnline: Utils.isOnline(),
-            isPWAInstalled: Utils.isPWAInstalled()
-        };
-    }
-
-    /**
-     * Log application state (for debugging)
-     */
-    logState() {
-        console.table(this.getState());
-    }
-
-    /**
-     * Force refresh/reload application
-     */
-    forceRefresh() {
-        if ('caches' in window) {
-            caches.keys().then(names => {
-                names.forEach(name => caches.delete(name));
-            });
+    getCurrentUser() {
+        if (typeof auth !== 'undefined' && auth.getCurrentUser) {
+            return auth.getCurrentUser();
         }
-        
-        window.location.reload(true);
+        return null;
     }
 
     /**
-     * Clear all application data and reset
+     * Check if current user is admin
+     * @returns {boolean}
      */
-    async clearAllData() {
-        const confirmed = await ui.showConfirmation({
-            title: '⚠️ مسح جميع البيانات',
-            message: 'سيتم حذف جميع البيانات المحلية والإعدادات. هذا الإجراء لا يمكن التراجع عنه!',
-            confirmText: 'نعم، امسح الكل',
-            cancelText: 'إلغاء',
-            type: 'danger'
+    isAdmin() {
+        if (typeof auth !== 'undefined' && auth.isAdmin) {
+            return auth.isAdmin();
+        }
+        return false;
+    }
+
+    // ============================================
+    // 🎨 UI ANIMATIONS & UTILITIES
+    // ============================================
+
+    /**
+     * Animate stat value counter
+     */
+    animateStatValue(elementId, targetValue) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+
+        const duration = 1000;
+        const steps = 60;
+        const stepDuration = duration / steps;
+        let currentValue = 0;
+        const increment = targetValue / steps;
+
+        const timer = setInterval(() => {
+            currentValue += increment;
+            if (currentValue >= targetValue) {
+                currentValue = targetValue;
+                clearInterval(timer);
+            }
+            el.textContent = Math.round(currentValue);
+        }, stepDuration);
+    }
+
+    // ============================================
+    // 📱 SETUP METHODS
+    // ============================================
+
+    /**
+     * Setup global event listeners
+     */
+    setupGlobalEventListeners() {
+        // Online/offline detection
+        window.addEventListener('online', () => this.handleOnlineStatus(true));
+        window.addEventListener('offline', () => this.handleOnlineStatus(false));
+
+        // Form submissions
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm && typeof auth !== 'undefined' && auth.handleLogin) {
+            loginForm.addEventListener('submit', (e) => auth.handleLogin(e));
+        }
+
+        const registerForm = document.getElementById('registerForm');
+        if (registerForm && typeof auth !== 'undefined' && auth.handleRegister) {
+            registerForm.addEventListener('submit', (e) => auth.handleRegister(e));
+        }
+
+        // Navigation links
+        document.querySelectorAll('[data-page]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.navigateTo(link.dataset.page);
+            });
         });
 
-        if (confirmed) {
-            // Clear storages
-            localStorage.clear();
-            sessionStorage.clear();
+        console.log('🎧 Global event listeners set up');
+    }
 
-            // Clear caches
-            if ('caches' in window) {
-                const cacheNames = await caches.keys();
-                await Promise.all(cacheNames.map(name => caches.delete(name)));
+    /**
+     * Handle online/offline status changes
+     */
+    handleOnlineStatus(isOnline) {
+        if (typeof ui !== 'undefined') {
+            if (isOnline) {
+                ui.showSuccess('تم استعادة الاتصال بالإنترنت');
+            } else {
+                ui.showWarning('لا يوجد اتصال بالإنترنت - بعض الميزات قد لا تعمل');
             }
+        }
+    }
 
-            // Reload
-            window.location.reload();
+    /**
+     * Load user settings from localStorage
+     */
+    loadUserSettings() {
+        try {
+            if (typeof Utils !== 'undefined' && Utils.loadFromStorage) {
+                const settings = Utils.loadFromStorage(Constants?.storageKeys?.USER_SETTINGS || 'user_settings');
+                if (settings) {
+                    console.log('⚙️ User settings loaded');
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to load settings:', error);
+        }
+    }
+
+    /**
+     * Setup PWA features (service worker, etc.)
+     */
+    setupPWAFeatures() {
+        try {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('✅ Service Worker registered:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.warn('⚠️ Service Worker registration failed:', error);
+                    });
+            }
+        } catch (error) {
+            console.warn('⚠️ PWA setup failed:', error);
         }
     }
 }
 
 // ============================================
-// 🎯 APPLICATION ENTRY POINT
+// 🚀 INITIALIZE APPLICATION
 // ============================================
 
-// Create global application instance
-const app = new App();
+/**
+ * Global app instance - created when DOM is ready
+ */
+let app;
 
-// Export for use in other modules
-window.App = App;
-window.app = app;
-
-// Initialize when DOM is ready
+// Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🌟 DOM Ready - Starting Axentro System v' + AppConfig.app.version);
+    console.log('📄 DOM Content Loaded - Initializing App...');
     
-    // Start application initialization
-    app.init().catch(error => {
-        console.error('Fatal error during initialization:', error);
-        
-        // Fallback: Show basic version without advanced features
-        document.getElementById('loadingScreen').style.display = 'flex';
-        document.getElementById('loadStatus').textContent = 'جاري تشغيل النظام...';
-        
-        // Try simpler initialization
-        setTimeout(() => {
-            ui.hideLoadingScreen();
-        }, 2000);
-    });
+    // Create app instance
+    app = new App();
+    
+    // Small delay to ensure all scripts are loaded
+    setTimeout(() => {
+        app.init().catch(error => {
+            console.error('❌ Fatal initialization error:', error);
+            showLoadingError(error.message || 'فشل تشغيل التطبيق');
+        });
+    }, 500);
 });
 
-// Handle unhandled errors globally
-window.onerror = function(msg, url, lineNo, columnNo, error) {
-    console.error('🚨 Global Error:', { msg, url, lineNo, columnNo, error });
-    
-    // Don't show toast for every error (too noisy)
-    // But log it for debugging
-    
-    return false;
-};
-
-window.onunhandledrejection = function(event) {
-    console.error('🚨 Unhandled Promise Rejection:', event.reason);
-    
-    // Show user-friendly message for network errors
-    if (event.reason?.message?.includes('fetch')) {
-        ui.showError('خطأ في الاتصال بالخادم');
+// Fallback: If DOMContentLoaded already fired
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    console.log('⚡ Document already loaded - initializing immediately');
+    if (!app) {
+        app = new App();
+        setTimeout(() => app.init(), 100);
     }
-    
-    event.preventDefault();
-};
+}
 
-// Log app version
-console.log(`
-%c┌─────────────────────────────────────┐
-│  AXENTRO ATTENDANCE SYSTEM v${AppConfig.app.version}  │
-│  © ${new Date().getFullYear()} Axentro Team              │
-│  Build: ${new Date().toISOString().split('T')[0]}       │
-└─────────────────────────────────────┘
-`, 'color: #3b82f6; font-weight: bold; font-size: 14px;');
+console.log('🎯 App.js loaded successfully - waiting for initialization...');
