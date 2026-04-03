@@ -458,7 +458,7 @@ class App {
     }
 
     // ============================================
-    // 🏠 DASHBOARD INITIALIZATION
+    // 🏠️ DASHBOARD INITIALIZATION
     // ============================================
 
     /**
@@ -514,9 +514,6 @@ class App {
 
             // Start camera
             await faceRecognition.startCamera(videoEl, { facingMode: 'user' });
-
-            // Optional: Start continuous detection (can be resource-intensive)
-            // For now, we'll detect on demand when user clicks check-in/out
 
             console.log('📹 Dashboard camera ready');
 
@@ -782,9 +779,7 @@ class App {
     forceRefresh() {
         if ('caches' in window) {
             caches.keys().then(names => {
-                names.forEach(name => {
-                    caches.delete(name);
-                });
+                names.forEach(name => caches.delete(name));
             });
         }
         
@@ -844,9 +839,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // Handle unhandled errors globally
 window.onerror = function(msg, url, lineNo, columnNo, error) {
     console.error('🚨 Global Error:', { msg, url, lineNo, columnNo, error });
-    
-    // Don't show toast for every error (too noisy)
-    // But log it for debugging
     
     return false;
 };
