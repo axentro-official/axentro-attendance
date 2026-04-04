@@ -1,8 +1,62 @@
-/**
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Attendance JS File</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        pre {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 80vh;
+        }
+        .file-header {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 0;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-right: 10px; }
+        .modified { background: #10b981; }
+        .info-box { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 15px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+
+<div class="file-header">
+    📄 الملف 6/7: attendance.js 
+    <span class="status modified">✅ تم التعديل والإضافة - الحضور والانصراف</span>
+</div>
+
+<div class="info-box">
+    <strong>📝 ملخص التعديلات:</strong><br>
+    • تسجيل حضور/انصراف مع تحقق GPS<br>
+    • حساب ساعات العمل تلقائياً<br>
+    • إرسال إيميلات تنبيه (Google Apps Script)<br>
+    • تحميل بيانات الموظف من Supabase<br>
+    • حساب الساعات الشهرية<br>
+    • التقارير (جدول زمني)
+</div>
+
+<pre><code>/**
  * ============================================
- * ⏰ AXENTRO ATTENDANCE MANAGER v4.1 - ROBUST
+ * ⏰ AXENTRO ATTENDANCE MANAGER v4.2 - COMPLETE
  * ✅ Check-in/Check-out & Time Tracking
- * 🚀 محسّن مع Error Handling قوي و Graceful Degradation
+ * 🔥 Enhanced with All Legacy Features
  * ============================================
  */
 
@@ -27,106 +81,109 @@ class AttendanceManager {
     // 🚀 INITIALIZATION
     // ============================================
 
-    /**
-     * Initialize attendance manager
-     */
     init() {
         console.log('✅ Attendance Manager ready');
     }
 
     // ============================================
-    // 📍 LOCATION TRACKING
+    // 📍 LOCATION TRACKING (من الكود القديم)
     // ============================================
 
-    /**
-     * Get current location with timeout and fallback
-     * @returns {Promise<object|null>} Location data
-     */
     async getCurrentLocation() {
         try {
-            const location = await Utils.getLocation({
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 60000 // Accept location from last minute
+            const location = await new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation not supported'));
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    pos => resolve(pos),
+                    err => reject(err),
+                    {
+                        enableHighAccuracy: AppConfig?.location?.enableHighAccuracy !== false,
+                        timeout: AppConfig?.location?.timeout || 15000,
+                        maximumAge: AppConfig?.location?.maximumAge || 0
+                    }
+                );
             });
-            
-            this.currentLocation = location;
 
-            // Update UI status
-            this.updateLocationStatus(true, location.accuracy);
+            this.currentLocation = {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                accuracy: location.coords.accuracy
+            };
 
-            return location;
+            // Update global state
+            window.currentLat = location.coords.latitude;
+            window.currentLon = location.coords.longitude;
+            window.currentLoc = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+
+            // Update UI
+            this.updateLocationStatus(true, location.coords.accuracy);
+
+            return this.currentLocation;
 
         } catch (error) {
             console.warn('⚠️ Location error:', error.message);
-            
-            // Update UI to show warning (not error - don't block attendance)
             this.updateLocationStatus(false);
+            
+            window.currentLoc = 'غير متوفر';
+            window.currentLat = null;
+            window.currentLon = null;
             
             return null;
         }
     }
 
-    /**
-     * Update location status in UI
-     * @param {boolean} success - Whether location was obtained
-     * @param {number} accuracy - GPS accuracy in meters
-     */
     updateLocationStatus(success, accuracy = null) {
-        const statusEl = document.getElementById('locationStatus');
-        
+        const statusEl = document.getElementById('locBar');
         if (!statusEl) return;
 
         if (success && accuracy) {
             statusEl.innerHTML = `
-                <i class="fas fa-map-marker-alt"></i>
-                دقة: ${Math.round(accuracy)}م
+                <i class="fas fa-map-marker-alt" style="color:#10b981;"></i> 
+                <a href="${window.currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">
+                    الموقع محدد (دقة: ${Math.round(accuracy)}م)
+                </a>
             `;
-            statusEl.className = 'text-success';
         } else {
             statusEl.innerHTML = `
-                <i class="fas fa-exclamation-triangle"></i>
-                الموقع غير متوفر
+                <i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i> 
+                <span style="color:#94a3b8;">تعذر تحديد الموقع</span>
             `;
-            statusEl.className = 'text-warning';
         }
     }
 
-    /**
-     * Generate Google Maps link from current location
-     * @returns {string|null} Maps URL or null
-     */
     getLocationLink() {
-        if (!this.currentLocation) return null;
-        
-        return Utils.getMapsLink(
-            this.currentLocation.latitude,
-            this.currentLocation.longitude
-        );
+        return window.currentLoc || null;
     }
 
     // ============================================
-    // 📊 TODAY'S RECORDS
+    // 📊 TODAY'S RECORDS (من الكود القديم)
     // ============================================
 
-    /**
-     * Load today's attendance records for current user
-     */
     async loadTodayRecords() {
         try {
-            if (typeof auth === 'undefined' || !auth.isAuthenticated()) {
-                console.warn('⚠️ Cannot load records - not authenticated');
+            if (!window.user?.code) {
+                console.warn('⚠️ Cannot load records - no user code');
                 return;
             }
 
-            const userCode = auth.getUserCode();
+            if (typeof db === 'undefined') {
+                console.warn('⚠️ Database module not available');
+                return;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
             
-            if (typeof db === 'undefined' || typeof db.getTodayAttendance !== 'function') {
-                console.warn('⚠️ Database module not available for loading records');
-                return;
-            }
+            const { data } = await db.from('attendance')
+                .select('*')
+                .eq('employee_code', window.user.code)
+                .gte('created_at', today)
+                .order('created_at', { ascending: true });
 
-            this.todayRecords = await db.getTodayAttendance(userCode);
+            this.todayRecords = data || [];
 
             // Determine current status
             this.determineCurrentStatus();
@@ -142,9 +199,6 @@ class AttendanceManager {
         }
     }
 
-    /**
-     * Determine current check-in/check-out status based on records
-     */
     determineCurrentStatus() {
         if (this.todayRecords.length === 0) {
             this.currentStatus = 'out';
@@ -171,20 +225,17 @@ class AttendanceManager {
         }
     }
 
-    /**
-     * Update UI with today's summary information
-     */
     updateTodaySummary() {
         // Update times
         const checkInTimeEl = document.getElementById('checkInTime');
         const checkOutTimeEl = document.getElementById('checkOutTime');
 
         if (checkInTimeEl && this.lastCheckIn) {
-            checkInTimeEl.textContent = Utils.formatDate(this.lastCheckIn.created_at, 'time');
+            checkInTimeEl.textContent = this.formatTime(this.lastCheckIn.created_at);
         }
 
         if (checkOutTimeEl && this.lastCheckOut) {
-            checkOutTimeEl.textContent = Utils.formatDate(this.lastCheckOut.created_at, 'time');
+            checkOutTimeEl.textContent = this.formatTime(this.lastCheckOut.created_at);
         }
 
         // Calculate total hours and overtime
@@ -207,7 +258,7 @@ class AttendanceManager {
         const todayHoursEl = document.getElementById('todayHours');
 
         if (totalHoursEl) {
-            totalHoursEl.textContent = Utils.formatHoursWorked(totalHours);
+            totalHoursEl.textContent = this.formatHoursWorked(totalHours);
         }
 
         if (overtimeEl) {
@@ -220,13 +271,10 @@ class AttendanceManager {
             todayHoursEl.textContent = totalHours.toFixed(1);
         }
 
-        // Update action buttons state
+        // Update action buttons
         this.updateActionButtons();
     }
 
-    /**
-     * Update action buttons based on current status
-     */
     updateActionButtons() {
         const checkInBtn = document.getElementById('checkInBtn');
         const checkOutBtn = document.getElementById('checkOutBtn');
@@ -239,394 +287,881 @@ class AttendanceManager {
             checkInBtn.classList.add('disabled');
             checkOutBtn.disabled = false;
             checkOutBtn.classList.remove('disabled');
-            
-            checkInBtn.innerHTML = '<i class="fas fa-check"></i><span>تم الحضور</span>';
-            checkOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span>انصراف</span>';
+            checkInBtn.innerHTML = 'تم الحضور';
+            checkOutBtn.innerHTML = 'انصراف';
         } else {
             // User is checked out - show checkin button active
             checkInBtn.disabled = false;
             checkInBtn.classList.remove('disabled');
             checkOutBtn.disabled = true;
             checkOutBtn.classList.add('disabled');
-            
-            checkInBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>حضور</span>';
-            checkOutBtn.innerHTML = '<i class="fas fa-check"></i><span>تم الانصراف</span>';
+            checkInBtn.innerHTML = 'حضور';
+            checkOutBtn.innerHTML = 'تم الانصراف';
         }
     }
 
     // ============================================
-    // ✅ CHECK-IN / CHECK-OUT OPERATIONS
+    // ✅ CHECK-IN / CHECK-OUT OPERATIONS (من الكود القديم)
     // ============================================
 
-    /**
-     * Handle check-in button click
-     */
     async handleCheckIn() {
         await this.recordAttendance('حضور');
     }
 
-    /**
-     * Handle check-out button click
-     */
     async handleCheckOut() {
         await this.recordAttendance('انصراف');
     }
 
-    /**
-     * Record attendance (main function)
-     * @param {string} type - 'حضور' or 'انصراف'
-     */
     async recordAttendance(type) {
-        // Prevent double-clicks / processing
+        // Prevent double-clicks
         if (this.isProcessing) {
-            if (typeof ui !== 'undefined' && ui.showWarning) {
-                ui.showWarning('جاري المعالجة... يرجى الانتظار');
-            }
+            showToast?.('جاري المعالجة... يرجى الانتظار', 'warning');
             return;
         }
 
-        // Check cooldown period
+        // Check cooldown
         if (this.isOnCooldown()) {
-            if (typeof ui !== 'undefined' && ui.showError) {
-                ui.showError(ErrorCodes.ATTENDANCE_COOLDOWN_ACTIVE.message);
-            }
+            showToast?.('يرجى الانتظار قبل المحاولة مرة أخرى', 'error');
             return;
         }
 
         // Validate user is authenticated
-        if (typeof auth === 'undefined' || !auth.isAuthenticated()) {
-            if (typeof ui !== 'undefined' && ui.showError) {
-                ui.showError(ErrorCodes.AUTH_SESSION_EXPIRED.message);
-            }
-            if (typeof app !== 'undefined' && app.navigateTo) {
-                app.navigateTo('loginPage');
-            }
+        if (!window.user) {
+            showToast?.('يجب تسجيل الدخول أولاً', 'error');
             return;
         }
 
         // Validate shift selection
         const selectedShift = this.getSelectedShift();
-        if (!selectedShift) {
-            if (typeof ui !== 'undefined' && ui.showError) {
-                ui.showError(ErrorCodes.ATTENDANCE_NO_SHIFT_SELECTED.message);
-            }
+        if (!selectedShift && type === 'حضور') {
+            showToast?.('يرجى اختيار الوردية', 'error');
             return;
         }
 
         // Check if opposite action already exists
         if (type === 'حضور' && this.currentStatus === 'in') {
-            if (typeof ui !== 'undefined' && ui.showError) {
-                ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_IN.message);
-            }
+            showToast?.('لقد سجلت حضورك بالفعل', 'error');
             return;
         }
 
         if (type === 'انصراف' && this.currentStatus === 'out') {
-            if (typeof ui !== 'undefined' && ui.showError) {
-                ui.showError(ErrorCodes.ATTENDANCE_ALREADY_CHECKED_OUT.message);
-            }
+            showToast?.('لم تسجل حضور بعد', 'error');
             return;
         }
 
         // Start processing
         this.isProcessing = true;
-        
+
         const btnId = type === 'حضور' ? 'checkInBtn' : 'checkOutBtn';
         const btn = document.getElementById(btnId);
-        
-        const loadingText = type === 'حضور' ? 
-            'جاري تسجيل الحضور...' : 
-            'جاري تسجيل الانصراف...';
+        const loadingText = type === 'حضور' ? 'جاري تسجيل الحضور...' : 'جاري تسجيل الانصراف...';
 
-        if (typeof ui !== 'undefined' && ui.showButtonLoading) {
-            ui.showButtonLoading(btn, loadingText);
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + loadingText;
         }
 
         try {
-            // Step 1: Try face recognition (optional - non-critical)
-            let recognizedFace = null;
-            
-            if (window.faceRecognitionAvailable !== false && 
-                typeof faceRecognition !== 'undefined' && 
-                faceRecognition.isCameraRunning?.()) {
-                
-                try {
-                    recognizedFace = await faceRecognition.recognizeForAttendance();
-                    
-                    // Verify recognized face matches logged in user
-                    if (recognizedFace && auth.getUserCode() && 
-                        recognizedFace.code !== auth.getUserCode()) {
-                        throw new Error('الوجه لا يتطابق مع المستخدم المسجل');
-                    }
-                } catch (faceError) {
-                    console.warn('⚠️ Face recognition failed, continuing without it:', faceError.message);
-                    // Continue without face recognition - don't block the operation!
-                }
-            }
-
-            // Step 2: Get location (non-blocking)
+            // Step 1: Get location (non-blocking)
             await this.getCurrentLocation();
-            const locationLink = this.getLocationLink();
 
-            // Step 3: Calculate hours worked (for check-out only)
+            // Step 2: Calculate hours worked (for check-out only)
             let hoursWorked = null;
             let overtime = null;
 
             if (type === 'انصراف' && this.lastCheckIn) {
                 const checkInTime = new Date(this.lastCheckIn.created_at);
                 const now = new Date();
-                
-                const diff = Utils.calculateTimeDifference(checkInTime, now);
-                hoursWorked = diff.totalHours.toFixed(2);
+                const diff = (now - checkInTime) / (1000 * 60 * 60);
+                hoursWorked = diff.toFixed(2);
 
                 // Calculate overtime
                 const normalHours = AppConfig?.attendance?.normalHours || 9;
-                const overtimeCalc = Utils.calculateOvertime(parseFloat(hoursWorked), normalHours);
-                
-                overtime = overtimeCalc.hasOvertime ? 
-                    `${overtimeCalc.overtimeHours} ساعة` : 
-                    'لا يوجد';
-            }
-
-            // Step 4: Capture image (if camera available - optional)
-            let imageUrl = null;
-            
-            if (window.faceRecognitionAvailable !== false &&
-                typeof faceRecognition !== 'undefined' && 
-                faceRecognition.currentVideoElement && 
-                faceRecognition.canvasElement) {
-                
-                try {
-                    const photo = faceRecognition.capturePhoto(
-                        faceRecognition.currentVideoElement,
-                        faceRecognition.canvasElement
-                    );
-                    
-                    // Compress image for upload
-                    const compressedImage = await Utils.compressImage(photo.base64, 640, 0.7);
-                    
-                    // Upload to storage if db supports it
-                    if (typeof db !== 'undefined' && typeof db.uploadFaceImage === 'function') {
-                        imageUrl = await db.uploadFaceImage(
-                            compressedImage, 
-                            `${auth.getUserCode()}_${type}`
-                        );
-                    }
-                } catch (imgError) {
-                    console.warn('⚠️ Image capture failed:', imgError.message);
-                    // Continue without image - non-critical
+                if (parseFloat(hoursWorked) > normalHours) {
+                    const ot = parseFloat(hoursWorked) - normalHours;
+                    overtime = `${ot.toFixed(1)} ساعة`;
+                } else {
+                    overtime = 'لا يوجد';
                 }
             }
 
-            // Step 5: Prepare attendance record data
-            const attendanceData = {
-                employee_code: auth.getUserCode(),
-                employee_name: auth.getUserName(),
+            // Step 3: Format datetime (12-hour format as requested)
+            const now = new Date();
+            const timeFormat = AppConfig?.reporting?.timeFormat || {};
+            const datetime = `${now.toLocaleDateString('ar-EG')} - ${now.toLocaleString('ar-EG', { 
+                hour12: timeFormat.hour12 !== false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            })}`;
+
+            // Step 4: Record to database
+            const recordData = {
+                employee_code: window.user.code,
+                employee_name: window.user.name,
                 type: type,
-                location_link: locationLink,
-                shift: selectedShift,
+                location_link: window.currentLoc || 'غير متوفر',
+                shift: selectedShift || 'لم يتم التحديد',
                 hours_worked: hoursWorked,
-                overtime: overtime,
-                gps_accuracy: this.currentLocation?.accuracy,
-                image_url: imageUrl
+                overtime: overtime
             };
 
-            // Step 6: Save to database
-            if (typeof db === 'undefined' || typeof db.recordAttendance !== 'function') {
-                throw new Error('Database module not available');
-            }
+            if (typeof db === 'undefined') throw new Error('Database not available');
 
-            const result = await db.recordAttendance(attendanceData);
+            const { error } = await db.from('attendance').insert(recordData);
 
-            if (result.success) {
-                // Success! Update UI and state
-                this.onAttendanceSuccess(type, result.record);
-            } else {
-                throw new Error(result.error || 'فشل تسجيل الحضور');
-            }
+            if (error) throw error;
+
+            // Success!
+            playSound?.('faceid-success');
+            showToast?.(`تم تسجيل ${type} بنجاح ${hoursWorked ? '(' + hoursWorked + ' ساعة)' : ''}`, 'success');
+
+            // Reload today's records
+            await this.loadTodayRecords();
+
+            // Send email alert in background (من الكود القديم)
+            this.sendAttendanceEmail(type, datetime, selectedShift, hoursWorked, overtime);
 
         } catch (error) {
-            console.error(`${type} error:`, error);
-            this.onAttendanceError(error, type);
+            console.error('❌ Attendance recording error:', error);
+            playSound?.('faceid-error');
+            showToast?.('فشل تسجيل ' + type, 'error');
         } finally {
             this.isProcessing = false;
-            
-            if (typeof ui !== 'undefined' && ui.hideButtonLoading) {
-                ui.hideButtonLoading(btn);
+
+            // Reset button
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = type === 'حضور' ? 
+                    '<i class="fas fa-sign-in-alt"></i> حضور' : 
+                    '<i class="fas fa-sign-out-alt"></i> انصراف';
             }
 
-            // Set cooldown timestamp
+            // Update cooldown
             this.lastActionTime = Date.now();
         }
     }
 
-    /**
-     * Handle successful attendance recording
-     * @param {string} type - Attendance type
-     * @param {object} record - Saved record object
-     */
-    onAttendanceSuccess(type, record) {
-        // Play success feedback
-        if (typeof ui !== 'undefined' && ui.playSuccessFeedback) {
-            ui.playSuccessFeedback();
-        }
+    // ============================================
+    // 📧 EMAIL NOTIFICATIONS (من الكود القديم)
+    // ============================================
 
-        // Show success message
-        const message = type === 'حضور' ? 
-            SuccessMessages.CHECK_IN_SUCCESS : 
-            SuccessMessages.CHECK_OUT_SUCCESS;
+    sendAttendanceEmail(type, datetime, shift, hoursWorked, overtime) {
+        if (!AppConfig?.emailService?.url) return;
 
-        if (typeof ui !== 'undefined' && ui.showSuccess) {
-            ui.showSuccess(message);
-        }
+        const emailData = {
+            action: 'sendAttAlert',
+            name: window.user?.name,
+            code: window.user?.code,
+            type: type,
+            datetime: datetime,
+            location: window.currentLoc || '-',
+            shift: shift || '',
+            hoursWorked: hoursWorked || '-',
+            overtime: overtime || 'لا يوجد'
+        };
 
-        // Vibrate on success (haptic feedback)
-        Utils.vibrate([100, 50, 100]);
-
-        // Add to local records array
-        if (record) {
-            this.todayRecords.push(record);
-        }
-
-        // Update UI state
-        this.determineCurrentStatus();
-        this.updateTodaySummary();
-
-        console.log(`✅ ${type} recorded successfully`);
-    }
-
-    /**
-     * Handle attendance recording error
-     * @param {Error} error - Error object
-     * @param {string} type - Attendance type that failed
-     */
-    onAttendanceError(error, type) {
-        console.error(`❌ ${type} recording failed:`, error.message);
-
-        // Play error feedback
-        if (typeof ui !== 'undefined' && ui.playErrorFeedback) {
-            ui.playErrorFeedback();
-        }
-
-        // Show user-friendly error message
-        if (typeof ui !== 'undefined' && ui.showError) {
-            ui.showError(error.message || `فشل تسجيل ${type}`);
-        }
+        fetch(AppConfig.emailService.url, {
+            method: 'POST',
+            body: JSON.stringify(emailData)
+        }).catch(e => console.log('Email notification error:', e));
     }
 
     // ============================================
-    // 🎛️ SHIFT SELECTION
+    // 📊 MONTHLY HOURS CALCULATION (من الكود القديم)
     // ============================================
 
-    /**
-     * Get currently selected shift
-     * @returns {string|null} Selected shift ID or null
-     */
-    getSelectedShift() {
-        const selectedRadio = document.querySelector('input[name="shift"]:checked');
-        return selectedRadio?.value || null;
-    }
+    async calculateMonthlyHours() {
+        try {
+            if (!window.user?.code) return;
 
-    // ============================================
-    // ⏱️ COOLDOWN MANAGEMENT
-    // ============================================
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    /**
-     * Check if action is on cooldown
-     * @returns {boolean}
-     */
-    isOnCooldown() {
-        const cooldownPeriod = AppConfig?.attendance?.cooldownPeriod || 60000; // Default 1 minute
-        
-        if (Date.now() - this.lastActionTime < cooldownPeriod) {
-            return true;
-        }
-        return false;
-    }
+            if (typeof db === 'undefined') return;
 
-    /**
-     * Get remaining cooldown time in seconds
-     * @returns {number}
-     */
-    getRemainingCooldown() {
-        const cooldownPeriod = AppConfig?.attendance?.cooldownPeriod || 60000;
-        const elapsed = Date.now() - this.lastActionTime;
-        const remaining = Math.ceil((cooldownPeriod - elapsed) / 1000);
-        
-        return Math.max(0, remaining);
-    }
+            const { data } = await db.from('attendance')
+                .select('created_at, type, hours_worked')
+                .eq('employee_code', window.user.code)
+                .gte('created_at', startOfMonth);
 
-    // ============================================
-    // 📈 STATISTICS & REPORTING HELPERS
-    // ============================================
+            if (data) {
+                let totalHours = 0;
 
-    /**
-     * Get today's statistics summary
-     * @returns {object} Today's stats
-     */
-    getTodayStats() {
-        const totalRecords = this.todayRecords.length;
-        const checkIns = this.todayRecords.filter(r => r.type === 'حضور').length;
-        const checkOuts = this.todayRecords.filter(r => r.type === 'انصراف').length;
+                data.forEach(record => {
+                    if (record.type === 'انصراف' && record.hours_worked) {
+                        totalHours += parseFloat(record.hours_worked) || 0;
+                    }
+                });
 
-        let totalHours = 0;
-        let overtimeHours = 0;
-
-        this.todayRecords.forEach(record => {
-            const hours = parseFloat(record.hours_worked) || 0;
-            totalHours += hours;
-
-            const otMatch = record.overtime?.match(/[\d.]+/);
-            if (otMatch) {
-                overtimeHours += parseFloat(otMatch[0]);
+                const monthHoursEl = document.getElementById('monthHoursValue');
+                if (monthHoursEl) {
+                    monthHoursEl.textContent = totalHours > 0 ? 
+                        `${totalHours.toFixed(2)} ساعة` : 
+                        '0 ساعة';
+                }
             }
-        });
 
-        return {
-            totalRecords,
-            checkIns,
-            checkOuts,
-            totalHours,
-            overtimeHours,
-            currentStatus: this.currentStatus,
-            firstCheckIn: this.lastCheckIn,
-            lastCheckOut: this.lastCheckOut
-        };
+        } catch(e) {
+            console.error('Monthly hours calculation error:', e);
+            
+            const monthHoursEl = document.getElementById('monthHoursValue');
+            if (monthHoursEl) monthHoursEl.textContent = '--';
+        }
     }
 
-    /**
-     * Format attendance record for display
-     * @param {object} record - Attendance record
-     * @returns {object} Formatted record
-     */
-    formatRecordForDisplay(record) {
-        return {
-            date: Utils.formatDate(record.created_at, 'date'),
-            time: Utils.formatDate(record.created_at, 'time'),
-            type: record.type,
-            shift: record.shift || '-',
-            hours: record.hours_worked || '-',
-            overtime: record.overtime || 'لا يوجد',
-            location: record.location_link ? '📍' : '-'
-        };
+    // ============================================
+    // 👥 EMPLOYEE DATA LOADING (للأدمن)
+    // ============================================
+
+    async loadEmployees() {
+        try {
+            if (typeof db === 'undefined') {
+                throw new Error('Database not available');
+            }
+
+            const { data: emps } = await db.from('employees')
+                .select('code, name, email, is_admin, is_deleted, created_at')
+                .eq('is_deleted', false)
+                .order('created_at', { ascending: true });
+
+            if (emps) {
+                window.employeesList = emps;
+
+                // Update count
+                const countEl = document.getElementById('empCount');
+                if (countEl) countEl.textContent = emps.length;
+
+                // Render list
+                this.renderEmployeeList(emps);
+
+                setStatus?.('متصل');
+            }
+
+        } catch(e) {
+            console.error('❌ Load employees error:', e);
+            setStatus?.('غير متصل');
+        }
+    }
+
+    renderEmployeeList(employees) {
+        const container = document.getElementById('searchResults');
+        if (!container) return;
+
+        if (!employees || !employees.length) {
+            container.innerHTML = '<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين مسجلين</p>';
+            return;
+        }
+
+        container.innerHTML = employees.map(emp => `
+            <div class="emp-item">
+                <div class="emp-info">
+                    <h4>${emp.name}</h4>
+                    <p>${emp.code}</p>
+                </div>
+                <div class="emp-actions">
+                    <button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${emp.code}', '${emp.name}')">
+                        <i class="fas fa-check"></i>
+                    </button>
+                    <button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${emp.code}', '${emp.name}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button class="btn btn-sm btn-report" onclick="loadEmpReport('${emp.code}', '${emp.name}')">
+                        <i class="fas fa-chart-bar"></i>
+                    </button>
+                    <button class="btn btn-sm btn-reg" onclick="adminResetFace('${emp.code}', '${emp.name}')" title="إعادة تسجيل بصمة">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    ${!emp.is_admin ? `
+                    <button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${emp.code}', '${emp.name}')" title="حذف الموظف">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Search functionality
+    setupSearch() {
+        const searchInput = document.getElementById('searchInput');
+        if (!searchInput) return;
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            
+            if (!query) {
+                this.renderEmployeeList(window.employeesList || []);
+                return;
+            }
+
+            const filtered = (window.employeesList || []).filter(emp =>
+                emp.name.toLowerCase().includes(query) ||
+                emp.code.toLowerCase().includes(query)
+            );
+
+            this.renderEmployeeList(filtered);
+        });
+    }
+
+    // ============================================
+    // 👔 ADMIN OPERATIONS (من الكود القديم)
+    // ============================================
+
+    async adminDirectAtt(type, code, name) {
+        // Verify admin has face registered
+        if (!window.sessionDescriptor) {
+            showToast?.('لا توجد بصمة أدمن مسجلة، جاري فتح الكاميرا للتسجيل...', 'warning');
+            window.firstTimeSetupMode = true;
+            
+            if (typeof openCamera === 'function') {
+                await openCamera();
+            }
+            return;
+        }
+
+        // Open camera for admin face verification
+        window.adminVerifyMode = true;
+        window.targetEmpForAdmin = { type, code, name };
+        window.attMode = false;
+        window.regMode = false;
+        window.updateFaceMode = false;
+        window.adminResetFaceMode = false;
+
+        if (typeof openCamera === 'function') {
+            const success = await openCamera();
+            if (!success) {
+                window.adminVerifyMode = false;
+                showToast?.('فشل فتح الكاميرا', 'error');
+            }
+        }
+    }
+
+    async adminDeleteEmp(code, name) {
+        if (!window.sessionDescriptor) {
+            showToast?.('لا توجد بصمة أدمن مسجلة', 'warning');
+            window.firstTimeSetupMode = true;
+            
+            if (typeof openCamera === 'function') {
+                await openCamera();
+            }
+            return;
+        }
+
+        window.adminVerifyMode = true;
+        window.targetEmpForAdmin = { type: 'حذف موظف', code, name };
+        window.attMode = false;
+        window.regMode = false;
+        window.updateFaceMode = false;
+        window.adminResetFaceMode = false;
+
+        if (typeof openCamera === 'function') {
+            const success = await openCamera();
+            if (!success) {
+                window.adminVerifyMode = false;
+                showToast?.('فشل فتح الكاميرا', 'error');
+            }
+        }
+    }
+
+    async adminResetFace(code, name) {
+        window.targetEmpForAdmin = { code, name };
+        window.adminResetFaceMode = true;
+        window.regMode = false;
+        window.attMode = false;
+        window.updateFaceMode = false;
+        window.adminVerifyMode = false;
+        window.firstTimeSetupMode = false;
+
+        showToast?.(`جاري فتح الكاميرا لتسجيل بصمة جديدة لـ ${name}`, 'warning');
+
+        if (typeof openCamera === 'function') {
+            const success = await openCamera();
+            if (!success) {
+                window.adminResetFaceMode = false;
+                showToast?.('فشل فتح الكاميرا', 'error');
+            }
+        }
+    }
+
+    // ============================================
+    // 📋 REPORTS (من الكود القديم)
+    // ============================================
+
+    async loadMyReport() {
+        if (!window.user?.code) return;
+
+        const titleEl = document.getElementById('reportTitle');
+        const bodyEl = document.getElementById('reportBody');
+        const modal = document.getElementById('reportModal');
+
+        if (titleEl) titleEl.textContent = `تقرير ${window.user.name}`;
+        if (bodyEl) bodyEl.innerHTML = '<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>';
+        if (modal) modal.classList.add('active');
+
+        await this.fetchAndRenderReport(window.user.code);
+    }
+
+    async loadEmpReport(code, name) {
+        const titleEl = document.getElementById('reportTitle');
+        const bodyEl = document.getElementById('reportBody');
+        const modal = document.getElementById('reportModal');
+
+        if (titleEl) titleEl.textContent = `تقرير ${name}`;
+        if (bodyEl) bodyEl.innerHTML = '<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>';
+        if (modal) modal.classList.add('active');
+
+        await this.fetchAndRenderReport(code);
+    }
+
+    async fetchAndRenderReport(code) {
+        const bodyEl = document.getElementById('reportBody');
+        if (!bodyEl) return;
+
+        try {
+            if (typeof db === 'undefined') throw new Error('Database not available');
+
+            const { data: records } = await db.from('attendance')
+                .select('*')
+                .eq('employee_code', code)
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            if (records && records.length > 0) {
+                bodyEl.innerHTML = `
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>الحالة</th>
+                                <th>الوقت</th>
+                                <th>الوردية</th>
+                                <th>الساعات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${records.map(r => {
+                                const dateStr = new Date(r.created_at).toLocaleDateString('ar-EG', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit'
+                                });
+                                
+                                const timeStr = new Date(r.created_at).toLocaleTimeString('ar-EG', {
+                                    hour12: true,
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                });
+
+                                return `
+                                    <tr>
+                                        <td style="font-size:12px;">${dateStr}</td>
+                                        <td>
+                                            <span class="att-badge ${r.type === 'حضور' ? 'att-in' : 'att-out'}">
+                                                ${r.type}
+                                            </span>
+                                        </td>
+                                        <td style="font-size:11px;">${timeStr}</td>
+                                        <td style="font-size:11px;">${r.shift || '-'}</td>
+                                        <td style="font-weight:bold; color:${r.hours_worked ? '#38bdf8' : '#64748b'}">
+                                            ${r.hours_worked || '-'}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                bodyEl.innerHTML = '<center style="color:#64748b; padding:30px;">لا توجد سجلات في هذه الفترة</center>';
+            }
+
+        } catch(e) {
+            console.error('Report fetch error:', e);
+            bodyEl.innerHTML = '<center style="color:#ef4444; padding:20px;">فشل تحميل التقرير</center>';
+        }
+    }
+
+    closeReportModal() {
+        const modal = document.getElementById('reportModal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    // ============================================
+    // 🎯 HANDLE ATTENDANCE WITH FACE (يستدعى من face-recognition.js)
+    // ============================================
+
+    async handleAttendanceOperation(descriptor) {
+        if (!descriptor) {
+            playSound?.('faceid-error');
+            showToast?.('فشل استخراج البصمة', 'error');
+            closeCamera?.();
+            return;
+        }
+
+        if (!window.sessionDescriptor) {
+            playSound?.('faceid-error');
+            showToast?.('بيانات الوجه غير مسجلة، تواصل مع الأدمن.', 'error');
+            closeCamera?.();
+            return;
+        }
+
+        // Verify face match
+        const distance = faceRecognition?.euclideanDistance(descriptor, window.sessionDescriptor) || 
+                         this.euclideanDistance(descriptor, window.sessionDescriptor);
+        
+        const threshold = AppConfig?.faceRecognition?.recognition?.threshold || 0.55;
+
+        if (distance >= threshold) {
+            // Face doesn't match
+            playSound?.('faceid-error');
+            showMatchResult?.(false);
+            showToast?.('الوجه غير مطابق!', 'error');
+            setCamStatus?.('الوجه غير مطابق!');
+            faceRecognition?.restartCamLoop();
+            return;
+        }
+
+        // Face matches! Show success
+        showMatchResult?.(true);
+
+        // Handle password change via face
+        if (window.attType === 'تغيير كلمة المرور') {
+            await this.handleChangePasswordWithFace();
+            return;
+        }
+
+        // Check GPS location (من الكود القديم)
+        if (window.currentLat && window.currentLon) {
+            const dist = this.getDistanceFromLatLonInKm(
+                window.currentLat, 
+                window.currentLon,
+                AppConfig?.location?.office?.latitude || 30.1407941,
+                AppConfig?.location?.office?.longitude || 31.3800838
+            );
+
+            const maxDistance = AppConfig?.location?.maxDistanceMeters || 500;
+
+            if (dist > maxDistance) {
+                playSound?.('faceid-error');
+                showToast?.(`بعيد عن المقر (${Math.round(dist)} متر)`, 'error');
+                setCamStatus?.('مرفوض: خارج نطاق المقر');
+                faceRecognition?.restartCamLoop();
+                return;
+            }
+        }
+
+        // Get shift selection
+        const selShift = document.querySelector('input[name="shift"]:checked');
+        
+        // Calculate hours worked for check-out
+        let hoursWorked = null;
+
+        if (window.attType === 'انصراف') {
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (typeof db !== 'undefined') {
+                const { data: lastCheckIn } = await db.from('attendance')
+                    .select('created_at')
+                    .eq('employee_code', window.user.code)
+                    .eq('type', 'حضور')
+                    .gte('created_at', today)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (lastCheckIn) {
+                    const diff = (new Date() - new Date(lastCheckIn.created_at)) / (1000 * 60 * 60);
+                    hoursWorked = diff.toFixed(2);
+                }
+            }
+        }
+
+        // Format datetime
+        const now = new Date();
+        const datetime = `${now.toLocaleDateString('ar-EG')} - ${now.toLocaleString('ar-EG', { 
+            hour12: true, 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        })}`;
+
+        // Record attendance
+        try {
+            if (typeof db === 'undefined') throw new Error('Database not available');
+
+            const { error } = await db.from('attendance').insert({
+                employee_code: window.user.code,
+                employee_name: window.user.name,
+                type: window.attType,
+                location_link: window.currentLoc || 'غير متوفر',
+                shift: selShift ? selShift.value : 'لم يتم التحديد',
+                hours_worked: hoursWorked
+            });
+
+            if (error) throw error;
+
+            // Success!
+            playSound?.('faceid-success');
+            showToast?.(`تم تسجيل ${window.attType} بنجاح ${hoursWorked ? '(' + hoursWorked + ')' : ''}`, 'success');
+
+            setTimeout(() => {
+                closeCamera?.();
+                this.calculateMonthlyHours();
+            }, 800);
+
+            // Send email notification
+            this.sendAttendanceEmail(
+                window.attType, 
+                datetime, 
+                selShift?.value, 
+                hoursWorked, 
+                null
+            );
+
+        } catch(e) {
+            console.error('Attendance recording error:', e);
+            playSound?.('faceid-error');
+            showMatchResult?.(false);
+            showToast?.('فشل التسجيل', 'error');
+            setCamStatus?.('حدث خطأ أثناء التسجيل');
+            faceRecognition?.restartCamLoop();
+        }
+    }
+
+    async handleChangePasswordWithFace() {
+        const pending = window._pendingPwChange;
+        if (!pending) {
+            showToast?.('لا توجد بيانات تغيير كلمة المرور', 'error');
+            closeCamera?.();
+            return;
+        }
+
+        try {
+            if (typeof db === 'undefined') throw new Error('Database not available');
+
+            const { error } = await db.from('employees')
+                .update({ password: pending.newPassword })
+                .eq('code', pending.code)
+                .eq('password', pending.oldPassword);
+
+            if (!error) {
+                playSound?.('login-success');
+                showToast?.('تم تغيير كلمة المرور', 'success');
+                
+                setTimeout(() => closeCamera?.(), 800);
+            } else {
+                playSound?.('login-error');
+                showToast?.('كلمة السر الحالية خاطئة', 'error');
+                faceRecognition?.restartCamLoop();
+            }
+
+        } catch(e) {
+            console.error('Password change error:', e);
+            playSound?.('login-error');
+            showToast?.('خطأ في تغيير كلمة المرور', 'error');
+            faceRecognition?.restartCamLoop();
+        }
+    }
+
+    // ============================================
+    // 📏 UTILITY FUNCTIONS (من الكود القديم)
+    // ============================================
+
+    getSelectedShift() {
+        const selected = document.querySelector('input[name="shift"]:checked');
+        return selected ? selected.value : null;
+    }
+
+    isOnCooldown() {
+        const cooldownPeriod = AppConfig?.attendance?.cooldownPeriod || 60000;
+        return (Date.now() - this.lastActionTime) < cooldownPeriod;
+    }
+
+    formatTime(dateStr) {
+        try {
+            return new Date(dateStr).toLocaleTimeString('ar-EG', {
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch(e) {
+            return '--:--';
+        }
+    }
+
+    formatHoursWorked(hours) {
+        return `${hours.toFixed(1)} ساعة`;
+    }
+
+    getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = this.deg2rad(lat2 - lat1);
+        const dLon = this.deg2rad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) ** 2 + 
+                  Math.cos(this.deg2rad(lat1)) * 
+                  Math.cos(this.deg2rad(lat2)) * 
+                  Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c * 1000; // Return meters
+    }
+
+    deg2rad(deg) {
+        return deg * (Math.PI / 180);
+    }
+
+    euclideanDistance(desc1, desc2) {
+        if (!desc1 || !desc2 || desc1.length !== desc2.length) return Infinity;
+        
+        let sum = 0;
+        for (let i = 0; i < desc1.length; i++) {
+            sum += (desc1[i] - desc2[i]) ** 2;
+        }
+        return Math.sqrt(sum);
     }
 }
 
 // ============================================
-// 🌍 GLOBAL INSTANCE
+// 🌍 GLOBAL ATTENDANCE INSTANCE & FUNCTIONS
 // ============================================
 
-/**
- * Global attendance manager instance
- */
 let attendance;
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     attendance = new AttendanceManager();
-    attendance.init();
     
-    console.log('⏰ Attendance module loaded');
+    // Make globally available
+    window.attendance = attendance;
+    
+    // Setup search if on admin page
+    attendance.setupSearch();
+    
+    console.log('✅ Attendance Manager initialized');
 });
 
-console.log('✅ attendance.js v4.1 loaded successfully');
+// Global functions for use by other modules
+window.handleAttendance = function(type) {
+    if (typeof attendance !== 'undefined') {
+        if (type === 'حضور') {
+            attendance.handleCheckIn();
+        } else if (type === 'انصراف') {
+            attendance.handleCheckOut();
+        }
+    }
+};
+
+window.loadEmployees = async function() {
+    if (typeof attendance !== 'undefined') {
+        await attendance.loadEmployees();
+    }
+};
+
+window.calculateMonthlyHours = async function() {
+    if (typeof attendance !== 'undefined') {
+        await attendance.calculateMonthlyHours();
+    }
+};
+
+window.fetchUserDataInBackground = async function() {
+    if (typeof attendance !== 'undefined' && window.user) {
+        await attendance.loadTodayRecords();
+        await attendance.calculateMonthlyHours();
+        
+        // Also load user's face descriptor
+        if (typeof db !== 'undefined') {
+            try {
+                const { data: emp } = await db.from('employees')
+                    .select('face_descriptor')
+                    .eq('code', window.user.code)
+                    .single();
+
+                if (emp?.face_descriptor) {
+                    window.sessionDescriptor = emp.face_descriptor;
+                    
+                    // Load user image
+                    const { data: imgData } = db.storage.from('faces')
+                        .getPublicUrl(`${window.user.code}_face.jpg`);
+                    
+                    if (imgData?.publicUrl) {
+                        window.userImage = imgData.publicUrl + '?t=' + new Date().getTime();
+                        
+                        const profileImg = document.querySelector('.emp-profile-img');
+                        if (profileImg) profileImg.src = window.userImage;
+                    }
+                } else if (!document.getElementById('cameraOverlay')?.classList.contains('active')) {
+                    // No face descriptor - need to register
+                    playSound?.('faceid-error');
+                    showToast?.('يرجى تسجيل بصمة وجهك أولاً', 'error');
+                    
+                    window.firstTimeSetupMode = true;
+                    if (typeof openCamera === 'function') {
+                        await openCamera();
+                    }
+                }
+            } catch(e) {
+                console.error('Error fetching user data:', e);
+            }
+        }
+        
+        setStatus?.('النظام جاهز');
+    }
+};
+
+window.loadMyReport = function() {
+    if (typeof attendance !== 'undefined') {
+        attendance.loadMyReport();
+    }
+};
+
+window.loadEmpReport = function(code, name) {
+    if (typeof attendance !== 'undefined') {
+        attendance.loadEmpReport(code, name);
+    }
+};
+
+window.closeReportModal = function() {
+    if (typeof attendance !== 'undefined') {
+        attendance.closeReportModal();
+    }
+};
+
+// Admin functions
+window.adminDirectAtt = function(type, code, name) {
+    if (typeof attendance !== 'undefined') {
+        attendance.adminDirectAtt(type, code, name);
+    }
+};
+
+window.adminDeleteEmp = function(code, name) {
+    if (typeof attendance !== 'undefined') {
+        attendance.adminDeleteEmp(code, name);
+    }
+};
+
+window.adminResetFace = function(code, name) {
+    if (typeof attendance !== 'undefined') {
+        attendance.adminResetFace(code, name);
+    }
+};
+
+// Export for modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = AttendanceManager;
+}
+</code></pre>
+
+<div style="margin-top: 20px; padding: 15px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">
+    <strong>✅ حالة الملف:</strong> تم التعديل والإضافة بنجاح<br>
+    <strong>📝 التعديلات الرئيسية:</strong><br>
+    • دمج كل عمليات الحضور/الانصراف من الكود القديم<br>
+    • إضافة GPS Verification (<500m من المكتب)<br>
+    • حساب ساعات العمل تلقائياً عند الانصراف<br>
+    • إرسال إيميلات تنبيه عبر Google Apps Script<br>
+    • حساب الساعات الشهرية للموظف<br>
+    • نظام تقارير متكامل (جدول زمني)<br>
+    • عمليات الأدمن (تسجيل يدوي، حذف موظف، إعادة بصمة)<br>
+    • دعم 12-hour time format كما طلبت
+</div>
+
+</body>
+</html>
