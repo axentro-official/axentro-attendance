@@ -13,6 +13,8 @@ class AuthManager {
         this.loginAttempts = {};
         this.lockoutUntil = {};
         this.pwChangeMode = '';
+        this.pendingLoginUser = null;
+        this.pendingRememberMe = false;
 
         console.log('🔐 Auth Manager initialized');
     }
@@ -47,6 +49,12 @@ class AuthManager {
                 return false;
             }
 
+            if (!session.user?.face_enrolled) {
+                console.warn('⚠️ Saved session rejected because face enrollment is incomplete');
+                this.clearSession();
+                return false;
+            }
+
             this.currentUser = session.user;
             window.user = session.user;
 
@@ -55,10 +63,8 @@ class AuthManager {
             }
 
             window.sessionDescriptor = session.user?.face_descriptor || null;
-            window.forceFaceEnrollment = !session.user?.face_enrolled;
-            if (window.forceFaceEnrollment) {
-                window.firstTimeSetupMode = true;
-            }
+            window.forceFaceEnrollment = false;
+            window.firstTimeSetupMode = false;
 
             console.log(`✅ Session restored for: ${this.currentUser.name}`);
             return true;
@@ -164,7 +170,12 @@ class AuthManager {
         localStorage.removeItem('axentro_last_activity');
 
         this.currentUser = null;
+        this.pendingLoginUser = null;
+        this.pendingRememberMe = false;
         window.user = null;
+        window.sessionDescriptor = null;
+        window.forceFaceEnrollment = false;
+        window.firstTimeSetupMode = false;
 
         if (typeof db !== 'undefined' && db && 'currentUser' in db) {
             db.currentUser = null;
@@ -208,58 +219,7 @@ class AuthManager {
         try {
             const result = await this.signIn(code, password);
 
-            if (result.success) {
-                if (result.user) {
-                    result.user.tempPasswordForFirstLogin = password;
-                }
-                this.resetLoginAttempts(code);
-
-                if (result.requiresPasswordChange) {
-                    this.handleFirstTimeLogin(result.user);
-                    return;
-                }
-
-                await this.onLoginSuccess(result.user, rememberMe);
-
-                if (result.requiresFaceEnrollment || !result.user.face_enrolled) {
-                    window.firstTimeSetupMode = true;
-                    this.toast('يجب تسجيل بصمة الوجه قبل استخدام النظام', 'warning');
-                }
-
-                if (typeof app !== 'undefined' && app?.playSound) {
-                    app.playSound('login-success');
-                }
-
-                this.toast(
-                    typeof SuccessMessages !== 'undefined' && SuccessMessages?.LOGIN_SUCCESS
-                        ? SuccessMessages.LOGIN_SUCCESS
-                        : 'تم تسجيل الدخول بنجاح',
-                    'success'
-                );
-
-                setTimeout(async () => {
-                    if (typeof showApp === 'function') {
-                        showApp();
-                    } else if (typeof app !== 'undefined' && app?.navigateTo) {
-                        app.navigateTo('dashboardPage');
-                        if (typeof app.initializeDashboard === 'function') {
-                            app.initializeDashboard();
-                        }
-                    } else {
-                        document.getElementById('loginPage')?.classList.remove('active');
-                        document.getElementById('dashboardPage')?.classList.add('active');
-                    }
-
-                    if (result.requiresFaceEnrollment || !result.user.face_enrolled) {
-                        window.firstTimeSetupMode = true;
-                        await openCamera?.();
-                    } else if (window.user?.role !== 'admin' && typeof fetchUserDataInBackground === 'function') {
-                        fetchUserDataInBackground();
-                    } else if (window.user?.role === 'admin' && typeof loadEmployees === 'function') {
-                        loadEmployees();
-                    }
-                }, 500);
-            } else {
+            if (!result.success) {
                 this.incrementLoginAttempts(code);
 
                 if (typeof app !== 'undefined' && app?.playSound) {
@@ -276,7 +236,71 @@ class AuthManager {
                         form.style.animation = '';
                     }, 500);
                 }
+                return;
             }
+
+            if (result.user) {
+                result.user.tempPasswordForFirstLogin = password;
+            }
+            this.resetLoginAttempts(code);
+
+            this.currentUser = result.user;
+            window.user = result.user;
+            window.sessionDescriptor = result.user?.face_descriptor || null;
+            window.sessionRole = result.user?.role || (result.user?.isAdmin ? 'admin' : 'employee');
+            this.pendingLoginUser = result.user;
+            this.pendingRememberMe = rememberMe;
+
+            if (result.requiresPasswordChange) {
+                this.handleFirstTimeLogin(result.user);
+                return;
+            }
+
+            if (result.requiresFaceEnrollment || !result.user.face_enrolled) {
+                window.forceFaceEnrollment = true;
+                window.firstTimeSetupMode = true;
+
+                if (typeof app !== 'undefined' && app?.playSound) {
+                    app.playSound('login-success');
+                }
+
+                this.toast('يجب تسجيل بصمة الوجه أولاً قبل الدخول للنظام', 'warning');
+                await openCamera?.();
+                return;
+            }
+
+            await this.onLoginSuccess(result.user, rememberMe);
+
+            if (typeof app !== 'undefined' && app?.playSound) {
+                app.playSound('login-success');
+            }
+
+            this.toast(
+                typeof SuccessMessages !== 'undefined' && SuccessMessages?.LOGIN_SUCCESS
+                    ? SuccessMessages.LOGIN_SUCCESS
+                    : 'تم تسجيل الدخول بنجاح',
+                'success'
+            );
+
+            setTimeout(() => {
+                if (typeof showApp === 'function') {
+                    showApp();
+                } else if (typeof app !== 'undefined' && app?.navigateTo) {
+                    app.navigateTo('dashboardPage');
+                    if (typeof app.initializeDashboard === 'function') {
+                        app.initializeDashboard();
+                    }
+                } else {
+                    document.getElementById('loginPage')?.classList.remove('active');
+                    document.getElementById('dashboardPage')?.classList.add('active');
+                }
+
+                if (window.user?.role !== 'admin' && typeof fetchUserDataInBackground === 'function') {
+                    fetchUserDataInBackground();
+                } else if (window.user?.role === 'admin' && typeof loadEmployees === 'function') {
+                    loadEmployees();
+                }
+            }, 500);
         } catch (error) {
             console.error('❌ Login error:', error);
 
@@ -361,6 +385,20 @@ class AuthManager {
         }
     }
 
+    async finalizePendingLogin(user = null) {
+        const finalUser = user || this.pendingLoginUser || this.currentUser || window.user;
+        if (!finalUser) {
+            throw new Error('No pending user to finalize');
+        }
+
+        await this.onLoginSuccess(finalUser, !!this.pendingRememberMe);
+        this.pendingLoginUser = null;
+        this.pendingRememberMe = false;
+        window.forceFaceEnrollment = false;
+        window.firstTimeSetupMode = false;
+    }
+
+
     handleFirstTimeLogin(user) {
         this.currentUser = user;
         window.user = user;
@@ -424,9 +462,12 @@ class AuthManager {
             if (window.user) window.user.isFirstLogin = false;
             this.toast('تم تحديث كلمة السر', 'success');
             if (!window.user.face_enrolled) {
+                this.pendingLoginUser = window.user;
+                window.forceFaceEnrollment = true;
                 window.firstTimeSetupMode = true;
                 await openCamera?.();
             } else {
+                await this.finalizePendingLogin(window.user);
                 showApp?.();
             }
         } catch (error) {

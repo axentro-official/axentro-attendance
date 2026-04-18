@@ -132,14 +132,6 @@ class App {
                 if (hasSession && this.isAuthenticated()) {
                     this.navigateTo('dashboardPage');
                     this.initializeDashboard();
-
-                    if (window.user && !window.user.face_enrolled) {
-                        window.firstTimeSetupMode = true;
-                        setTimeout(() => {
-                            showToast?.('يجب تسجيل بصمة الوجه أولاً', 'warning');
-                            openCamera?.();
-                        }, 700);
-                    }
                 } else {
                     this.navigateTo('loginPage');
                 }

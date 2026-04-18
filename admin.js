@@ -631,7 +631,13 @@ window.handleFirstTimeSetupCapture = async function(descriptor) {
         if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
         showMatchResult?.(true);
         showToast?.('تم تسجيل البصمة بنجاح!', 'success');
-        setTimeout(() => { closeCamera?.(); showApp?.(); }, 800);
+        setTimeout(async () => {
+            closeCamera?.();
+            if (window.auth?.finalizePendingLogin) {
+                await window.auth.finalizePendingLogin(window.user);
+            }
+            showApp?.();
+        }, 800);
     } catch (e) {
         console.error('❌ First time setup error:', e);
         playSound?.('faceid-error');

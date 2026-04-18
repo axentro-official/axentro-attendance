@@ -46,7 +46,7 @@ const AppConfig = {
         },
         detection: {
             inputSize: 320,
-            scoreThreshold: 0.35,
+            scoreThreshold: 0.18,
             minFaceSize: 120,
             maxFaces: 1
         },
@@ -75,7 +75,7 @@ const AppConfig = {
             requireBlink: true,
             requireTurnLeftRight: true,
             requireNod: true,
-            minStableFrames: 7,
+            minStableFrames: 4,
             earBlinkThreshold: 0.19,
             minBlinks: 1,
             yawMovementPx: 12,
@@ -115,7 +115,7 @@ const AppConfig = {
     liveness: {
         enabled: true,
         headMovementThreshold: 0.08,
-        stableFramesRequired: 7,
+        stableFramesRequired: 4,
         stabilityRing: {
             circumference: 126,
             radius: 20
