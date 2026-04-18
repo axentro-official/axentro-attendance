@@ -625,6 +625,10 @@ window.handleFirstTimeSetupCapture = async function(descriptor) {
         playSound?.('faceid-success');
         window.sessionDescriptor = descriptor;
         window.user.face_enrolled = true;
+        window.user.face_descriptor = descriptor;
+        window.forceFaceEnrollment = false;
+        window.firstTimeSetupMode = false;
+        if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
         showMatchResult?.(true);
         showToast?.('تم تسجيل البصمة بنجاح!', 'success');
         setTimeout(() => { closeCamera?.(); showApp?.(); }, 800);
@@ -656,6 +660,8 @@ window.handleFaceUpdateCapture = async function(descriptor) {
         playSound?.('faceid-success');
         window.sessionDescriptor = descriptor;
         window.user.face_enrolled = true;
+        window.user.face_descriptor = descriptor;
+        if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
         showMatchResult?.(true);
         showToast?.('تم تحديث البصمة بنجاح', 'success');
         setTimeout(() => closeCamera?.(), 800);

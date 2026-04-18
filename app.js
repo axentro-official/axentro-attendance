@@ -132,6 +132,14 @@ class App {
                 if (hasSession && this.isAuthenticated()) {
                     this.navigateTo('dashboardPage');
                     this.initializeDashboard();
+
+                    if (window.user && !window.user.face_enrolled) {
+                        window.firstTimeSetupMode = true;
+                        setTimeout(() => {
+                            showToast?.('يجب تسجيل بصمة الوجه أولاً', 'warning');
+                            openCamera?.();
+                        }, 700);
+                    }
                 } else {
                     this.navigateTo('loginPage');
                 }
@@ -633,6 +641,9 @@ class App {
         const userName = document.getElementById('userName');
         const userCodeDisplay = document.getElementById('userCodeDisplay');
         const adminPanelBtn = document.getElementById('adminPanelBtn');
+        const adminLogoutBtn = document.getElementById('adminLogoutBtn');
+        const adminHeaderName = document.getElementById('adminHeaderName');
+        const adminHeaderCode = document.getElementById('adminHeaderCode');
         const totalEmployeesStat = document.getElementById('totalEmployeesStat');
 
         if (userName) {
@@ -650,6 +661,10 @@ class App {
                 this.navigateTo(isAdmin ? 'adminPage' : 'dashboardPage');
             };
         }
+
+        if (adminHeaderName) adminHeaderName.textContent = displayName;
+        if (adminHeaderCode) adminHeaderCode.textContent = isAdmin ? `ADMIN: ${displayCode}` : `CODE: ${displayCode}`;
+        if (adminLogoutBtn) adminLogoutBtn.style.display = isAdmin ? 'inline-flex' : 'none';
 
         document.querySelectorAll('.admin-only').forEach((el) => {
             el.style.display = isAdmin ? '' : 'none';

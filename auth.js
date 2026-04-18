@@ -54,6 +54,12 @@ class AuthManager {
                 db.currentUser = session.user;
             }
 
+            window.sessionDescriptor = session.user?.face_descriptor || null;
+            window.forceFaceEnrollment = !session.user?.face_enrolled;
+            if (window.forceFaceEnrollment) {
+                window.firstTimeSetupMode = true;
+            }
+
             console.log(`✅ Session restored for: ${this.currentUser.name}`);
             return true;
         } catch (error) {
@@ -124,8 +130,31 @@ class AuthManager {
 
         this.currentUser = user;
         window.user = user;
+        window.sessionDescriptor = user?.face_descriptor || null;
+        window.forceFaceEnrollment = !user?.face_enrolled;
 
         console.log(`👤 User logged in: ${user.name}`);
+    }
+
+    updateStoredSession(user) {
+        try {
+            const remembered = localStorage.getItem('rememberedUser');
+            const currentSession = sessionStorage.getItem('user');
+
+            if (remembered) {
+                const parsed = JSON.parse(remembered);
+                parsed.user = { ...(parsed.user || {}), ...(user || {}) };
+                localStorage.setItem('rememberedUser', JSON.stringify(parsed));
+            }
+
+            if (currentSession) {
+                const parsed = JSON.parse(currentSession);
+                parsed.user = { ...(parsed.user || {}), ...(user || {}) };
+                sessionStorage.setItem('user', JSON.stringify(parsed));
+            }
+        } catch (error) {
+            console.warn('Session sync warning:', error);
+        }
     }
 
     clearSession() {
@@ -359,6 +388,8 @@ class AuthManager {
 
         window.sessionDescriptor = null;
         window.userImage = '';
+        window.forceFaceEnrollment = false;
+        window.firstTimeSetupMode = false;
 
         document.getElementById('dashboardPage')?.classList.remove('active');
         document.getElementById('registerPage')?.classList.remove('active');
