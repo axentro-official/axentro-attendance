@@ -60,8 +60,8 @@ class FaceRecognitionManager {
     }
 
     setupCameraElements() {
-        this.videoElement = document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
-        this.canvasElement = document.getElementById('dashboardCanvas') || document.getElementById('registerCanvas') || document.getElementById('canvas');
+        this.videoElement = document.getElementById('video');
+        this.canvasElement = document.getElementById('canvas');
         
         console.log('📹 Camera elements set up');
     }
@@ -77,7 +77,7 @@ class FaceRecognitionManager {
         }
 
         const MODELS_URL = AppConfig?.faceRecognition?.models?.tinyFaceDetector || 
-                          'https://justadudewhohacks.github.io/face-api.js/weights';
+                          'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
 
         try {
             setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
@@ -163,14 +163,14 @@ class FaceRecognitionManager {
             window.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
 
             // Setup video element
-            const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
+            const video = this.videoElement || document.getElementById('video');
             if (!video) throw new Error('Video element not found');
 
             video.srcObject = window.currentStream;
             await video.play();
 
             // Show camera overlay
-            const overlay = document.getElementById('cameraOverlay') || document.getElementById('registerVideoContainer');
+            const overlay = document.getElementById('cameraOverlay');
             if (overlay) overlay.classList.add('active');
 
             // Reset status text
@@ -188,7 +188,7 @@ class FaceRecognitionManager {
             );
 
             // Setup canvas
-            const canvas = this.canvasElement || document.getElementById('dashboardCanvas') || document.getElementById('registerCanvas') || document.getElementById('canvas');
+            const canvas = this.canvasElement || document.getElementById('canvas');
             if (canvas && video) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -226,11 +226,11 @@ class FaceRecognitionManager {
         }
 
         // Clear video
-        const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
+        const video = this.videoElement || document.getElementById('video');
         if (video) video.srcObject = null;
 
         // Hide overlay
-        const overlay = document.getElementById('cameraOverlay') || document.getElementById('registerVideoContainer');
+        const overlay = document.getElementById('cameraOverlay');
         if (overlay) overlay.classList.remove('active');
 
         // Hide scan line
@@ -238,7 +238,7 @@ class FaceRecognitionManager {
         if (scanLine) scanLine.classList.remove('active');
 
         // Reset match result
-        const matchResult = document.getElementById('recognizedEmployeeName') || document.getElementById('matchResult');
+        const matchResult = document.getElementById('matchResult');
         if (matchResult) matchResult.className = 'match-result';
 
         // Hide stability ring
@@ -291,8 +291,8 @@ class FaceRecognitionManager {
         }
 
         const detect = async () => {
-            const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
-            const overlay = document.getElementById('cameraOverlay') || document.getElementById('registerVideoContainer');
+            const video = this.videoElement || document.getElementById('video');
+            const overlay = document.getElementById('cameraOverlay');
             
             if (!video?.srcObject || !overlay?.classList.contains('active') || window.isProcessingCapture) {
                 return;
@@ -307,8 +307,8 @@ class FaceRecognitionManager {
     }
 
     async drawFaceBox() {
-        const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
-        const canvas = this.canvasElement || document.getElementById('dashboardCanvas') || document.getElementById('registerCanvas') || document.getElementById('canvas');
+        const video = this.videoElement || document.getElementById('video');
+        const canvas = this.canvasElement || document.getElementById('canvas');
         
         if (!video?.srcObject || !video.videoWidth || !canvas) return;
         if (!window.lightModels) {
@@ -514,7 +514,7 @@ class FaceRecognitionManager {
     // ============================================
 
     async extractStableDescriptor() {
-        const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
+        const video = this.videoElement || document.getElementById('video');
         if (!video) return null;
 
         const samples = [];
@@ -624,7 +624,7 @@ class FaceRecognitionManager {
     }
 
     showMatchResult(success) {
-        const el = document.getElementById('recognizedEmployeeName') || document.getElementById('matchResult');
+        const el = document.getElementById('matchResult');
         if (!el) return;
 
         el.className = `match-result ${success ? 'success' : 'fail'}`;
@@ -642,7 +642,7 @@ class FaceRecognitionManager {
     // ============================================
 
     createStorageImageBlob() {
-        const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
+        const video = this.videoElement || document.getElementById('video');
         if (!video) return Promise.resolve(null);
 
         const canvas = document.createElement('canvas');
@@ -747,7 +747,7 @@ window.closeCamera = function() {
 // Status updates
 window.setCamStatus = function(html) {
     if (html !== window.lastCamStatusText) {
-        const el = document.getElementById('cameraStatus') || document.getElementById('camStatus');
+        const el = document.getElementById('camStatus');
         if (el) el.innerHTML = html;
         window.lastCamStatusText = html;
     }

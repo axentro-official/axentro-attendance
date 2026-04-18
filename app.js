@@ -17,17 +17,10 @@ window.addEventListener('unhandledrejection', function(event) {
 window.addEventListener('error', function(event) {
     console.error('❌ Global Error:', event.error);
     
-    if (document.getElementById('loadingScreen') || document.getElementById('splashScreen')?.style.display !== 'none') {
+    if (document.getElementById('splashScreen')?.style.display !== 'none') {
         showLoadingError(event.message || 'حدث خطأ أثناء تحميل النظام');
     }
 });
-
-window.showLoadingError = function(message) {
-    if (window.app && typeof window.app.showLoadingError === 'function') {
-        return window.app.showLoadingError(message);
-    }
-    console.error('Loading error:', message);
-};
 
 // ============================================
 // 🚀 APPLICATION CLASS
@@ -285,15 +278,26 @@ class App {
 
     hideSplashScreen() {
         const splash = document.getElementById('loadingScreen') || document.getElementById('splashScreen');
+        const appRoot = document.getElementById('app');
+
         if (splash) {
             splash.classList.add('hidden');
+            splash.style.display = 'none';
+        }
+
+        if (appRoot) {
+            appRoot.classList.remove('hidden');
+            appRoot.style.display = 'block';
         }
     }
 
     showLoadingError(message) {
-        const actions = document.getElementById('loadingError') || document.getElementById('errorActions');
-        if (actions) {
-            actions.classList.add('show');
+        const errorBox = document.getElementById('loadingError') || document.getElementById('errorActions');
+        if (errorBox) {
+            errorBox.style.display = 'block';
+            errorBox.classList.add('show');
+            const msgEl = errorBox.querySelector('p');
+            if (msgEl && message) msgEl.textContent = message;
         }
     }
 
@@ -308,7 +312,7 @@ class App {
     }
 
     retryLoading() {
-        const actions = document.getElementById('loadingError') || document.getElementById('errorActions');
+        const actions = document.getElementById('errorActions');
         if (actions) {
             actions.classList.remove('show');
         }
@@ -430,16 +434,12 @@ class App {
     // 🌐 ONLINE/OFFLINE DETECTION (من الكود القديم)
     // ============================================
 
-    handleOnlineStatus() {
-        window.isOnline = navigator.onLine;
-    }
-
     setupGlobalEventListeners() {
         // Online/Offline detection
         window.addEventListener('online', () => {
             window.isOnline = true;
             const connDot = document.getElementById('connDot');
-            const connText = document.getElementById('connText') || document.getElementById('connectionText');
+            const connText = document.getElementById('connText');
             
             if (connDot) {
                 connDot.classList.remove('offline');
@@ -451,7 +451,7 @@ class App {
         window.addEventListener('offline', () => {
             window.isOnline = false;
             const connDot = document.getElementById('connDot');
-            const connText = document.getElementById('connText') || document.getElementById('connectionText');
+            const connText = document.getElementById('connText');
             
             if (connDot) {
                 connDot.classList.remove('online');
@@ -551,7 +551,13 @@ class App {
 
     navigateTo(pageId) {
         // Hide all pages
-        const pages = ['loginPage', 'registerPage', 'dashboardPage'];
+        const appRoot = document.getElementById('app');
+        if (appRoot) {
+            appRoot.classList.remove('hidden');
+            appRoot.style.display = 'block';
+        }
+
+        const pages = ['loginPage', 'registerPage', 'forgotPasswordPage', 'dashboardPage'];
         pages.forEach(p => {
             const el = document.getElementById(p);
             if (el) el.style.display = 'none';
@@ -566,44 +572,44 @@ class App {
     }
 
     showLoginScreen() {
-        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
-        const registerScreen = document.getElementById('registerPage') || document.getElementById('registerScreen');
-        const forgotPage = document.getElementById('forgotPasswordPage');
-        const changePasswordPage = document.getElementById('changePasswordPage');
-        const mainApp = document.getElementById('dashboardPage') || document.getElementById('mainApp');
-        
-        if (loginScreen) loginScreen.style.display = 'block';
-        if (registerScreen) registerScreen.style.display = 'none';
-        if (forgotPage) forgotPage.style.display = 'none';
-        if (changePasswordPage) changePasswordPage.style.display = 'none';
-        if (mainApp) mainApp.style.display = 'none';
+        const loginPage = document.getElementById('loginPage');
+        const registerPage = document.getElementById('registerPage');
+        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
+        const dashboardPage = document.getElementById('dashboardPage');
+
+        if (registerPage) registerPage.classList.remove('active');
+        if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
+        if (dashboardPage) dashboardPage.classList.remove('active');
+        if (loginPage) loginPage.classList.add('active');
     }
 
     showMainApp() {
-        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
-        const registerScreen = document.getElementById('registerPage') || document.getElementById('registerScreen');
-        const forgotPage = document.getElementById('forgotPasswordPage');
-        const changePasswordPage = document.getElementById('changePasswordPage');
-        const mainApp = document.getElementById('dashboardPage') || document.getElementById('mainApp');
-        
-        if (loginScreen) loginScreen.style.display = 'none';
-        if (registerScreen) registerScreen.style.display = 'none';
-        if (forgotPage) forgotPage.style.display = 'none';
-        if (changePasswordPage) changePasswordPage.style.display = 'none';
-        if (mainApp) mainApp.style.display = 'block';
+        const loginPage = document.getElementById('loginPage');
+        const registerPage = document.getElementById('registerPage');
+        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
+        const dashboardPage = document.getElementById('dashboardPage');
+
+        if (loginPage) loginPage.classList.remove('active');
+        if (registerPage) registerPage.classList.remove('active');
+        if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
+        if (dashboardPage) dashboardPage.classList.add('active');
     }
 
     hideLoginScreen() {
-        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
-        if (loginScreen) loginScreen.style.display = 'none';
+        const loginPage = document.getElementById('loginPage');
+        if (loginPage) loginPage.classList.remove('active');
     }
 
     showRegisterScreen() {
-        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
-        const registerScreen = document.getElementById('registerPage') || document.getElementById('registerScreen');
-        
-        if (loginScreen) loginScreen.style.display = 'none';
-        if (registerScreen) registerScreen.style.display = 'block';
+        const loginPage = document.getElementById('loginPage');
+        const registerPage = document.getElementById('registerPage');
+        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
+        const dashboardPage = document.getElementById('dashboardPage');
+
+        if (loginPage) loginPage.classList.remove('active');
+        if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
+        if (dashboardPage) dashboardPage.classList.remove('active');
+        if (registerPage) registerPage.classList.add('active');
     }
 
     // ============================================
@@ -750,6 +756,7 @@ let app;
 
 document.addEventListener('DOMContentLoaded', () => {
     app = new App();
+    window.app = app;
     
     // Initialize location tracking
     if (typeof app.setupLocationTracking === 'function') {
@@ -764,4 +771,24 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof window !== 'undefined') {
     window.App = App;
     window.app = app;
+}
+
+
+if (typeof window !== 'undefined') {
+    window.retryLoading = () => window.app?.retryLoading?.();
+    window.skipFaceRecognition = () => window.app?.skipFaceRecognition?.();
+    window.showLoadingError = (message) => window.app?.showLoadingError?.(message);
+    window.showLoginScreen = () => window.app?.showLoginScreen?.();
+    window.showRegisterScreen = () => window.app?.showRegisterScreen?.();
+    window.showForgotPasswordScreen = () => {
+        const loginPage = document.getElementById('loginPage');
+        const registerPage = document.getElementById('registerPage');
+        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
+        const dashboardPage = document.getElementById('dashboardPage');
+        const appRoot = document.getElementById('app');
+        if (appRoot) appRoot.classList.remove('hidden');
+        [loginPage, registerPage, dashboardPage].forEach(el => el?.classList.remove('active'));
+        forgotPasswordPage?.classList.add('active');
+    };
+    window.showApp = () => window.app?.showMainApp?.();
 }

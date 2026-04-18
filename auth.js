@@ -23,43 +23,7 @@ class AuthManager {
     init() {
         this.checkExistingSession();
         this.setupActivityTracking();
-        this.setupEventListeners();
         console.log('✅ Auth Manager ready');
-    }
-
-    setupEventListeners() {
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm && !loginForm.dataset.boundAuth) {
-            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
-            loginForm.dataset.boundAuth = '1';
-        }
-
-        const biometricBtn = document.getElementById('biometricLoginBtn') || document.getElementById('fingerprintLoginBtn');
-        if (biometricBtn && !biometricBtn.dataset.boundAuth) {
-            biometricBtn.addEventListener('click', () => this.handleFingerprintLogin());
-            biometricBtn.dataset.boundAuth = '1';
-        }
-
-        const showRegisterLink = document.getElementById('showRegisterLink');
-        if (showRegisterLink && !showRegisterLink.dataset.boundAuth) {
-            showRegisterLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (typeof app !== 'undefined' && app.navigateTo) app.navigateTo('registerPage');
-            });
-            showRegisterLink.dataset.boundAuth = '1';
-        }
-
-        const showForgotPasswordLink = document.getElementById('showForgotPasswordLink');
-        if (showForgotPasswordLink && !showForgotPasswordLink.dataset.boundAuth) {
-            showForgotPasswordLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                const forgotPage = document.getElementById('forgotPasswordPage');
-                const loginPage = document.getElementById('loginPage');
-                if (loginPage) loginPage.style.display = 'none';
-                if (forgotPage) forgotPage.style.display = 'block';
-            });
-            showForgotPasswordLink.dataset.boundAuth = '1';
-        }
     }
 
     // ============================================
@@ -377,11 +341,15 @@ class AuthManager {
         window.sessionDescriptor = null;
         window.userImage = '';
 
-        const mainApp = document.getElementById('dashboardPage') || document.getElementById('mainApp');
-        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
-        
-        if (mainApp) mainApp.style.display = 'none';
-        if (loginScreen) loginScreen.style.display = 'block';
+        const dashboardPage = document.getElementById('dashboardPage');
+        const registerPage = document.getElementById('registerPage');
+        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
+        const loginPage = document.getElementById('loginPage');
+
+        dashboardPage?.classList.remove('active');
+        registerPage?.classList.remove('active');
+        forgotPasswordPage?.classList.remove('active');
+        loginPage?.classList.add('active');
         
         setStatus('النظام جاهز');
         
@@ -393,7 +361,7 @@ class AuthManager {
     // ============================================
 
     async submitFirstPwChange() {
-        const newPwInput = document.getElementById('newPassword') || document.getElementById('firstNewPw');
+        const newPwInput = document.getElementById('firstNewPw');
         const newPw = newPwInput?.value?.trim();
         
         if (!newPw || newPw.length < 4) {
@@ -462,6 +430,7 @@ class AuthManager {
     }
 
     // Change Password Modal Logic
+    pwChangeMode = '';
 
     openChangePwModal(mode) {
         this.pwChangeMode = mode;
@@ -510,7 +479,7 @@ class AuthManager {
 
     async submitChangePassword() {
         if (this.pwChangeMode === 'own') {
-            const oldPw = document.getElementById('currentPassword') || document.getElementById('oldPassword')?.value?.trim();
+            const oldPw = document.getElementById('oldPassword')?.value?.trim();
             const newPw = document.getElementById('newPassword')?.value?.trim();
             
             if (!oldPw || !newPw) {
@@ -695,19 +664,17 @@ class AuthManager {
     // ============================================
 
     showRegisterScreen() {
-        const loginScreen = document.getElementById('loginScreen');
-        const registerScreen = document.getElementById('registerScreen');
-        
-        if (loginScreen) loginScreen.classList.add('hidden');
-        if (registerScreen) registerScreen.classList.remove('hidden');
+        document.getElementById('loginPage')?.classList.remove('active');
+        document.getElementById('forgotPasswordPage')?.classList.remove('active');
+        document.getElementById('dashboardPage')?.classList.remove('active');
+        document.getElementById('registerPage')?.classList.add('active');
     }
 
     showLoginScreen() {
-        const loginScreen = document.getElementById('loginScreen');
-        const registerScreen = document.getElementById('registerScreen');
-        
-        if (registerScreen) registerScreen.classList.add('hidden');
-        if (loginScreen) loginScreen.classList.remove('hidden');
+        document.getElementById('registerPage')?.classList.remove('active');
+        document.getElementById('forgotPasswordPage')?.classList.remove('active');
+        document.getElementById('dashboardPage')?.classList.remove('active');
+        document.getElementById('loginPage')?.classList.add('active');
     }
 
     async startRegistration(event) {
@@ -883,17 +850,17 @@ class AuthManager {
 
     // Utility methods
     showLoginPage() {
-        const mainApp = document.getElementById('dashboardPage') || document.getElementById('mainApp');
-        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
-        
-        if (mainApp) mainApp.style.display = 'none';
-        if (loginScreen) loginScreen.style.display = 'block';
+        const dashboardPage = document.getElementById('dashboardPage');
+        const registerPage = document.getElementById('registerPage');
+        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
+        const loginPage = document.getElementById('loginPage');
+
+        dashboardPage?.classList.remove('active');
+        registerPage?.classList.remove('active');
+        forgotPasswordPage?.classList.remove('active');
+        loginPage?.classList.add('active');
     }
 }
-
-
-window.handleLogin = (event) => window.auth?.handleLogin(event || new Event('submit'));
-window.handleFingerprintLogin = () => window.auth?.handleFingerprintLogin();
 
 // ============================================
 // 🌍 GLOBAL AUTH INSTANCE
@@ -904,9 +871,34 @@ let auth;
 document.addEventListener('DOMContentLoaded', () => {
     auth = new AuthManager();
     auth.init();
+
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    const showRegisterLink = document.getElementById('showRegisterLink');
+    const showForgotPasswordLink = document.getElementById('showForgotPasswordLink');
+    const backToLoginFromRegister = document.getElementById('backToLoginFromRegister');
+    const backToLoginFromRegFooter = document.getElementById('backToLoginFromRegFooter');
+    const backToLoginFromForgot = document.getElementById('backToLoginFromForgot');
+    const biometricLoginBtn = document.getElementById('biometricLoginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    loginForm?.addEventListener('submit', (e) => auth.handleLogin(e));
+    registerForm?.addEventListener('submit', (e) => auth.startRegistration(e));
+    forgotPasswordForm?.addEventListener('submit', (e) => { e.preventDefault(); auth.submitForgotPw(); });
+
+    showRegisterLink?.addEventListener('click', (e) => { e.preventDefault(); auth.showRegisterScreen(); });
+    showForgotPasswordLink?.addEventListener('click', (e) => { e.preventDefault(); window.showForgotPasswordScreen?.(); });
+    backToLoginFromRegister?.addEventListener('click', (e) => { e.preventDefault(); auth.showLoginScreen(); });
+    backToLoginFromRegFooter?.addEventListener('click', (e) => { e.preventDefault(); auth.showLoginScreen(); });
+    backToLoginFromForgot?.addEventListener('click', (e) => { e.preventDefault(); auth.showLoginScreen(); });
+    biometricLoginBtn?.addEventListener('click', () => auth.loginWithFingerprint?.());
+    logoutBtn?.addEventListener('click', () => auth.logout());
     
     // Make globally available
     window.auth = auth;
+    window.handleLogin = (e) => auth.handleLogin(e);
+    window.submitForgotPw = () => auth.submitForgotPw();
 });
 
 // Export for modules

@@ -46,10 +46,10 @@ const AppConfig = {
     faceRecognition: {
         // Model URLs
         models: {
-            tinyFaceDetector: 'https://justadudewhohacks.github.io/face-api.js/weights',
-            faceLandmark68Tiny: 'https://justadudewhohacks.github.io/face-api.js/weights',
-            faceRecognition: 'https://justadudewhohacks.github.io/face-api.js/weights',
-            faceLandmark68Net: 'https://justadudewhohacks.github.io/face-api.js/weights'
+            tinyFaceDetector: 'https://justadudewhohacks.github.io/face-api.js/weights/',
+            faceLandmark68Tiny: 'https://justadudewhohacks.github.io/face-api.js/weights/',
+            faceRecognition: 'https://justadudewhohacks.github.io/face-api.js/weights/',
+            faceLandmark68Net: 'https://justadudewhohacks.github.io/face-api.js/weights/'
         },
         
         // Detection Settings

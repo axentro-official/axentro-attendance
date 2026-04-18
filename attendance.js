@@ -83,7 +83,7 @@ class AttendanceManager {
     }
 
     updateLocationStatus(success, accuracy = null) {
-        const statusEl = document.getElementById('locationStatus') || document.getElementById('locBar');
+        const statusEl = document.getElementById('locBar');
         if (!statusEl) return;
 
         if (success && accuracy) {

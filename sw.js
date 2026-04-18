@@ -456,8 +456,8 @@ self.addEventListener('push', event => {
     let data = {
         title: 'Axentro',
         body: 'إشعار جديد',
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: './icon-192.png',
+        badge: './icon-192.png',
         dir: 'rtl',
         lang: 'ar'
     };
