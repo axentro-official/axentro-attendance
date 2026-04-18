@@ -43,6 +43,23 @@ class App {
         console.log('🏗️ App constructor initialized');
     }
 
+    handleOnlineStatus() {
+        const isOnline = navigator.onLine;
+        window.isOnline = isOnline;
+
+        const connDot = document.getElementById('connDot');
+        const connText = document.getElementById('connText');
+
+        if (connDot) {
+            connDot.classList.toggle('online', isOnline);
+            connDot.classList.toggle('offline', !isOnline);
+        }
+
+        if (connText) {
+            connText.textContent = isOnline ? 'متصل' : 'غير متصل';
+        }
+    }
+
     // ============================================
     // 🚀 INITIALIZATION
     // ============================================
