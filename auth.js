@@ -13,8 +13,6 @@ class AuthManager {
         this.loginAttempts = {};
         this.lockoutUntil = {};
         this.pwChangeMode = '';
-        this.pendingLoginUser = null;
-        this.pendingRememberMe = false;
 
         console.log('🔐 Auth Manager initialized');
     }
@@ -24,7 +22,7 @@ class AuthManager {
     // ============================================
 
     init() {
-        // Session restore is handled centrally in app.init() to avoid duplicated UI navigation
+        this.checkExistingSession();
         this.setupActivityTracking();
         console.log('✅ Auth Manager ready');
     }
@@ -49,22 +47,12 @@ class AuthManager {
                 return false;
             }
 
-            if (!session.user?.face_enrolled || session.user?.isFirstLogin || session.user?.is_first_login) {
-                console.warn('⚠️ Saved session rejected because onboarding is incomplete');
-                this.clearSession();
-                return false;
-            }
-
             this.currentUser = session.user;
             window.user = session.user;
 
             if (typeof db !== 'undefined' && db && 'currentUser' in db) {
                 db.currentUser = session.user;
             }
-
-            window.sessionDescriptor = session.user?.face_descriptor || null;
-            window.forceFaceEnrollment = false;
-            window.firstTimeSetupMode = false;
 
             console.log(`✅ Session restored for: ${this.currentUser.name}`);
             return true;
@@ -136,31 +124,8 @@ class AuthManager {
 
         this.currentUser = user;
         window.user = user;
-        window.sessionDescriptor = user?.face_descriptor || null;
-        window.forceFaceEnrollment = !user?.face_enrolled;
 
         console.log(`👤 User logged in: ${user.name}`);
-    }
-
-    updateStoredSession(user) {
-        try {
-            const remembered = localStorage.getItem('rememberedUser');
-            const currentSession = sessionStorage.getItem('user');
-
-            if (remembered) {
-                const parsed = JSON.parse(remembered);
-                parsed.user = { ...(parsed.user || {}), ...(user || {}) };
-                localStorage.setItem('rememberedUser', JSON.stringify(parsed));
-            }
-
-            if (currentSession) {
-                const parsed = JSON.parse(currentSession);
-                parsed.user = { ...(parsed.user || {}), ...(user || {}) };
-                sessionStorage.setItem('user', JSON.stringify(parsed));
-            }
-        } catch (error) {
-            console.warn('Session sync warning:', error);
-        }
     }
 
     clearSession() {
@@ -170,12 +135,7 @@ class AuthManager {
         localStorage.removeItem('axentro_last_activity');
 
         this.currentUser = null;
-        this.pendingLoginUser = null;
-        this.pendingRememberMe = false;
         window.user = null;
-        window.sessionDescriptor = null;
-        window.forceFaceEnrollment = false;
-        window.firstTimeSetupMode = false;
 
         if (typeof db !== 'undefined' && db && 'currentUser' in db) {
             db.currentUser = null;
@@ -219,7 +179,41 @@ class AuthManager {
         try {
             const result = await this.signIn(code, password);
 
-            if (!result.success) {
+            if (result.success) {
+                this.resetLoginAttempts(code);
+
+                if (result.requiresPasswordChange) {
+                    this.handleFirstTimeLogin(result.user);
+                    return;
+                }
+
+                await this.onLoginSuccess(result.user, rememberMe);
+
+                if (typeof app !== 'undefined' && app?.playSound) {
+                    app.playSound('login-success');
+                }
+
+                this.toast(
+                    typeof SuccessMessages !== 'undefined' && SuccessMessages?.LOGIN_SUCCESS
+                        ? SuccessMessages.LOGIN_SUCCESS
+                        : 'تم تسجيل الدخول بنجاح',
+                    'success'
+                );
+
+                setTimeout(() => {
+                    if (typeof showApp === 'function') {
+                        showApp();
+                    } else if (typeof app !== 'undefined' && app?.navigateTo) {
+                        app.navigateTo('dashboardPage');
+                        if (typeof app.initializeDashboard === 'function') {
+                            app.initializeDashboard();
+                        }
+                    } else {
+                        document.getElementById('loginPage')?.classList.remove('active');
+                        document.getElementById('dashboardPage')?.classList.add('active');
+                    }
+                }, 500);
+            } else {
                 this.incrementLoginAttempts(code);
 
                 if (typeof app !== 'undefined' && app?.playSound) {
@@ -236,71 +230,7 @@ class AuthManager {
                         form.style.animation = '';
                     }, 500);
                 }
-                return;
             }
-
-            if (result.user) {
-                result.user.tempPasswordForFirstLogin = password;
-            }
-            this.resetLoginAttempts(code);
-
-            this.currentUser = result.user;
-            window.user = result.user;
-            window.sessionDescriptor = result.user?.face_descriptor || null;
-            window.sessionRole = result.user?.role || (result.user?.isAdmin ? 'admin' : 'employee');
-            this.pendingLoginUser = result.user;
-            this.pendingRememberMe = rememberMe;
-
-            if (result.requiresPasswordChange) {
-                this.handleFirstTimeLogin(result.user);
-                return;
-            }
-
-            if (result.requiresFaceEnrollment || !result.user.face_enrolled) {
-                window.forceFaceEnrollment = true;
-                window.firstTimeSetupMode = true;
-
-                if (typeof app !== 'undefined' && app?.playSound) {
-                    app.playSound('login-success');
-                }
-
-                this.toast('يجب تسجيل بصمة الوجه أولاً قبل الدخول للنظام', 'warning');
-                await openCamera?.();
-                return;
-            }
-
-            await this.onLoginSuccess(result.user, rememberMe);
-
-            if (typeof app !== 'undefined' && app?.playSound) {
-                app.playSound('login-success');
-            }
-
-            this.toast(
-                typeof SuccessMessages !== 'undefined' && SuccessMessages?.LOGIN_SUCCESS
-                    ? SuccessMessages.LOGIN_SUCCESS
-                    : 'تم تسجيل الدخول بنجاح',
-                'success'
-            );
-
-            setTimeout(() => {
-                if (typeof showApp === 'function') {
-                    showApp();
-                } else if (typeof app !== 'undefined' && app?.navigateTo) {
-                    app.navigateTo('dashboardPage');
-                    if (typeof app.initializeDashboard === 'function') {
-                        app.initializeDashboard();
-                    }
-                } else {
-                    document.getElementById('loginPage')?.classList.remove('active');
-                    document.getElementById('dashboardPage')?.classList.add('active');
-                }
-
-                if (window.user?.role !== 'admin' && typeof fetchUserDataInBackground === 'function') {
-                    fetchUserDataInBackground();
-                } else if (window.user?.role === 'admin' && typeof loadEmployees === 'function') {
-                    loadEmployees();
-                }
-            }, 500);
         } catch (error) {
             console.error('❌ Login error:', error);
 
@@ -325,33 +255,36 @@ class AuthManager {
             }
 
             const result = await db.signIn(code, password);
+
             if (result?.success && result.user) {
                 const rawUser = result.user;
-                const role = rawUser.role || result.role || (rawUser.is_admin ? 'admin' : 'employee');
+
                 const user = {
-                    name: rawUser.name || (role === 'admin' ? 'مدير النظام' : ''),
-                    code: rawUser.code || null,
-                    username: rawUser.username || null,
-                    email: rawUser.email || null,
-                    role,
-                    isAdmin: role === 'admin',
-                    isFirstLogin: !!(rawUser.is_first_login ?? rawUser.isFirstLogin),
-                    face_enrolled: !!(rawUser.face_enrolled ?? rawUser.faceEnrolled),
-                    face_descriptor: rawUser.face_descriptor || null
+                    name: rawUser.name,
+                    code: rawUser.code,
+                    isAdmin: rawUser.is_admin ?? rawUser.isAdmin ?? false,
+                    isFirstLogin: rawUser.is_first_login ?? rawUser.isFirstLogin ?? false,
+                    face_descriptor: rawUser.face_descriptor ?? null,
+                    email: rawUser.email ?? null
                 };
 
                 return {
                     success: true,
                     user,
-                    requiresPasswordChange: !!result.requiresPasswordChange,
-                    requiresFaceEnrollment: !!result.requiresFaceEnrollment || !user.face_enrolled
+                    requiresPasswordChange: !!result.requiresPasswordChange
                 };
             }
 
-            return { success: false, error: result?.error || 'بيانات خاطئة' };
+            return {
+                success: false,
+                error: result?.error || 'بيانات خاطئة'
+            };
         } catch (error) {
             console.error('Sign in error:', error);
-            return { success: false, error: 'خطأ في الاتصال' };
+            return {
+                success: false,
+                error: 'خطأ في الاتصال'
+            };
         }
     }
 
@@ -377,27 +310,12 @@ class AuthManager {
 
         if (user.face_descriptor || typeof fetchUserDataInBackground === 'function') {
             window.sessionDescriptor = user.face_descriptor || null;
-            window.sessionRole = user.role || (user.isAdmin ? 'admin' : 'employee');
 
             if (!window.sessionDescriptor) {
                 console.log('⚠️ No face descriptor - will prompt for registration');
             }
         }
     }
-
-    async finalizePendingLogin(user = null) {
-        const finalUser = user || this.pendingLoginUser || this.currentUser || window.user;
-        if (!finalUser) {
-            throw new Error('No pending user to finalize');
-        }
-
-        await this.onLoginSuccess(finalUser, !!this.pendingRememberMe);
-        this.pendingLoginUser = null;
-        this.pendingRememberMe = false;
-        window.forceFaceEnrollment = false;
-        window.firstTimeSetupMode = false;
-    }
-
 
     handleFirstTimeLogin(user) {
         this.currentUser = user;
@@ -426,8 +344,6 @@ class AuthManager {
 
         window.sessionDescriptor = null;
         window.userImage = '';
-        window.forceFaceEnrollment = false;
-        window.firstTimeSetupMode = false;
 
         document.getElementById('dashboardPage')?.classList.remove('active');
         document.getElementById('registerPage')?.classList.remove('active');
@@ -446,33 +362,66 @@ class AuthManager {
     async submitFirstPwChange() {
         const newPwInput = document.getElementById('firstNewPw');
         const newPw = newPwInput?.value?.trim();
+
         if (!newPw || newPw.length < 4) {
             return this.toast('كلمة السر ضعيفة (4 أحرف على الأقل)', 'error');
         }
+
         this.setStatus('جاري التغيير...');
+
         try {
-            if (!window.user) throw new Error('User not available');
-            const result = await db.changeOwnPassword(window.user, window.user.tempPasswordForFirstLogin || '', newPw);
+            if (typeof db === 'undefined' || !db || typeof db.updateEmployee !== 'function') {
+                throw new Error('Database service not available');
+            }
+
+            const code = this.currentUser?.code || window.user?.code;
+            const result = await db.updateEmployee(code, {
+                password: newPw,
+                is_first_login: false,
+                updated_at: new Date().toISOString()
+            });
+
             if (!result?.success) {
                 throw new Error(result?.error || 'Update failed');
             }
+
             const modal = document.getElementById('forcePwModal');
             if (modal) modal.classList.remove('active');
+
             if (this.currentUser) this.currentUser.isFirstLogin = false;
             if (window.user) window.user.isFirstLogin = false;
+
+            const savedRemembered = localStorage.getItem('rememberedUser');
+            if (savedRemembered) {
+                const session = JSON.parse(savedRemembered);
+                session.user.isFirstLogin = false;
+                localStorage.setItem('rememberedUser', JSON.stringify(session));
+            }
+
             this.toast('تم تحديث كلمة السر', 'success');
-            if (!window.user.face_enrolled) {
-                this.pendingLoginUser = window.user;
-                window.forceFaceEnrollment = true;
-                window.firstTimeSetupMode = true;
-                await openCamera?.();
+
+            if (typeof app !== 'undefined' && app?.playSound) {
+                app.playSound('login-success');
+            }
+
+            if (typeof fetchUserDataInBackground === 'function') {
+                await fetchUserDataInBackground();
+            }
+
+            if (typeof showApp === 'function') {
+                showApp();
             } else {
-                await this.finalizePendingLogin(window.user);
-                showApp?.();
+                document.getElementById('loginPage')?.classList.remove('active');
+                document.getElementById('dashboardPage')?.classList.add('active');
             }
         } catch (error) {
             console.error('Password change error:', error);
-            this.toast(error.message || 'خطأ في التحديث', 'error');
+
+            if (typeof app !== 'undefined' && app?.playSound) {
+                app.playSound('login-error');
+            }
+
+            this.toast('خطأ في التحديث', 'error');
         } finally {
             this.setStatus('النظام جاهز');
         }
@@ -573,7 +522,8 @@ class AuthManager {
                 throw new Error('Database service not available');
             }
 
-            const result = await db.changeOwnPassword(window.user, 
+            const result = await db.changePassword(
+                (code || '').trim().toUpperCase(),
                 oldPw,
                 newPw
             );
@@ -604,7 +554,14 @@ class AuthManager {
                 throw new Error('Database service not available');
             }
 
-            const result = await db.adminChangeEmployeePassword((code || '').trim().toUpperCase(), newPassword);
+            const result = await db.updateEmployee(
+                (code || '').trim().toUpperCase(),
+                {
+                    password: newPassword,
+                    is_first_login: false,
+                    updated_at: new Date().toISOString()
+                }
+            );
 
             if (result?.success) {
                 if (typeof app !== 'undefined' && app?.playSound) {
@@ -686,35 +643,17 @@ class AuthManager {
     // ============================================
 
     showRegisterScreen() {
-        if (typeof app !== 'undefined' && app?.hideAllPages) {
-            app.hideAllPages();
-        }
-        ['loginPage','forgotPasswordPage','dashboardPage','adminPage'].forEach((id) => {
-            const el = document.getElementById(id);
-            if (el) { el.classList.remove('active'); el.style.display = 'none'; }
-        });
-        const registerPage = document.getElementById('registerPage');
-        if (registerPage) {
-            registerPage.style.display = 'block';
-            registerPage.classList.add('active');
-        }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.getElementById('loginPage')?.classList.remove('active');
+        document.getElementById('forgotPasswordPage')?.classList.remove('active');
+        document.getElementById('dashboardPage')?.classList.remove('active');
+        document.getElementById('registerPage')?.classList.add('active');
     }
 
     showLoginScreen() {
-        if (typeof app !== 'undefined' && app?.hideAllPages) {
-            app.hideAllPages();
-        }
-        ['registerPage','forgotPasswordPage','dashboardPage','adminPage'].forEach((id) => {
-            const el = document.getElementById(id);
-            if (el) { el.classList.remove('active'); el.style.display = 'none'; }
-        });
-        const loginPage = document.getElementById('loginPage');
-        if (loginPage) {
-            loginPage.style.display = 'block';
-            loginPage.classList.add('active');
-        }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.getElementById('registerPage')?.classList.remove('active');
+        document.getElementById('forgotPasswordPage')?.classList.remove('active');
+        document.getElementById('dashboardPage')?.classList.remove('active');
+        document.getElementById('loginPage')?.classList.add('active');
     }
 
     async startRegistration(event) {
@@ -733,25 +672,27 @@ class AuthManager {
 
         if (registerBtn) {
             registerBtn.disabled = true;
-            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>جاري إنشاء الحساب...</span>';
+            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري إنشاء الحساب...';
         }
 
         try {
-            if (typeof db === 'undefined' || !db || typeof db.createEmployee !== 'function') {
-                throw new Error('خدمة إنشاء الحساب غير متاحة');
+            if (typeof db === 'undefined' || !db || typeof db.registerEmployee !== 'function') {
+                throw new Error('Database service not available');
             }
 
-            const result = await db.createEmployee({ name, email });
+            const result = await db.registerEmployee({ name, email });
+
             if (!result?.success) {
-                throw new Error(result?.error || 'فشل إنشاء الحساب');
+                throw new Error(result?.details || result?.error || 'فشل في إنشاء الحساب');
             }
 
-            this.toast('تم إنشاء الحساب بنجاح. سيتم إرسال الكود وكلمة المرور المؤقتة إلى البريد الإلكتروني.', 'success');
-            document.getElementById('registerForm')?.reset();
-            setTimeout(() => this.showLoginScreen(), 900);
+            this.toast('تم إنشاء الحساب وإرسال الكود وكلمة المرور إلى البريد الإلكتروني', 'success');
+            nameInput.value = '';
+            emailInput.value = '';
+            this.showLoginScreen();
         } catch (error) {
             console.error('Registration error:', error);
-            this.toast(error.message || 'فشل إنشاء الحساب', 'error');
+            this.toast(error?.message || 'فشل في إنشاء الحساب', 'error');
         } finally {
             if (registerBtn) {
                 registerBtn.disabled = false;
@@ -969,7 +910,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('loginPage')?.classList.remove('active');
             document.getElementById('registerPage')?.classList.remove('active');
             document.getElementById('dashboardPage')?.classList.remove('active');
-            const forgot = document.getElementById('forgotPasswordPage'); if (forgot) { forgot.style.display='block'; forgot.classList.add('active'); }
+            document.getElementById('forgotPasswordPage')?.classList.add('active');
         }
     });
 

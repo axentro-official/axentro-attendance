@@ -83,7 +83,7 @@ class AttendanceManager {
     }
 
     updateLocationStatus(success, accuracy = null) {
-        const statusEl = document.getElementById('locationStatus') || document.getElementById('locBar');
+        const statusEl = document.getElementById('locBar');
         if (!statusEl) return;
 
         if (success && accuracy) {
@@ -111,17 +111,34 @@ class AttendanceManager {
 
     async loadTodayRecords() {
         try {
-            if (!window.user || window.user.role === 'admin') {
-                this.todayRecords = [];
-                this.currentStatus = 'out';
-                this.updateTodaySummary();
+            if (!window.user?.code) {
+                console.warn('⚠️ Cannot load records - no user code');
                 return;
             }
-            if (typeof db === 'undefined') return;
-            this.todayRecords = await db.getTodayAttendance(window.user.code);
+
+            if (typeof db === 'undefined') {
+                console.warn('⚠️ Database module not available');
+                return;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            
+            const { data } = await db.from('attendance')
+                .select('*')
+                .eq('employee_code', window.user.code)
+                .gte('created_at', today)
+                .order('created_at', { ascending: true });
+
+            this.todayRecords = data || [];
+
+            // Determine current status
             this.determineCurrentStatus();
+
+            // Update UI
             this.updateTodaySummary();
+
             console.log(`📋 Loaded ${this.todayRecords.length} today's records`);
+
         } catch (error) {
             console.error('❌ Load today records error:', error);
             this.todayRecords = [];
@@ -445,14 +462,29 @@ class AttendanceManager {
 
     async loadEmployees() {
         try {
-            if (typeof db === 'undefined') throw new Error('Database not available');
-            const emps = await db.getAllEmployees();
-            window.employeesList = emps || [];
-            const countEl = document.getElementById('empCount') || document.getElementById('totalEmployeesStat');
-            if (countEl) countEl.textContent = (emps || []).length;
-            this.renderEmployeeList(emps || []);
-            setStatus?.('متصل');
-        } catch (e) {
+            if (typeof db === 'undefined') {
+                throw new Error('Database not available');
+            }
+
+            const { data: emps } = await db.from('employees')
+                .select('code, name, email, is_admin, is_deleted, created_at')
+                .eq('is_deleted', false)
+                .order('created_at', { ascending: true });
+
+            if (emps) {
+                window.employeesList = emps;
+
+                // Update count
+                const countEl = document.getElementById('empCount');
+                if (countEl) countEl.textContent = emps.length;
+
+                // Render list
+                this.renderEmployeeList(emps);
+
+                setStatus?.('متصل');
+            }
+
+        } catch(e) {
             console.error('❌ Load employees error:', e);
             setStatus?.('غير متصل');
         }
@@ -486,7 +518,11 @@ class AttendanceManager {
                     <button class="btn btn-sm btn-reg" onclick="adminResetFace('${emp.code}', '${emp.name}')" title="إعادة تسجيل بصمة">
                         <i class="fas fa-sync-alt"></i>
                     </button>
-                    <button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${emp.code}', '${emp.name}')" title="حذف الموظف"><i class="fas fa-trash"></i></button>
+                    ${!emp.is_admin ? `
+                    <button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${emp.code}', '${emp.name}')" title="حذف الموظف">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    ` : ''}
                 </div>
             </div>
         `).join('');
@@ -720,7 +756,7 @@ class AttendanceManager {
         const distance = faceRecognition?.euclideanDistance(descriptor, window.sessionDescriptor) || 
                          this.euclideanDistance(descriptor, window.sessionDescriptor);
         
-        const threshold = window.user?.role === 'admin' ? (AppConfig?.faceRecognition?.recognition?.adminThreshold || 0.45) : (AppConfig?.faceRecognition?.recognition?.threshold || 0.48);
+        const threshold = AppConfig?.faceRecognition?.recognition?.threshold || 0.55;
 
         if (distance >= threshold) {
             // Face doesn't match
@@ -751,15 +787,6 @@ class AttendanceManager {
             );
 
             const maxDistance = AppConfig?.location?.maxDistanceMeters || 500;
-
-            const maxAccuracy = AppConfig?.location?.maxAccuracyMeters || 50;
-            if ((this.currentLocation?.accuracy || window.currentAccuracy || 0) > maxAccuracy) {
-                playSound?.('faceid-error');
-                showToast?.(`دقة الموقع غير كافية (${Math.round(this.currentLocation?.accuracy || window.currentAccuracy || 0)} متر)`, 'error');
-                setCamStatus?.('مرفوض: دقة الموقع غير كافية');
-                faceRecognition?.restartCamLoop();
-                return;
-            }
 
             if (dist > maxDistance) {
                 playSound?.('faceid-error');
@@ -809,20 +836,16 @@ class AttendanceManager {
         try {
             if (typeof db === 'undefined') throw new Error('Database not available');
 
-            const result = await db.recordAttendanceSecure({
+            const { error } = await db.from('attendance').insert({
                 employee_code: window.user.code,
                 employee_name: window.user.name,
                 type: window.attType,
                 location_link: window.currentLoc || 'غير متوفر',
                 shift: selShift ? selShift.value : 'لم يتم التحديد',
-                hours_worked: hoursWorked,
-                latitude: window.currentLat,
-                longitude: window.currentLon,
-                gps_accuracy: this.currentLocation?.accuracy || window.currentAccuracy || null,
-                face_verified: true
+                hours_worked: hoursWorked
             });
 
-            if (!result?.success) throw new Error(result?.error || 'فشل التسجيل');
+            if (error) throw error;
 
             // Success!
             playSound?.('faceid-success');
@@ -859,18 +882,27 @@ class AttendanceManager {
             closeCamera?.();
             return;
         }
+
         try {
-            const result = await db.changeOwnPassword(window.user, pending.oldPassword, pending.newPassword);
-            if (!result?.success) {
+            if (typeof db === 'undefined') throw new Error('Database not available');
+
+            const { error } = await db.from('employees')
+                .update({ password: pending.newPassword })
+                .eq('code', pending.code)
+                .eq('password', pending.oldPassword);
+
+            if (!error) {
+                playSound?.('login-success');
+                showToast?.('تم تغيير كلمة المرور', 'success');
+                
+                setTimeout(() => closeCamera?.(), 800);
+            } else {
                 playSound?.('login-error');
-                showToast?.(result?.error || 'كلمة السر الحالية خاطئة', 'error');
+                showToast?.('كلمة السر الحالية خاطئة', 'error');
                 faceRecognition?.restartCamLoop();
-                return;
             }
-            playSound?.('login-success');
-            showToast?.('تم تغيير كلمة المرور', 'success');
-            setTimeout(() => closeCamera?.(), 800);
-        } catch (e) {
+
+        } catch(e) {
             console.error('Password change error:', e);
             playSound?.('login-error');
             showToast?.('خطأ في تغيير كلمة المرور', 'error');
@@ -977,33 +1009,48 @@ window.calculateMonthlyHours = async function() {
 };
 
 window.fetchUserDataInBackground = async function() {
-    if (typeof attendance === 'undefined' || !window.user) return;
-    if (window.user.role !== 'admin') {
+    if (typeof attendance !== 'undefined' && window.user) {
         await attendance.loadTodayRecords();
         await attendance.calculateMonthlyHours();
-    }
-    if (typeof db !== 'undefined') {
-        try {
-            const ctx = await db.getFaceContext(window.user);
-            if (ctx?.success !== false && ctx) {
-                window.sessionDescriptor = ctx.face_descriptor || null;
-                window.userImage = ctx.profile_image_url || '';
-                window.user.face_enrolled = !!ctx.face_enrolled;
-                if (window.userImage) {
-                    const profileImg = document.querySelector('.emp-profile-img');
-                    if (profileImg) profileImg.src = window.userImage + '?t=' + Date.now();
-                }
-                if (!ctx.face_enrolled && !document.getElementById('cameraOverlay')?.classList.contains('active')) {
-                    showToast?.('يجب تسجيل بصمة الوجه أولاً', 'warning');
+        
+        // Also load user's face descriptor
+        if (typeof db !== 'undefined') {
+            try {
+                const { data: emp } = await db.from('employees')
+                    .select('face_descriptor')
+                    .eq('code', window.user.code)
+                    .single();
+
+                if (emp?.face_descriptor) {
+                    window.sessionDescriptor = emp.face_descriptor;
+                    
+                    // Load user image
+                    const { data: imgData } = db.storage.from('faces')
+                        .getPublicUrl(`${window.user.code}_face.jpg`);
+                    
+                    if (imgData?.publicUrl) {
+                        window.userImage = imgData.publicUrl + '?t=' + new Date().getTime();
+                        
+                        const profileImg = document.querySelector('.emp-profile-img');
+                        if (profileImg) profileImg.src = window.userImage;
+                    }
+                } else if (!document.getElementById('cameraOverlay')?.classList.contains('active')) {
+                    // No face descriptor - need to register
+                    playSound?.('faceid-error');
+                    showToast?.('يرجى تسجيل بصمة وجهك أولاً', 'error');
+                    
                     window.firstTimeSetupMode = true;
-                    await openCamera?.();
+                    if (typeof openCamera === 'function') {
+                        await openCamera();
+                    }
                 }
+            } catch(e) {
+                console.error('Error fetching user data:', e);
             }
-        } catch (e) {
-            console.error('Error fetching user data:', e);
         }
+        
+        setStatus?.('النظام جاهز');
     }
-    setStatus?.('النظام جاهز');
 };
 
 window.loadMyReport = function() {

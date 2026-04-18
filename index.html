@@ -108,10 +108,9 @@
                 </div>
 
                 <div class="form-options">
-                    <label class="checkbox-wrapper">
+                    <label class="checkbox-wrapper" for="rememberMe">
                         <input type="checkbox" id="rememberMe" checked>
-                        <span class="checkmark"></span>
-                        تذكرني (حفظل جلسة الدخول)
+                        <span class="checkbox-label">تذكرني (حفظ جلسة الدخول)</span>
                     </label>
                 </div>
 
@@ -134,11 +133,13 @@
                 </div>
             </form>
 
-            <div class="auth-footer legacy-footer">
-                <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="qr-link">
+            <div class="auth-footer common-footer">
+                <p class="footer-copy">© 2024 Axentro – All Rights Reserved</p>
+                <p class="footer-team">By Axentro Team</p>
+                <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="footer-qr-link">
                     <img src="qr-links.png" alt="QR Code" class="qr-code">
                 </a>
-                <p>Scan Me &gt; Click On Me</p>
+                <p class="footer-qr-caption">Scan Me &gt; Click On Me</p>
             </div>
         </div>
     </section>
@@ -152,7 +153,7 @@
                 <button class="back-btn" id="backToLoginFromRegister">
                     <i class="fas fa-arrow-right"></i>
                 </button>
-                <h2>تسجيل موظف جديد</h2>
+                <h2>تسجل موظف جديد</h2>
             </div>
 
             <form id="registerForm" class="auth-form" novalidate>
@@ -165,9 +166,19 @@
                     <label for="regEmail"><i class="fas fa-envelope"></i> البريد الإلكتروني (اختياري)</label>
                     <input type="email" id="regEmail" placeholder="example@email.com">
                 </div>
-                <div class="info-box onboarding-box">
-                    <i class="fas fa-circle-info"></i>
-                    <p>أدخل الاسم والبريد الإلكتروني فقط. سيصل للموظف كود الحساب وكلمة مرور مؤقتة عبر البريد الإلكتروني، وعند أول دخول سيُطلب منه تغيير كلمة المرور ثم تسجيل بصمة الوجه.</p>
+                    <div class="face-actions">
+                        <button type="button" class="btn btn-outline" id="startCameraBtn">
+                            <i class="fas fa-video"></i> تشغيل الكاميرا
+                        </button>
+                        <button type="button" class="btn btn-primary" id="captureFaceBtn" disabled>
+                            <i class="fas-camera-retro"></i> التقاط الوجه
+                        </button>
+                    </div>
+
+                    <div id="capturedFacePreview" class="captured-face-preview hidden">
+                        <img id="capturedFaceImg" alt="الوجه المسجل">
+                        <p><i class="fas fa-check-circle"></i> تم التقاط الوجه</p>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block" id="registerBtn">
@@ -180,6 +191,14 @@
                     رجوع لتسجيل الدخول
                 </button>
             </form>
+            <div class="auth-footer common-footer">
+                <p class="footer-copy">© 2024 Axentro – All Rights Reserved</p>
+                <p class="footer-team">By Axentro Team</p>
+                <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="footer-qr-link">
+                    <img src="qr-links.png" alt="QR Code" class="qr-code">
+                </a>
+                <p class="footer-qr-caption">Scan Me &gt; Click On Me</p>
+            </div>
         </div>
     </section>
 
@@ -211,6 +230,14 @@
                     إرسال كلمة السر
                 </button>
             </form>
+            <div class="auth-footer common-footer">
+                <p class="footer-copy">© 2024 Axentro – All Rights Reserved</p>
+                <p class="footer-team">By Axentro Team</p>
+                <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="footer-qr-link">
+                    <img src="qr-links.png" alt="QR Code" class="qr-code">
+                </a>
+                <p class="footer-qr-caption">Scan Me &gt; Click On Me</p>
+            </div>
         </div>
     </section>
 
@@ -483,6 +510,14 @@
                 <span>تغيير الرقم السري</span>
             </a>
         </nav>
+        <div class="auth-footer common-footer dashboard-footer">
+            <p class="footer-copy">© 2024 Axentro – All Rights Reserved</p>
+            <p class="footer-team">By Axentro Team</p>
+            <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="footer-qr-link">
+                <img src="qr-links.png" alt="QR Code" class="qr-code">
+            </a>
+            <p class="footer-qr-caption">Scan Me &gt; Click On Me</p>
+        </div>
     </section>
 
     <!-- ================================ -->
@@ -589,80 +624,82 @@
     <!-- ================================ -->
     <!-- 👔 ADMIN PANEL PAGE (NEW!) -->
     <!-- ================================ -->
-    <section id="adminPage" class="page admin-themed-page">
-        <header class="dashboard-header admin-dashboard-header">
-            <div class="user-info">
-                <h3 id="adminHeaderName">مرحباً، مدير النظام</h3>
-                <span id="adminHeaderCode">ADMIN: admin</span>
-            </div>
-            <div class="header-actions">
-                <button class="icon-btn" id="adminSettingsBtn" title="الإعدادات">
-                    <i class="fas fa-cog"></i>
-                </button>
-                <button class="icon-btn" id="adminLogoutBtn" title="تسجيل الخروج" onclick="window.auth?.logout?.()">
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
-            </div>
-        </header>
-
-        <header class="page-header admin-page-header">
+    <section id="adminPage" class="page">
+        <header class="page-header" style="background: linear-gradient(135deg, #7c3aed, #2563eb);)">
             <h2><i class="fas fa-user-shield"></i> لوحة تحكم المدير</h2>
-            <p>إدارة الموظفين والنظام</p>
+            <p style="color: rgba(255,255,255,0.8); margin-top: 8px;">إدارة الموظفين والنظام</p>
         </header>
 
-        <div class="admin-container">
-            <div class="admin-stats-grid">
-                <div class="stat-card admin-stat-card admin-stat-blue">
-                    <i class="fas fa-users"></i>
-                    <span class="stat-value" id="adminTotalEmp">0</span>
+        <div class="admin-container" style="max-width: 1200px; margin: 30px auto;">
+            
+            <!-- Quick Stats Cards -->
+            <div class="admin-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px); margin-bottom: 25px;">
+                <div class="stat-card" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;">
+                    <i class="fas fa-users" style="font-size: 2rem; opacity: 0.9;"></i>
+                    <span class="stat-value" id="adminTotalEmp" style="font-size: 2rem; font-weight: 700;">0</span>
                     <span class="stat-label">إجمالي الموظفين</span>
                 </div>
-                <div class="stat-card admin-stat-card admin-stat-cyan">
-                    <i class="fas fa-user-check"></i>
-                    <span class="stat-value" id="adminTodayCheckIns">0</span>
+                
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+                    <i class="fas fa-user-check" style="font-size: 2rem; opacity: 0.9;"></i>
+                    <span class="stat-value" id="adminTodayCheckIns" style="font-size: 2rem; font-weight: 700;">0</span>
                     <span class="stat-label">حضور اليوم</span>
                 </div>
-                <div class="stat-card admin-stat-card admin-stat-indigo">
-                    <i class="fas fa-user-clock"></i>
-                    <span class="stat-value" id="adminTodayCheckOuts">0</span>
+                
+                <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">
+                    <i class="fas fa-user-clock" style="font-size: 2rem; opacity: 0.9;"></i>
+                    <span class="stat-value" id="adminTodayCheckOuts" style="font-size: 2rem; font-weight: 700;">0</span>
                     <span class="stat-label">انصراف اليوم</span>
                 </div>
-                <div class="stat-card admin-stat-card admin-stat-navy">
-                    <i class="fas fa-plus-circle"></i>
-                    <span class="stat-value" id="adminNewThisMonth">0</span>
+                
+                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white;">
+                    <i class="fas fa-plus-circle" style="font-size: 2rem; opacity: 0.9;"></i>
+                    <span class="stat-value" id="adminNewThisMonth" style="font-size: 2rem; font-weight: 700;">0</span>
                     <span class="stat-label">مسجلين هذا الشهر</span>
                 </div>
             </div>
 
-            <div class="admin-actions-row">
+            <!-- Quick Actions -->
+            <div style="display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap;">
                 <button class="btn btn-primary" onclick="openAddEmployeeModal()">
                     <i class="fas fa-user-plus"></i>
                     إضافة موظف
                 </button>
+                
                 <button class="btn btn-outline" onclick="admin.exportEmployeesList()">
                     <i class="fas fa-download"></i>
                     تصدير القائمة
                 </button>
+                
                 <button class="btn btn-outline" onclick="admin.refreshData()">
                     <i class="fas fa-sync-alt"></i>
                     تحديث البيانات
                 </button>
             </div>
 
-            <div class="employees-table-container admin-table-shell">
-                <div class="admin-table-topbar">
-                    <h3>
-                        <i class="fas fa-users"></i>
+            <!-- Employees Table -->
+            <div class="employees-table-container" style="background: var(--bg-primary); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+                <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-secondary);">
+                        <i class="fas fa-users" style="color: var(--primary); margin-left: 8px;"></i>
                         قائمة الموظفين
                     </h3>
-                    <div class="admin-search-wrap">
-                        <input type="search" id="adminSearchInput" placeholder="بحث بالاسم أو الكود...">
-                        <i class="fas fa-search"></i>
+                    
+                    <div style="position: relative; width: 300px;">
+                        <input type="search" id="adminSearchInput" 
+                               placeholder="بحث بالاسم أو الكود..." 
+                               style="padding: 10px 14px; border: 1px solid var(--border-color); 
+                               border-radius: 8px; background: var(--bg-secondary); 
+                               font-size: 0.9rem; color: var(--text-primary);
+                               padding-right: 35px;"
+                               >
+                        <i class="fas fa-search" style="position:absolute; right: 12px; top: 50%; transform: translateX(-50%); color: var(--text-muted);"></i>
                     </div>
                 </div>
 
-                <div class="admin-table-scroll">
-                    <table class="admin-table">
+                <!-- Table Body -->
+                <div id="adminEmployeesTableBody" style="max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 15px;">
+                    <table class="admin-table" style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr>
                                 <th>#</th>
@@ -676,7 +713,7 @@
                         </thead>
                         <tbody id="adminEmployeesTableBody">
                             <tr>
-                                <td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted);">
+                                <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">
                                     <i class="fas fa-spinner fa-spin"></i>
                                     جاري تحميل البيانات...
                                 </td>
@@ -685,8 +722,7 @@
                     </table>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
 </div><!-- End App Container -->
 
@@ -695,15 +731,6 @@
 <!-- ============================================ -->
 
 <!-- Toast Container -->
-<div class="global-app-footer">
-    <p class="footer-copy">© 2024 Axentro – All Rights Reserved</p>
-    <p class="footer-copy footer-sub">By Axentro Team</p>
-    <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="qr-link global-qr-link">
-        <img src="qr-links.png" alt="QR Code" class="qr-code global-qr-code">
-    </a>
-    <p class="footer-scan">Scan Me &gt; Click On Me</p>
-</div>
-
 <div id="toastContainer" class="toast-container"></div>
 
 <!-- Notifications Modal -->
