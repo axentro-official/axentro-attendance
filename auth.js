@@ -1,3 +1,11 @@
+function getAuthEl(...ids) {
+    for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el) return el;
+    }
+    return null;
+}
+
 /**
  * ============================================
  * 🔐 AXENTRO AUTHENTICATION v4.2 - COMPLETE
@@ -144,7 +152,7 @@ class AuthManager {
         event.preventDefault();
 
         const codeInput = document.getElementById('loginCode');
-        const passwordInput = document.getElementById('loginPass');
+        const passwordInput = getAuthEl('loginPassword', 'loginPass');
         const rememberMeCheckbox = document.getElementById('rememberMe');
 
         const code = codeInput?.value?.trim() || '';
@@ -288,7 +296,7 @@ class AuthManager {
         // Save login credentials for fingerprint (من الكود القديم)
         if (rememberMe) {
             const codeInput = document.getElementById('loginCode');
-            const passInput = document.getElementById('loginPass');
+            const passInput = getAuthEl('loginPassword', 'loginPass');
             
             localStorage.setItem('axentro_saved_login', JSON.stringify({
                 code: user.code || codeInput?.value,
@@ -341,11 +349,11 @@ class AuthManager {
         window.sessionDescriptor = null;
         window.userImage = '';
 
-        const mainApp = document.getElementById('mainApp');
-        const loginScreen = document.getElementById('loginScreen');
+        const mainApp = getAuthEl('dashboardPage', 'mainApp');
+        const loginScreen = getAuthEl('loginPage', 'loginScreen');
         
         if (mainApp) mainApp.style.display = 'none';
-        if (loginScreen) loginScreen.classList.remove('hidden');
+        if (loginScreen) loginScreen.style.display = 'block';
         
         setStatus('النظام جاهز');
         
@@ -660,19 +668,19 @@ class AuthManager {
     // ============================================
 
     showRegisterScreen() {
-        const loginScreen = document.getElementById('loginScreen');
-        const registerScreen = document.getElementById('registerScreen');
+        const loginScreen = getAuthEl('loginPage', 'loginScreen');
+        const registerScreen = getAuthEl('registerPage', 'registerScreen');
         
-        if (loginScreen) loginScreen.classList.add('hidden');
-        if (registerScreen) registerScreen.classList.remove('hidden');
+        if (loginScreen) loginScreen.style.display = 'none';
+        if (registerScreen) registerScreen.style.display = 'block';
     }
 
     showLoginScreen() {
-        const loginScreen = document.getElementById('loginScreen');
-        const registerScreen = document.getElementById('registerScreen');
+        const loginScreen = getAuthEl('loginPage', 'loginScreen');
+        const registerScreen = getAuthEl('registerPage', 'registerScreen');
         
-        if (registerScreen) registerScreen.classList.add('hidden');
-        if (loginScreen) loginScreen.classList.remove('hidden');
+        if (registerScreen) registerScreen.style.display = 'none';
+        if (loginScreen) loginScreen.style.display = 'block';
     }
 
     async startRegistration(event) {
@@ -848,11 +856,11 @@ class AuthManager {
 
     // Utility methods
     showLoginPage() {
-        const mainApp = document.getElementById('mainApp');
-        const loginScreen = document.getElementById('loginScreen');
+        const mainApp = getAuthEl('dashboardPage', 'mainApp');
+        const loginScreen = getAuthEl('loginPage', 'loginScreen');
         
         if (mainApp) mainApp.style.display = 'none';
-        if (loginScreen) loginScreen.classList.remove('hidden');
+        if (loginScreen) loginScreen.style.display = 'block';
     }
 }
 
