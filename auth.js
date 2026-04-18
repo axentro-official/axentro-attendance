@@ -24,7 +24,7 @@ class AuthManager {
     // ============================================
 
     init() {
-        this.checkExistingSession();
+        // Session restore is handled centrally in app.init() to avoid duplicated UI navigation
         this.setupActivityTracking();
         console.log('✅ Auth Manager ready');
     }
@@ -704,22 +704,40 @@ class AuthManager {
 
         const nameInput = document.getElementById('regName');
         const emailInput = document.getElementById('regEmail');
+        const registerBtn = document.getElementById('registerBtn');
 
         const name = nameInput?.value?.trim();
         const email = emailInput?.value?.trim();
 
         if (!name || !email) {
-            return this.toast('يرجى إدخال البيانات', 'error');
+            return this.toast('يرجى إدخال الاسم والبريد الإلكتروني', 'error');
         }
 
-        window.regData = { name, email };
-        window.regMode = true;
+        if (registerBtn) {
+            registerBtn.disabled = true;
+            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>جاري إنشاء الحساب...</span>';
+        }
 
-        if (typeof openCamera === 'function') {
-            const success = await openCamera();
-            if (!success) {
-                window.regMode = false;
-                this.toast('فشل فتح الكاميرا', 'error');
+        try {
+            if (typeof db === 'undefined' || !db || typeof db.createEmployee !== 'function') {
+                throw new Error('خدمة إنشاء الحساب غير متاحة');
+            }
+
+            const result = await db.createEmployee({ name, email });
+            if (!result?.success) {
+                throw new Error(result?.error || 'فشل إنشاء الحساب');
+            }
+
+            this.toast('تم إنشاء الحساب بنجاح. سيتم إرسال الكود وكلمة المرور المؤقتة إلى البريد الإلكتروني.', 'success');
+            document.getElementById('registerForm')?.reset();
+            setTimeout(() => this.showLoginScreen(), 900);
+        } catch (error) {
+            console.error('Registration error:', error);
+            this.toast(error.message || 'فشل إنشاء الحساب', 'error');
+        } finally {
+            if (registerBtn) {
+                registerBtn.disabled = false;
+                registerBtn.innerHTML = '<i class="fas fa-user-plus"></i><span>إنشاء الحساب</span><span class="btn-loader hidden"></span>';
             }
         }
     }

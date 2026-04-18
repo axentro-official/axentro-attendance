@@ -370,14 +370,14 @@ class FaceRecognitionManager {
                 video,
                 new faceapi.TinyFaceDetectorOptions({ 
                     inputSize: AppConfig?.faceRecognition?.detection?.inputSize || 256,
-                    scoreThreshold: AppConfig?.faceRecognition?.detection?.scoreThreshold || 0.18
+                    scoreThreshold: AppConfig?.faceRecognition?.detection?.scoreThreshold || 0.12
                 })
             ).withFaceLandmarks(true);
 
             if (!detection) {
                 detection = await faceapi.detectSingleFace(
                     video,
-                    new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.12 })
+                    new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.08 })
                 ).withFaceLandmarks(true);
             }
 
@@ -532,16 +532,16 @@ class FaceRecognitionManager {
         if (scanLine) scanLine.classList.remove('active');
 
         if (!window.currentFaceDetected) {
-            showToast?.('لم يتم اكتشاف وجه واضح بعد', 'warning');
-            window.isProcessingCapture = false;
-            this.startDetectionLoop();
-            return;
+            setCamStatus?.('<i class="fas fa-camera"></i> محاولة التقاط مباشرة من الكاميرا...');
         }
 
         setCamStatus?.('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
 
-        // Extract stable descriptor (من الكود القديم)
+        // Extract stable descriptor حتى لو لم يرسم الإطار بعد
         const newDescriptor = await this.extractStableDescriptor();
+        if (!newDescriptor && !window.currentFaceDetected) {
+            showToast?.('لم يتم اكتشاف وجه واضح. قرّب الوجه داخل الإطار، استخدم الكاميرا الأمامية، وجرّب مرة أخرى.', 'warning');
+        }
 
         if (!newDescriptor) {
             playSound?.('faceid-error');
@@ -964,3 +964,11 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = FaceRecognitionManager;
 }
+
+
+window.switchFaceCamera = async function() {
+    try {
+        AppConfig.faceRecognition.camera.facingMode = AppConfig.faceRecognition.camera.facingMode === 'user' ? 'environment' : 'user';
+        if (typeof faceRecognition !== 'undefined') await faceRecognition.openCamera();
+    } catch (e) { console.warn('switch camera failed', e); }
+};

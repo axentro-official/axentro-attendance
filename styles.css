@@ -41,9 +41,9 @@
     --gray-900: #0f172a;
     
     /* Background Colors */
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --bg-tertiary: #f1f5f9;
+    --bg-primary: #0b1733;
+    --bg-secondary: #081226;
+    --bg-tertiary: #0f1f42;
     
     /* Text Colors */
     --text-primary: #0f172a;
@@ -121,8 +121,8 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: var(--font-base);
     line-height: 1.6;
-    color: var(--text-primary);
-    background-color: var(--bg-secondary);
+    color: #e2e8f0;
+    background: linear-gradient(135deg, #071227 0%, #0b1733 55%, #10244a 100%);
     direction: rtl;
     overflow-x: hidden;
     min-height: 100vh;
@@ -1925,3 +1925,32 @@ input, textarea, select {
 #adminPage .btn-primary { background: linear-gradient(135deg, #1d4ed8, #2563eb); color:#fff; border:none; }
 #adminPage .btn-outline { border-color:#1d4ed8; color:#1d4ed8; background:#fff; }
 #adminPage .btn-outline:hover { background:#eff6ff; }
+
+
+/* unified dark theme */
+.auth-container,.employees-table-container,.admin-table-shell,.stat-card,.attendance-card,.page-header,.dashboard-header,.modal-content,.info-box,.recent-activity,.attendance-section,.settings-section,.reports-section,.admin-actions-row,.admin-table-topbar{background:linear-gradient(135deg, rgba(6,18,45,.94) 0%, rgba(12,35,86,.96) 100%) !important;border:1px solid rgba(96,165,250,.16);box-shadow:0 18px 40px rgba(0,0,0,.28);color:#e2e8f0;}
+.input-group label,.stat-label,.page-header p,.auth-header p,.info-box p,th,td,.text-muted{color:#cbd5e1 !important;}
+.auth-header,.dashboard-header,.page-header,.admin-dashboard-header,.admin-page-header{background:linear-gradient(135deg, #06132d 0%, #0b1f4a 55%, #0f4ca8 100%) !important;border:1px solid rgba(96,165,250,.18);}
+.auth-header h1,.auth-header h2,.page-header h2,.dashboard-header h3,.admin-page-header h2,.admin-dashboard-header h3{color:#fff !important;}
+input,select,textarea,#adminSearchInput{background:rgba(255,255,255,.06) !important;border:1px solid rgba(148,163,184,.2) !important;color:#fff !important;}
+input::placeholder,textarea::placeholder{color:#94a3b8 !important;}
+.btn-primary,.btn-login{background:linear-gradient(135deg,#1d4ed8 0%, #2563eb 45%, #0ea5e9 100%) !important;color:#fff !important;box-shadow:0 12px 25px rgba(37,99,235,.25);}
+.btn-outline,.btn-text,.btn{border-color:rgba(96,165,250,.35) !important;color:#dbeafe;}
+.admin-stat-card{background:linear-gradient(135deg,#06132d 0%, #0b1f4a 55%, #0f4ca8 100%) !important;}
+.admin-stat-blue,.admin-stat-cyan,.admin-stat-indigo,.admin-stat-navy{background:linear-gradient(135deg,#06132d 0%, #0b1f4a 55%, #0f4ca8 100%) !important;}
+.auth-footer{opacity:.88;}
+.face-capture-section{display:none !important;}
+
+.toast-container{position:fixed;top:18px;right:18px;left:18px;display:flex;flex-direction:column;gap:12px;z-index:9999;pointer-events:none;}
+.app-toast{pointer-events:auto;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg, rgba(6,18,45,.98), rgba(12,35,86,.98));border:1px solid rgba(96,165,250,.2);border-radius:18px;padding:14px 16px;box-shadow:0 24px 50px rgba(0,0,0,.35);transform:translateY(-8px);opacity:0;transition:.24s ease;color:#fff;}
+.app-toast.show{transform:translateY(0);opacity:1;}
+.app-toast-icon{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);font-size:18px;}
+.app-toast-success .app-toast-icon{color:#22c55e}.app-toast-error .app-toast-icon{color:#ef4444}.app-toast-warning .app-toast-icon{color:#f59e0b}.app-toast-info .app-toast-icon{color:#38bdf8}
+.app-toast-body{display:flex;flex-direction:column;gap:2px;flex:1}.app-toast-body strong{font-size:14px}.app-toast-body span{font-size:13px;color:#cbd5e1}
+.app-toast-close{color:#cbd5e1;font-size:22px;line-height:1;padding:0 6px}
+.app-dialog-backdrop{position:fixed;inset:0;background:rgba(2,6,23,.72);display:none;align-items:center;justify-content:center;z-index:10020;padding:20px;}
+.app-dialog-backdrop.show{display:flex;}
+.app-dialog{width:min(92vw,420px);background:linear-gradient(135deg, rgba(6,18,45,.98), rgba(12,35,86,.98));border:1px solid rgba(96,165,250,.22);border-radius:24px;padding:18px;box-shadow:0 30px 70px rgba(0,0,0,.42);color:#fff}
+.app-dialog-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:1rem}.app-dialog-header i{color:#38bdf8}.app-dialog-message{color:#cbd5e1;line-height:1.8;margin-bottom:18px}.app-dialog-actions{display:flex;justify-content:flex-end}
+.onboarding-box{margin-bottom:16px}
+@media (max-width: 768px){.toast-container{top:auto;bottom:16px;right:12px;left:12px}.auth-container,.employees-table-container,.admin-table-shell,.page-header,.dashboard-header{border-radius:20px}}

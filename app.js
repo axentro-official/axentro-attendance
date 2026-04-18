@@ -128,6 +128,7 @@ class App {
             
             setTimeout(() => {
                 this.hideSplashScreen();
+                this.hideAllPages();
                 
                 if (hasSession && this.isAuthenticated()) {
                     this.navigateTo('dashboardPage');
@@ -565,62 +566,66 @@ class App {
     // 🎨 UI HELPERS
     // ============================================
 
+    hideAllPages() {
+        const pages = ['loginPage', 'registerPage', 'forgotPasswordPage', 'dashboardPage', 'adminPage'];
+        pages.forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.remove('active');
+            el.style.display = 'none';
+        });
+    }
+
+
     navigateTo(pageId) {
-        // Hide all pages
         const appRoot = document.getElementById('app');
         if (appRoot) {
             appRoot.classList.remove('hidden');
             appRoot.style.display = 'block';
         }
 
-        const pages = ['loginPage', 'registerPage', 'forgotPasswordPage', 'dashboardPage', 'adminPage'];
-        pages.forEach(p => {
-            const el = document.getElementById(p);
-            if (el) el.style.display = 'none';
-        });
+        this.hideAllPages();
 
-        // Show target page
         if (pageId === 'loginPage') {
             this.showLoginScreen();
+        } else if (pageId === 'registerPage') {
+            this.showRegisterScreen();
+        } else if (pageId === 'forgotPasswordPage') {
+            window.showForgotPasswordScreen?.();
         } else if (pageId === 'dashboardPage' || pageId === 'adminPage') {
             this.showMainApp();
         }
     }
 
     showLoginScreen() {
+        this.hideAllPages();
         const loginPage = document.getElementById('loginPage');
-        const registerPage = document.getElementById('registerPage');
-        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
-        const dashboardPage = document.getElementById('dashboardPage');
-
-        if (registerPage) registerPage.classList.remove('active');
-        if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
-        if (dashboardPage) dashboardPage.classList.remove('active');
-        if (loginPage) loginPage.classList.add('active');
+        if (loginPage) {
+            loginPage.style.display = 'block';
+            loginPage.classList.add('active');
+        }
     }
 
     showMainApp() {
         this.applyUserContextToDashboard();
+        this.hideAllPages();
 
-        const loginPage = document.getElementById('loginPage');
-        const registerPage = document.getElementById('registerPage');
-        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
         const dashboardPage = document.getElementById('dashboardPage');
         const adminPage = document.getElementById('adminPage');
 
-        if (loginPage) loginPage.classList.remove('active');
-        if (registerPage) registerPage.classList.remove('active');
-        if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
-
         if (window.user?.role === 'admin' || window.user?.isAdmin) {
-            if (dashboardPage) dashboardPage.classList.remove('active');
-            if (adminPage) adminPage.classList.add('active');
+            if (adminPage) {
+                adminPage.style.display = 'block';
+                adminPage.classList.add('active');
+            }
             if (typeof loadEmployees === 'function') {
                 Promise.resolve(loadEmployees()).catch(err => console.warn('loadEmployees failed:', err));
             }
         } else {
-            if (adminPage) adminPage.classList.remove('active');
-            if (dashboardPage) dashboardPage.classList.add('active');
+            if (dashboardPage) {
+                dashboardPage.style.display = 'block';
+                dashboardPage.classList.add('active');
+            }
         }
     }
 
@@ -682,15 +687,12 @@ class App {
     }
 
     showRegisterScreen() {
-        const loginPage = document.getElementById('loginPage');
+        this.hideAllPages();
         const registerPage = document.getElementById('registerPage');
-        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
-        const dashboardPage = document.getElementById('dashboardPage');
-
-        if (loginPage) loginPage.classList.remove('active');
-        if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
-        if (dashboardPage) dashboardPage.classList.remove('active');
-        if (registerPage) registerPage.classList.add('active');
+        if (registerPage) {
+            registerPage.style.display = 'block';
+            registerPage.classList.add('active');
+        }
     }
 
     // ============================================
@@ -795,17 +797,38 @@ class App {
 // ============================================
 
 // Toast notification
-function showToast(msg, type = '') {
-    const t = document.getElementById('toast');
-    if (!t) {
-        alert(msg); // Fallback
+function showToast(msg, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) {
+        console.log('[TOAST]', type, msg);
         return;
     }
-    
-    t.textContent = msg;
-    t.className = `toast show ${type}`;
-    setTimeout(() => t.classList.remove('show'), 4500);
+    const toast = document.createElement('div');
+    toast.className = `app-toast app-toast-${type}`;
+    const iconMap = { success: 'check-circle', error: 'triangle-exclamation', warning: 'circle-exclamation', info: 'circle-info' };
+    toast.innerHTML = `<div class="app-toast-icon"><i class="fas fa-${iconMap[type] || iconMap.info}"></i></div><div class="app-toast-body"><strong>${type === 'success' ? 'تم بنجاح' : type === 'error' ? 'تنبيه مهم' : type === 'warning' ? 'ملاحظة' : 'إشعار'}</strong><span>${msg}</span></div><button class="app-toast-close" aria-label="close">&times;</button>`;
+    const close = () => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 240); };
+    toast.querySelector('.app-toast-close')?.addEventListener('click', close);
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    setTimeout(close, (AppConfig?.ui?.toast?.defaultDuration || 4500));
 }
+
+function showAppDialog(message, title = 'تنبيه') {
+    let modal = document.getElementById('appDialog');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'appDialog';
+        modal.className = 'app-dialog-backdrop';
+        modal.innerHTML = `<div class="app-dialog"><div class="app-dialog-header"><i class="fas fa-shield-halved"></i><strong id="appDialogTitle"></strong></div><div class="app-dialog-message" id="appDialogMessage"></div><div class="app-dialog-actions"><button id="appDialogOk" class="btn btn-primary">حسنًا</button></div></div>`;
+        document.body.appendChild(modal);
+        modal.querySelector('#appDialogOk')?.addEventListener('click', () => modal.classList.remove('show'));
+    }
+    modal.querySelector('#appDialogTitle').textContent = title;
+    modal.querySelector('#appDialogMessage').textContent = message;
+    modal.classList.add('show');
+}
+if (typeof window !== 'undefined') { window.alert = (msg) => showAppDialog(String(msg || ''), 'رسالة النظام'); }
 
 // Status update
 function setStatus(txt) {
