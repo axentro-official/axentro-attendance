@@ -299,7 +299,7 @@ class AdminManager {
                 playSound?.('faceid-success');
                 showToast?.(`تم حذف ${targetEmp.name} بنجاح`, 'success');
 
-                setTimeout(async () => {
+                setTimeout(() => {
                     closeCamera?.();
                     
                     // Reload employees list
@@ -344,7 +344,7 @@ class AdminManager {
                 playSound?.('faceid-success');
                 showToast?.(`تم تسجيل ${targetEmp.type} لـ ${targetEmp.name} بنجاح`, 'success');
 
-                setTimeout(async () => {
+                setTimeout(() => {
                     closeCamera?.();
                     
                     // Reload data

@@ -426,10 +426,10 @@ class AuthManager {
     }
 
     // Change Password Modal Logic
-    pwChangeMode = '';
+    let pwChangeMode = '';
 
     openChangePwModal(mode) {
-        this.pwChangeMode = mode;
+        pwChangeMode = mode;
         const body = document.getElementById('changePwBody');
         const title = document.getElementById('changePwTitle');
         const modal = document.getElementById('changePwModal');
@@ -474,7 +474,7 @@ class AuthManager {
     }
 
     async submitChangePassword() {
-        if (this.pwChangeMode === 'own') {
+        if (pwChangeMode === 'own') {
             const oldPw = document.getElementById('oldPassword')?.value?.trim();
             const newPw = document.getElementById('newPassword')?.value?.trim();
             

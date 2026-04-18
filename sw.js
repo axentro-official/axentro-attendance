@@ -17,24 +17,24 @@ const APP_SHELL_FILES = [
     './index.html',
     './manifest.json',
     './icon-192.png',
-    ./icon-512.png',
+    './icon-512.png',
     './qr-links.png',
     
     // CSS
-    './css/styles.css',
+    './styles.css',
     
     // JavaScript Modules (order matters!)
-    './js/config.js',
-    './js/utils.js',
-    './js/validator.js',
-    './js/ui-manager.js',
-    './js/supabase-client.js',
-    './js/auth.js',
-    './js/face-recognition.js',
-    './js/attendance.js',
-    './js/admin.js',
-    './js/reports.js',
-    './js/app.js',
+    './config.js',
+    './utils.js',
+    './validator.js',
+    './ui-manager.js',
+    './supabase-client.js',
+    './auth.js',
+    './face-recognition.js',
+    './attendance.js',
+    './admin.js',
+    './reports.js',
+    './app.js',
     
     // Audio files
     './login-success.mp3',
@@ -456,8 +456,8 @@ self.addEventListener('push', event => {
     let data = {
         title: 'Axentro',
         body: 'إشعار جديد',
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: './icon-192.png',
+        badge: './icon-192.png',
         dir: 'rtl',
         lang: 'ar'
     };
