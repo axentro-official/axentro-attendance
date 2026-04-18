@@ -1,15 +1,3 @@
-function getFaceVideoElement() {
-    return document.getElementById('dashboardVideo') ||
-           document.getElementById('registerVideo') ||
-           getFaceVideoElement();
-}
-
-function getFaceCanvasElement() {
-    return document.getElementById('dashboardCanvas') ||
-           document.getElementById('registerCanvas') ||
-           getFaceCanvasElement();
-}
-
 /**
  * ============================================
  * 📷 AXENTRO FACE RECOGNITION v4.2 - COMPLETE
@@ -72,8 +60,8 @@ class FaceRecognitionManager {
     }
 
     setupCameraElements() {
-        this.videoElement = getFaceVideoElement();
-        this.canvasElement = getFaceCanvasElement();
+        this.videoElement = document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
+        this.canvasElement = document.getElementById('dashboardCanvas') || document.getElementById('registerCanvas') || document.getElementById('canvas');
         
         console.log('📹 Camera elements set up');
     }
@@ -88,7 +76,8 @@ class FaceRecognitionManager {
             return true;
         }
 
-        const MODELS_URL = (AppConfig?.faceRecognition?.models?.tinyFaceDetector || 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights/').replace(/([^/])$/, '$1/');
+        const MODELS_URL = AppConfig?.faceRecognition?.models?.tinyFaceDetector || 
+                          'https://justadudewhohacks.github.io/face-api.js/weights';
 
         try {
             setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
@@ -174,21 +163,21 @@ class FaceRecognitionManager {
             window.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
 
             // Setup video element
-            const video = this.videoElement || getFaceVideoElement();
+            const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
             if (!video) throw new Error('Video element not found');
 
             video.srcObject = window.currentStream;
             await video.play();
 
             // Show camera overlay
-            const overlay = document.getElementById('cameraOverlay') || { classList: { add() {}, remove() {}, contains() { return true; } } };
+            const overlay = document.getElementById('cameraOverlay') || document.getElementById('registerVideoContainer');
             if (overlay) overlay.classList.add('active');
 
             // Reset status text
             window.lastCamStatusText = '';
 
             // Show scan line
-            const scanLine = document.getElementById('scanLine') || { classList: { add() {}, remove() {} } };
+            const scanLine = document.getElementById('scanLine');
             if (scanLine) scanLine.classList.add('active');
 
             // Set initial status
@@ -199,7 +188,7 @@ class FaceRecognitionManager {
             );
 
             // Setup canvas
-            const canvas = this.canvasElement || getFaceCanvasElement();
+            const canvas = this.canvasElement || document.getElementById('dashboardCanvas') || document.getElementById('registerCanvas') || document.getElementById('canvas');
             if (canvas && video) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -237,19 +226,19 @@ class FaceRecognitionManager {
         }
 
         // Clear video
-        const video = this.videoElement || getFaceVideoElement();
+        const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
         if (video) video.srcObject = null;
 
         // Hide overlay
-        const overlay = document.getElementById('cameraOverlay') || { classList: { add() {}, remove() {}, contains() { return true; } } };
+        const overlay = document.getElementById('cameraOverlay') || document.getElementById('registerVideoContainer');
         if (overlay) overlay.classList.remove('active');
 
         // Hide scan line
-        const scanLine = document.getElementById('scanLine') || { classList: { add() {}, remove() {} } };
+        const scanLine = document.getElementById('scanLine');
         if (scanLine) scanLine.classList.remove('active');
 
         // Reset match result
-        const matchResult = document.getElementById('matchResult');
+        const matchResult = document.getElementById('recognizedEmployeeName') || document.getElementById('matchResult');
         if (matchResult) matchResult.className = 'match-result';
 
         // Hide stability ring
@@ -302,8 +291,8 @@ class FaceRecognitionManager {
         }
 
         const detect = async () => {
-            const video = this.videoElement || getFaceVideoElement();
-            const overlay = document.getElementById('cameraOverlay') || { classList: { add() {}, remove() {}, contains() { return true; } } };
+            const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
+            const overlay = document.getElementById('cameraOverlay') || document.getElementById('registerVideoContainer');
             
             if (!video?.srcObject || !overlay?.classList.contains('active') || window.isProcessingCapture) {
                 return;
@@ -318,8 +307,8 @@ class FaceRecognitionManager {
     }
 
     async drawFaceBox() {
-        const video = this.videoElement || getFaceVideoElement();
-        const canvas = this.canvasElement || getFaceCanvasElement();
+        const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
+        const canvas = this.canvasElement || document.getElementById('dashboardCanvas') || document.getElementById('registerCanvas') || document.getElementById('canvas');
         
         if (!video?.srcObject || !video.videoWidth || !canvas) return;
         if (!window.lightModels) {
@@ -481,7 +470,7 @@ class FaceRecognitionManager {
         }
 
         // Hide scan line
-        const scanLine = document.getElementById('scanLine') || { classList: { add() {}, remove() {} } };
+        const scanLine = document.getElementById('scanLine');
         if (scanLine) scanLine.classList.remove('active');
 
         setCamStatus?.('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
@@ -525,7 +514,7 @@ class FaceRecognitionManager {
     // ============================================
 
     async extractStableDescriptor() {
-        const video = this.videoElement || getFaceVideoElement();
+        const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
         if (!video) return null;
 
         const samples = [];
@@ -635,7 +624,7 @@ class FaceRecognitionManager {
     }
 
     showMatchResult(success) {
-        const el = document.getElementById('matchResult');
+        const el = document.getElementById('recognizedEmployeeName') || document.getElementById('matchResult');
         if (!el) return;
 
         el.className = `match-result ${success ? 'success' : 'fail'}`;
@@ -653,7 +642,7 @@ class FaceRecognitionManager {
     // ============================================
 
     createStorageImageBlob() {
-        const video = this.videoElement || getFaceVideoElement();
+        const video = this.videoElement || document.getElementById('dashboardVideo') || document.getElementById('registerVideo') || document.getElementById('video');
         if (!video) return Promise.resolve(null);
 
         const canvas = document.createElement('canvas');
@@ -730,7 +719,7 @@ class FaceRecognitionManager {
         window.stabilityCounter = 0;
         updateStabilityRing?.(0, AppConfig?.liveness?.stableFramesRequired || 5);
         
-        const scanLine = document.getElementById('scanLine') || { classList: { add() {}, remove() {} } };
+        const scanLine = document.getElementById('scanLine');
         if (scanLine) scanLine.classList.add('active');
         
         this.startDetectionLoop();
@@ -758,7 +747,7 @@ window.closeCamera = function() {
 // Status updates
 window.setCamStatus = function(html) {
     if (html !== window.lastCamStatusText) {
-        const el = document.getElementById('camStatus');
+        const el = document.getElementById('cameraStatus') || document.getElementById('camStatus');
         if (el) el.innerHTML = html;
         window.lastCamStatusText = html;
     }

@@ -17,29 +17,17 @@ window.addEventListener('unhandledrejection', function(event) {
 window.addEventListener('error', function(event) {
     console.error('❌ Global Error:', event.error);
     
-    if (getAxentroEl('loadingScreen', 'splashScreen')?.style.display !== 'none') {
+    if (document.getElementById('loadingScreen') || document.getElementById('splashScreen')?.style.display !== 'none') {
         showLoadingError(event.message || 'حدث خطأ أثناء تحميل النظام');
     }
 });
 
-
-function getAxentroEl(...ids) {
-    for (const id of ids) {
-        const el = document.getElementById(id);
-        if (el) return el;
-    }
-    return null;
-}
-
-function showLoadingError(message) {
+window.showLoadingError = function(message) {
     if (window.app && typeof window.app.showLoadingError === 'function') {
         return window.app.showLoadingError(message);
     }
-    const errorBox = getAxentroEl('loadingError', 'errorActions');
-    const errorMessage = getAxentroEl('errorMessage');
-    if (errorMessage) errorMessage.textContent = message || 'حدث خطأ أثناء تحميل النظام';
-    if (errorBox) errorBox.style.display = 'block';
-}
+    console.error('Loading error:', message);
+};
 
 // ============================================
 // 🚀 APPLICATION CLASS
@@ -60,18 +48,6 @@ class App {
         this.handleOnlineStatus = this.handleOnlineStatus.bind(this);
         
         console.log('🏗️ App constructor initialized');
-    }
-
-    handleOnlineStatus() {
-        const isOnline = navigator.onLine;
-        window.isOnline = isOnline;
-        const connDot = getAxentroEl('connDot');
-        const connText = getAxentroEl('connText');
-        if (connDot) {
-            connDot.classList.toggle('online', isOnline);
-            connDot.classList.toggle('offline', !isOnline);
-        }
-        if (connText) connText.textContent = isOnline ? 'متصل' : 'غير متصل';
     }
 
     // ============================================
@@ -308,19 +284,16 @@ class App {
     }
 
     hideSplashScreen() {
-        const splash = getAxentroEl('loadingScreen', 'splashScreen');
+        const splash = document.getElementById('loadingScreen') || document.getElementById('splashScreen');
         if (splash) {
             splash.classList.add('hidden');
-            splash.style.display = 'none';
         }
-        const appContainer = getAxentroEl('app');
-        if (appContainer) appContainer.classList.remove('hidden');
     }
 
     showLoadingError(message) {
-        const actions = getAxentroEl('loadingError', 'errorActions');
+        const actions = document.getElementById('loadingError') || document.getElementById('errorActions');
         if (actions) {
-            actions.style.display = 'block';
+            actions.classList.add('show');
         }
     }
 
@@ -335,9 +308,9 @@ class App {
     }
 
     retryLoading() {
-        const actions = getAxentroEl('loadingError', 'errorActions');
+        const actions = document.getElementById('loadingError') || document.getElementById('errorActions');
         if (actions) {
-            actions.style.display = 'none';
+            actions.classList.remove('show');
         }
         this.retryCount = 0;
         this.init();
@@ -364,7 +337,7 @@ class App {
             try {
                 const ld = JSON.parse(savedLogin);
                 const loginCodeInput = document.getElementById('loginCode');
-                const loginPassInput = getAxentroEl('loginPassword', 'loginPass');
+                const loginPassInput = document.getElementById('loginPassword') || document.getElementById('loginPass');
                 const rememberMeCheckbox = document.getElementById('rememberMe');
                 
                 if (loginCodeInput) loginCodeInput.value = ld.code || '';
@@ -422,7 +395,7 @@ class App {
                     window.currentAccuracy = pos.coords.accuracy || 0;
                     window.currentLoc = `https://maps.google.com/?q=${window.currentLat},${window.currentLon}`;
                     
-                    const locBar = getAxentroEl('locationStatus', 'locBar');
+                    const locBar = document.getElementById('locationStatus') || document.getElementById('locBar');
                     if (locBar) {
                         locBar.innerHTML = `
                             <i class="fas fa-map-marker-alt" style="color:#10b981;"></i> 
@@ -433,7 +406,7 @@ class App {
                     }
                 },
                 () => {
-                    const locBar = getAxentroEl('locationStatus', 'locBar');
+                    const locBar = document.getElementById('locationStatus') || document.getElementById('locBar');
                     if (locBar) {
                         locBar.innerHTML = `
                             <i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i> 
@@ -457,12 +430,16 @@ class App {
     // 🌐 ONLINE/OFFLINE DETECTION (من الكود القديم)
     // ============================================
 
+    handleOnlineStatus() {
+        window.isOnline = navigator.onLine;
+    }
+
     setupGlobalEventListeners() {
         // Online/Offline detection
         window.addEventListener('online', () => {
             window.isOnline = true;
             const connDot = document.getElementById('connDot');
-            const connText = document.getElementById('connText');
+            const connText = document.getElementById('connText') || document.getElementById('connectionText');
             
             if (connDot) {
                 connDot.classList.remove('offline');
@@ -474,7 +451,7 @@ class App {
         window.addEventListener('offline', () => {
             window.isOnline = false;
             const connDot = document.getElementById('connDot');
-            const connText = document.getElementById('connText');
+            const connText = document.getElementById('connText') || document.getElementById('connectionText');
             
             if (connDot) {
                 connDot.classList.remove('online');
@@ -493,13 +470,13 @@ class App {
         document.addEventListener('DOMContentLoaded', () => {
             // Fingerprint button visibility
             if (window.PublicKeyCredential && localStorage.getItem('axentro_fp_id')) {
-                const fpBtn = getAxentroEl('biometricLoginBtn', 'fingerprintLoginBtn');
+                const fpBtn = document.getElementById('biometricLoginBtn') || document.getElementById('fingerprintLoginBtn');
                 if (fpBtn) fpBtn.style.display = 'flex';
             }
 
             // Enter key handlers
             const loginCode = document.getElementById('loginCode');
-            const loginPass = getAxentroEl('loginPassword', 'loginPass');
+            const loginPass = document.getElementById('loginPassword') || document.getElementById('loginPass');
             const forgotCode = document.getElementById('forgotCode');
 
             if (loginCode) {
@@ -589,36 +566,44 @@ class App {
     }
 
     showLoginScreen() {
-        const loginScreen = getAxentroEl('loginPage', 'loginScreen');
-        const registerScreen = getAxentroEl('registerPage', 'registerScreen');
-        const mainApp = getAxentroEl('dashboardPage', 'mainApp');
+        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
+        const registerScreen = document.getElementById('registerPage') || document.getElementById('registerScreen');
+        const forgotPage = document.getElementById('forgotPasswordPage');
+        const changePasswordPage = document.getElementById('changePasswordPage');
+        const mainApp = document.getElementById('dashboardPage') || document.getElementById('mainApp');
         
-        if (loginScreen) loginScreen.classList.remove('hidden');
-        if (registerScreen) registerScreen.classList.add('hidden');
+        if (loginScreen) loginScreen.style.display = 'block';
+        if (registerScreen) registerScreen.style.display = 'none';
+        if (forgotPage) forgotPage.style.display = 'none';
+        if (changePasswordPage) changePasswordPage.style.display = 'none';
         if (mainApp) mainApp.style.display = 'none';
     }
 
     showMainApp() {
-        const loginScreen = getAxentroEl('loginPage', 'loginScreen');
-        const registerScreen = getAxentroEl('registerPage', 'registerScreen');
-        const mainApp = getAxentroEl('dashboardPage', 'mainApp');
+        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
+        const registerScreen = document.getElementById('registerPage') || document.getElementById('registerScreen');
+        const forgotPage = document.getElementById('forgotPasswordPage');
+        const changePasswordPage = document.getElementById('changePasswordPage');
+        const mainApp = document.getElementById('dashboardPage') || document.getElementById('mainApp');
         
-        if (loginScreen) loginScreen.classList.add('hidden');
-        if (registerScreen) registerScreen.classList.add('hidden');
+        if (loginScreen) loginScreen.style.display = 'none';
+        if (registerScreen) registerScreen.style.display = 'none';
+        if (forgotPage) forgotPage.style.display = 'none';
+        if (changePasswordPage) changePasswordPage.style.display = 'none';
         if (mainApp) mainApp.style.display = 'block';
     }
 
     hideLoginScreen() {
-        const loginScreen = getAxentroEl('loginPage', 'loginScreen');
-        if (loginScreen) loginScreen.classList.add('hidden');
+        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
+        if (loginScreen) loginScreen.style.display = 'none';
     }
 
     showRegisterScreen() {
-        const loginScreen = getAxentroEl('loginPage', 'loginScreen');
-        const registerScreen = getAxentroEl('registerPage', 'registerScreen');
+        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
+        const registerScreen = document.getElementById('registerPage') || document.getElementById('registerScreen');
         
-        if (loginScreen) loginScreen.classList.add('hidden');
-        if (registerScreen) registerScreen.classList.remove('hidden');
+        if (loginScreen) loginScreen.style.display = 'none';
+        if (registerScreen) registerScreen.style.display = 'block';
     }
 
     // ============================================
@@ -775,20 +760,8 @@ document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
 
-function retryLoading() {
-    if (window.app && typeof window.app.retryLoading === 'function') window.app.retryLoading();
-}
-
-function skipFaceRecognition() {
-    if (window.app && typeof window.app.skipFaceRecognition === 'function') window.app.skipFaceRecognition();
-}
-
 // Make globally available
 if (typeof window !== 'undefined') {
     window.App = App;
     window.app = app;
-    window.retryLoading = retryLoading;
-    window.skipFaceRecognition = skipFaceRecognition;
-    window.showLoadingError = showLoadingError;
 }
-

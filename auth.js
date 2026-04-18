@@ -1,11 +1,3 @@
-function getAuthEl(...ids) {
-    for (const id of ids) {
-        const el = document.getElementById(id);
-        if (el) return el;
-    }
-    return null;
-}
-
 /**
  * ============================================
  * 🔐 AXENTRO AUTHENTICATION v4.2 - COMPLETE
@@ -31,7 +23,43 @@ class AuthManager {
     init() {
         this.checkExistingSession();
         this.setupActivityTracking();
+        this.setupEventListeners();
         console.log('✅ Auth Manager ready');
+    }
+
+    setupEventListeners() {
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm && !loginForm.dataset.boundAuth) {
+            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+            loginForm.dataset.boundAuth = '1';
+        }
+
+        const biometricBtn = document.getElementById('biometricLoginBtn') || document.getElementById('fingerprintLoginBtn');
+        if (biometricBtn && !biometricBtn.dataset.boundAuth) {
+            biometricBtn.addEventListener('click', () => this.handleFingerprintLogin());
+            biometricBtn.dataset.boundAuth = '1';
+        }
+
+        const showRegisterLink = document.getElementById('showRegisterLink');
+        if (showRegisterLink && !showRegisterLink.dataset.boundAuth) {
+            showRegisterLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (typeof app !== 'undefined' && app.navigateTo) app.navigateTo('registerPage');
+            });
+            showRegisterLink.dataset.boundAuth = '1';
+        }
+
+        const showForgotPasswordLink = document.getElementById('showForgotPasswordLink');
+        if (showForgotPasswordLink && !showForgotPasswordLink.dataset.boundAuth) {
+            showForgotPasswordLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                const forgotPage = document.getElementById('forgotPasswordPage');
+                const loginPage = document.getElementById('loginPage');
+                if (loginPage) loginPage.style.display = 'none';
+                if (forgotPage) forgotPage.style.display = 'block';
+            });
+            showForgotPasswordLink.dataset.boundAuth = '1';
+        }
     }
 
     // ============================================
@@ -152,7 +180,7 @@ class AuthManager {
         event.preventDefault();
 
         const codeInput = document.getElementById('loginCode');
-        const passwordInput = getAuthEl('loginPassword', 'loginPass');
+        const passwordInput = document.getElementById('loginPassword') || document.getElementById('loginPass');
         const rememberMeCheckbox = document.getElementById('rememberMe');
 
         const code = codeInput?.value?.trim() || '';
@@ -296,7 +324,7 @@ class AuthManager {
         // Save login credentials for fingerprint (من الكود القديم)
         if (rememberMe) {
             const codeInput = document.getElementById('loginCode');
-            const passInput = getAuthEl('loginPassword', 'loginPass');
+            const passInput = document.getElementById('loginPassword') || document.getElementById('loginPass');
             
             localStorage.setItem('axentro_saved_login', JSON.stringify({
                 code: user.code || codeInput?.value,
@@ -349,8 +377,8 @@ class AuthManager {
         window.sessionDescriptor = null;
         window.userImage = '';
 
-        const mainApp = getAuthEl('dashboardPage', 'mainApp');
-        const loginScreen = getAuthEl('loginPage', 'loginScreen');
+        const mainApp = document.getElementById('dashboardPage') || document.getElementById('mainApp');
+        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
         
         if (mainApp) mainApp.style.display = 'none';
         if (loginScreen) loginScreen.style.display = 'block';
@@ -365,7 +393,7 @@ class AuthManager {
     // ============================================
 
     async submitFirstPwChange() {
-        const newPwInput = document.getElementById('firstNewPw');
+        const newPwInput = document.getElementById('newPassword') || document.getElementById('firstNewPw');
         const newPw = newPwInput?.value?.trim();
         
         if (!newPw || newPw.length < 4) {
@@ -434,7 +462,6 @@ class AuthManager {
     }
 
     // Change Password Modal Logic
-    pwChangeMode = '';
 
     openChangePwModal(mode) {
         this.pwChangeMode = mode;
@@ -483,7 +510,7 @@ class AuthManager {
 
     async submitChangePassword() {
         if (this.pwChangeMode === 'own') {
-            const oldPw = document.getElementById('oldPassword')?.value?.trim();
+            const oldPw = document.getElementById('currentPassword') || document.getElementById('oldPassword')?.value?.trim();
             const newPw = document.getElementById('newPassword')?.value?.trim();
             
             if (!oldPw || !newPw) {
@@ -668,19 +695,19 @@ class AuthManager {
     // ============================================
 
     showRegisterScreen() {
-        const loginScreen = getAuthEl('loginPage', 'loginScreen');
-        const registerScreen = getAuthEl('registerPage', 'registerScreen');
+        const loginScreen = document.getElementById('loginScreen');
+        const registerScreen = document.getElementById('registerScreen');
         
-        if (loginScreen) loginScreen.style.display = 'none';
-        if (registerScreen) registerScreen.style.display = 'block';
+        if (loginScreen) loginScreen.classList.add('hidden');
+        if (registerScreen) registerScreen.classList.remove('hidden');
     }
 
     showLoginScreen() {
-        const loginScreen = getAuthEl('loginPage', 'loginScreen');
-        const registerScreen = getAuthEl('registerPage', 'registerScreen');
+        const loginScreen = document.getElementById('loginScreen');
+        const registerScreen = document.getElementById('registerScreen');
         
-        if (registerScreen) registerScreen.style.display = 'none';
-        if (loginScreen) loginScreen.style.display = 'block';
+        if (registerScreen) registerScreen.classList.add('hidden');
+        if (loginScreen) loginScreen.classList.remove('hidden');
     }
 
     async startRegistration(event) {
@@ -856,13 +883,17 @@ class AuthManager {
 
     // Utility methods
     showLoginPage() {
-        const mainApp = getAuthEl('dashboardPage', 'mainApp');
-        const loginScreen = getAuthEl('loginPage', 'loginScreen');
+        const mainApp = document.getElementById('dashboardPage') || document.getElementById('mainApp');
+        const loginScreen = document.getElementById('loginPage') || document.getElementById('loginScreen');
         
         if (mainApp) mainApp.style.display = 'none';
         if (loginScreen) loginScreen.style.display = 'block';
     }
 }
+
+
+window.handleLogin = (event) => window.auth?.handleLogin(event || new Event('submit'));
+window.handleFingerprintLogin = () => window.auth?.handleFingerprintLogin();
 
 // ============================================
 // 🌍 GLOBAL AUTH INSTANCE

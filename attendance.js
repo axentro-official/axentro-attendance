@@ -1,11 +1,3 @@
-function getAttendanceEl(...ids) {
-    for (const id of ids) {
-        const el = document.getElementById(id);
-        if (el) return el;
-    }
-    return null;
-}
-
 /**
  * ============================================
  * ⏰ AXENTRO ATTENDANCE MANAGER v4.2 - COMPLETE
@@ -91,7 +83,7 @@ class AttendanceManager {
     }
 
     updateLocationStatus(success, accuracy = null) {
-        const statusEl = getAttendanceEl('locationStatus', 'locBar');
+        const statusEl = document.getElementById('locationStatus') || document.getElementById('locBar');
         if (!statusEl) return;
 
         if (success && accuracy) {
