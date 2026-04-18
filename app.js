@@ -573,7 +573,7 @@ class App {
             appRoot.style.display = 'block';
         }
 
-        const pages = ['loginPage', 'registerPage', 'forgotPasswordPage', 'dashboardPage'];
+        const pages = ['loginPage', 'registerPage', 'forgotPasswordPage', 'dashboardPage', 'adminPage'];
         pages.forEach(p => {
             const el = document.getElementById(p);
             if (el) el.style.display = 'none';
@@ -582,7 +582,7 @@ class App {
         // Show target page
         if (pageId === 'loginPage') {
             this.showLoginScreen();
-        } else if (pageId === 'dashboardPage') {
+        } else if (pageId === 'dashboardPage' || pageId === 'adminPage') {
             this.showMainApp();
         }
     }
@@ -601,15 +601,72 @@ class App {
 
     showMainApp() {
         this.applyUserContextToDashboard();
+
         const loginPage = document.getElementById('loginPage');
         const registerPage = document.getElementById('registerPage');
         const forgotPasswordPage = document.getElementById('forgotPasswordPage');
         const dashboardPage = document.getElementById('dashboardPage');
+        const adminPage = document.getElementById('adminPage');
 
         if (loginPage) loginPage.classList.remove('active');
         if (registerPage) registerPage.classList.remove('active');
         if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
-        if (dashboardPage) dashboardPage.classList.add('active');
+
+        if (window.user?.role === 'admin' || window.user?.isAdmin) {
+            if (dashboardPage) dashboardPage.classList.remove('active');
+            if (adminPage) adminPage.classList.add('active');
+            if (typeof loadEmployees === 'function') {
+                Promise.resolve(loadEmployees()).catch(err => console.warn('loadEmployees failed:', err));
+            }
+        } else {
+            if (adminPage) adminPage.classList.remove('active');
+            if (dashboardPage) dashboardPage.classList.add('active');
+        }
+    }
+
+    applyUserContextToDashboard() {
+        const user = window.user || {};
+        const isAdmin = user.role === 'admin' || user.isAdmin === true;
+        const displayName = isAdmin ? (user.name || 'مدير النظام') : (user.name || 'موظف');
+        const displayCode = isAdmin ? (user.username || 'admin') : (user.code || '----');
+
+        const userName = document.getElementById('userName');
+        const userCodeDisplay = document.getElementById('userCodeDisplay');
+        const adminPanelBtn = document.getElementById('adminPanelBtn');
+        const totalEmployeesStat = document.getElementById('totalEmployeesStat');
+
+        if (userName) {
+            userName.textContent = `مرحباً، ${displayName}`;
+        }
+
+        if (userCodeDisplay) {
+            userCodeDisplay.textContent = `CODE: ${displayCode}`;
+        }
+
+        if (adminPanelBtn) {
+            adminPanelBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+            adminPanelBtn.onclick = (e) => {
+                e?.preventDefault?.();
+                this.navigateTo(isAdmin ? 'adminPage' : 'dashboardPage');
+            };
+        }
+
+        document.querySelectorAll('.admin-only').forEach((el) => {
+            el.style.display = isAdmin ? '' : 'none';
+        });
+
+        const attendanceSection = document.querySelector('.attendance-section');
+        const statsGrid = document.querySelector('.stats-grid');
+        if (attendanceSection) attendanceSection.style.display = isAdmin ? 'none' : '';
+        if (statsGrid && isAdmin && totalEmployeesStat) {
+            totalEmployeesStat.textContent = totalEmployeesStat.textContent || '0';
+        }
+
+        document.querySelectorAll('.nav-link').forEach((link) => {
+            const target = link.getAttribute('data-page');
+            const shouldBeActive = isAdmin ? target === 'adminPage' : target === 'dashboardPage';
+            link.classList.toggle('active', !!shouldBeActive);
+        });
     }
 
     hideLoginScreen() {
