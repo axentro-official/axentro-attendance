@@ -584,30 +584,29 @@ class FaceRecognitionManager {
 
         const samples = [];
 
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 6; i++) {
             try {
                 const det = await faceapi.detectSingleFace(
                     video,
                     new faceapi.TinyFaceDetectorOptions({ 
                         inputSize: 416, 
-                        scoreThreshold: 0.12 
+                        scoreThreshold: 0.08 
                     })
                 ).withFaceLandmarks()
                 .withFaceDescriptor();
 
-                if (!det) return null;
-
-                samples.push(Array.from(det.descriptor));
-
-                if (i === 0) {
-                    await new Promise(resolve => setTimeout(resolve, 120));
+                if (det?.descriptor) {
+                    samples.push(Array.from(det.descriptor));
                 }
+
+                await new Promise(resolve => setTimeout(resolve, 90));
 
             } catch(e) {
                 console.error('Descriptor extraction error:', e);
-                return null;
             }
         }
+
+        if (!samples.length) return null;
 
         // Calculate average descriptor
         const avg = new Array(samples[0].length).fill(0);

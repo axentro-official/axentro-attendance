@@ -130,8 +130,8 @@ class App {
                 this.hideSplashScreen();
                 this.hideAllPages();
                 
-                if (hasSession && this.isAuthenticated()) {
-                    this.navigateTo('dashboardPage');
+                if (hasSession && this.isAuthenticated() && !window.forceFaceEnrollment && !window.firstTimeSetupMode) {
+                    this.navigateTo(window.user?.role === 'admin' || window.user?.isAdmin ? 'adminPage' : 'dashboardPage');
                     this.initializeDashboard();
                 } else {
                     this.navigateTo('loginPage');
@@ -607,6 +607,10 @@ class App {
     }
 
     showMainApp() {
+        if (window.forceFaceEnrollment || window.firstTimeSetupMode) {
+            this.showLoginScreen();
+            return;
+        }
         this.applyUserContextToDashboard();
         this.hideAllPages();
 

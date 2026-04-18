@@ -180,20 +180,29 @@ class SupabaseClient {
     async createEmployee(employeeData) {
         try {
             const adminUser = window.user?.username || 'admin';
-            const { data, error } = await this.rpc(AppConfig.supabase.rpc.createEmployee, {
+            const baseParams = {
                 p_admin_username: String(adminUser).toLowerCase(),
                 p_name: employeeData.name?.trim(),
-                p_email: employeeData.email || null,
-                p_plain_password: employeeData.password,
+                p_email: employeeData.email || null
+            };
+
+            let data, error;
+            ({ data, error } = await this.rpc(AppConfig.supabase.rpc.createEmployee, {
+                ...baseParams,
+                p_plain_password: employeeData.password || null,
                 p_face_descriptor: employeeData.faceDescriptor || null,
                 p_profile_image_url: employeeData.profileImageUrl || null
-            });
+            }));
+
+            if (error && String(error.message || '').includes('Could not find the function')) {
+                ({ data, error } = await this.rpc(AppConfig.supabase.rpc.createEmployee, baseParams));
+            }
             if (error) throw error;
             const payload = Array.isArray(data) ? data[0] : data;
             return payload || { success: false, error: 'Unknown error' };
         } catch (error) {
             console.error('❌ Create employee error:', error);
-            return { success: false, error: error.message };
+            return { success: false, error: error.message || 'فشل إنشاء الحساب' };
         }
     }
 

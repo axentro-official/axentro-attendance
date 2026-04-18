@@ -49,8 +49,8 @@ class AuthManager {
                 return false;
             }
 
-            if (!session.user?.face_enrolled) {
-                console.warn('⚠️ Saved session rejected because face enrollment is incomplete');
+            if (!session.user?.face_enrolled || session.user?.isFirstLogin || session.user?.is_first_login) {
+                console.warn('⚠️ Saved session rejected because onboarding is incomplete');
                 this.clearSession();
                 return false;
             }
@@ -686,17 +686,35 @@ class AuthManager {
     // ============================================
 
     showRegisterScreen() {
-        document.getElementById('loginPage')?.classList.remove('active');
-        document.getElementById('forgotPasswordPage')?.classList.remove('active');
-        document.getElementById('dashboardPage')?.classList.remove('active');
-        document.getElementById('registerPage')?.classList.add('active');
+        if (typeof app !== 'undefined' && app?.hideAllPages) {
+            app.hideAllPages();
+        }
+        ['loginPage','forgotPasswordPage','dashboardPage','adminPage'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) { el.classList.remove('active'); el.style.display = 'none'; }
+        });
+        const registerPage = document.getElementById('registerPage');
+        if (registerPage) {
+            registerPage.style.display = 'block';
+            registerPage.classList.add('active');
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     showLoginScreen() {
-        document.getElementById('registerPage')?.classList.remove('active');
-        document.getElementById('forgotPasswordPage')?.classList.remove('active');
-        document.getElementById('dashboardPage')?.classList.remove('active');
-        document.getElementById('loginPage')?.classList.add('active');
+        if (typeof app !== 'undefined' && app?.hideAllPages) {
+            app.hideAllPages();
+        }
+        ['registerPage','forgotPasswordPage','dashboardPage','adminPage'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) { el.classList.remove('active'); el.style.display = 'none'; }
+        });
+        const loginPage = document.getElementById('loginPage');
+        if (loginPage) {
+            loginPage.style.display = 'block';
+            loginPage.classList.add('active');
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     async startRegistration(event) {
@@ -951,7 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('loginPage')?.classList.remove('active');
             document.getElementById('registerPage')?.classList.remove('active');
             document.getElementById('dashboardPage')?.classList.remove('active');
-            document.getElementById('forgotPasswordPage')?.classList.add('active');
+            const forgot = document.getElementById('forgotPasswordPage'); if (forgot) { forgot.style.display='block'; forgot.classList.add('active'); }
         }
     });
 
