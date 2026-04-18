@@ -180,6 +180,9 @@ class AuthManager {
             const result = await this.signIn(code, password);
 
             if (result.success) {
+                if (result.user) {
+                    result.user.tempPasswordForFirstLogin = password;
+                }
                 this.resetLoginAttempts(code);
 
                 if (result.requiresPasswordChange) {
@@ -188,6 +191,11 @@ class AuthManager {
                 }
 
                 await this.onLoginSuccess(result.user, rememberMe);
+
+                if (result.requiresFaceEnrollment || !result.user.face_enrolled) {
+                    window.firstTimeSetupMode = true;
+                    this.toast('يجب تسجيل بصمة الوجه قبل استخدام النظام', 'warning');
+                }
 
                 if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-success');
@@ -200,7 +208,7 @@ class AuthManager {
                     'success'
                 );
 
-                setTimeout(() => {
+                setTimeout(async () => {
                     if (typeof showApp === 'function') {
                         showApp();
                     } else if (typeof app !== 'undefined' && app?.navigateTo) {
@@ -211,6 +219,15 @@ class AuthManager {
                     } else {
                         document.getElementById('loginPage')?.classList.remove('active');
                         document.getElementById('dashboardPage')?.classList.add('active');
+                    }
+
+                    if (result.requiresFaceEnrollment || !result.user.face_enrolled) {
+                        window.firstTimeSetupMode = true;
+                        await openCamera?.();
+                    } else if (window.user?.role !== 'admin' && typeof fetchUserDataInBackground === 'function') {
+                        fetchUserDataInBackground();
+                    } else if (window.user?.role === 'admin' && typeof loadEmployees === 'function') {
+                        loadEmployees();
                     }
                 }, 500);
             } else {
@@ -255,36 +272,33 @@ class AuthManager {
             }
 
             const result = await db.signIn(code, password);
-
             if (result?.success && result.user) {
                 const rawUser = result.user;
-
+                const role = rawUser.role || result.role || (rawUser.is_admin ? 'admin' : 'employee');
                 const user = {
-                    name: rawUser.name,
-                    code: rawUser.code,
-                    isAdmin: rawUser.is_admin ?? rawUser.isAdmin ?? false,
-                    isFirstLogin: rawUser.is_first_login ?? rawUser.isFirstLogin ?? false,
-                    face_descriptor: rawUser.face_descriptor ?? null,
-                    email: rawUser.email ?? null
+                    name: rawUser.name || (role === 'admin' ? 'مدير النظام' : ''),
+                    code: rawUser.code || null,
+                    username: rawUser.username || null,
+                    email: rawUser.email || null,
+                    role,
+                    isAdmin: role === 'admin',
+                    isFirstLogin: !!(rawUser.is_first_login ?? rawUser.isFirstLogin),
+                    face_enrolled: !!(rawUser.face_enrolled ?? rawUser.faceEnrolled),
+                    face_descriptor: rawUser.face_descriptor || null
                 };
 
                 return {
                     success: true,
                     user,
-                    requiresPasswordChange: !!result.requiresPasswordChange
+                    requiresPasswordChange: !!result.requiresPasswordChange,
+                    requiresFaceEnrollment: !!result.requiresFaceEnrollment || !user.face_enrolled
                 };
             }
 
-            return {
-                success: false,
-                error: result?.error || 'بيانات خاطئة'
-            };
+            return { success: false, error: result?.error || 'بيانات خاطئة' };
         } catch (error) {
             console.error('Sign in error:', error);
-            return {
-                success: false,
-                error: 'خطأ في الاتصال'
-            };
+            return { success: false, error: 'خطأ في الاتصال' };
         }
     }
 
@@ -310,6 +324,7 @@ class AuthManager {
 
         if (user.face_descriptor || typeof fetchUserDataInBackground === 'function') {
             window.sessionDescriptor = user.face_descriptor || null;
+            window.sessionRole = user.role || (user.isAdmin ? 'admin' : 'employee');
 
             if (!window.sessionDescriptor) {
                 console.log('⚠️ No face descriptor - will prompt for registration');
@@ -362,66 +377,30 @@ class AuthManager {
     async submitFirstPwChange() {
         const newPwInput = document.getElementById('firstNewPw');
         const newPw = newPwInput?.value?.trim();
-
         if (!newPw || newPw.length < 4) {
             return this.toast('كلمة السر ضعيفة (4 أحرف على الأقل)', 'error');
         }
-
         this.setStatus('جاري التغيير...');
-
         try {
-            if (typeof db === 'undefined' || !db || typeof db.updateEmployee !== 'function') {
-                throw new Error('Database service not available');
-            }
-
-            const code = this.currentUser?.code || window.user?.code;
-            const result = await db.updateEmployee(code, {
-                password: newPw,
-                is_first_login: false,
-                updated_at: new Date().toISOString()
-            });
-
+            if (!window.user) throw new Error('User not available');
+            const result = await db.changeOwnPassword(window.user, window.user.tempPasswordForFirstLogin || '', newPw);
             if (!result?.success) {
                 throw new Error(result?.error || 'Update failed');
             }
-
             const modal = document.getElementById('forcePwModal');
             if (modal) modal.classList.remove('active');
-
             if (this.currentUser) this.currentUser.isFirstLogin = false;
             if (window.user) window.user.isFirstLogin = false;
-
-            const savedRemembered = localStorage.getItem('rememberedUser');
-            if (savedRemembered) {
-                const session = JSON.parse(savedRemembered);
-                session.user.isFirstLogin = false;
-                localStorage.setItem('rememberedUser', JSON.stringify(session));
-            }
-
             this.toast('تم تحديث كلمة السر', 'success');
-
-            if (typeof app !== 'undefined' && app?.playSound) {
-                app.playSound('login-success');
-            }
-
-            if (typeof fetchUserDataInBackground === 'function') {
-                await fetchUserDataInBackground();
-            }
-
-            if (typeof showApp === 'function') {
-                showApp();
+            if (!window.user.face_enrolled) {
+                window.firstTimeSetupMode = true;
+                await openCamera?.();
             } else {
-                document.getElementById('loginPage')?.classList.remove('active');
-                document.getElementById('dashboardPage')?.classList.add('active');
+                showApp?.();
             }
         } catch (error) {
             console.error('Password change error:', error);
-
-            if (typeof app !== 'undefined' && app?.playSound) {
-                app.playSound('login-error');
-            }
-
-            this.toast('خطأ في التحديث', 'error');
+            this.toast(error.message || 'خطأ في التحديث', 'error');
         } finally {
             this.setStatus('النظام جاهز');
         }
@@ -522,8 +501,7 @@ class AuthManager {
                 throw new Error('Database service not available');
             }
 
-            const result = await db.changePassword(
-                (code || '').trim().toUpperCase(),
+            const result = await db.changeOwnPassword(window.user, 
                 oldPw,
                 newPw
             );
@@ -554,14 +532,7 @@ class AuthManager {
                 throw new Error('Database service not available');
             }
 
-            const result = await db.updateEmployee(
-                (code || '').trim().toUpperCase(),
-                {
-                    password: newPassword,
-                    is_first_login: false,
-                    updated_at: new Date().toISOString()
-                }
-            );
+            const result = await db.adminChangeEmployeePassword((code || '').trim().toUpperCase(), newPassword);
 
             if (result?.success) {
                 if (typeof app !== 'undefined' && app?.playSound) {

@@ -29,7 +29,10 @@ class FaceRecognitionManager {
         // Liveness detection (من الكود القديم)
         window.livenessActive = false;
         window.livenessStartYaw = null;
+        window.livenessStartNoseY = null;
         window.livenessMoved = false;
+        window.livenessCounter = { blink: 0, turn: false, nod: false };
+        window.livenessBlinkClosed = false;
         window.stabilityCounter = 0;
         
         console.log('🎭 Face Recognition Manager initialized');
@@ -60,10 +63,42 @@ class FaceRecognitionManager {
     }
 
     setupCameraElements() {
-        this.videoElement = document.getElementById('video');
-        this.canvasElement = document.getElementById('canvas');
+        this.videoElement = document.getElementById('video') || document.getElementById('dashboardVideo') || document.getElementById('registerVideo');
+        this.canvasElement = document.getElementById('canvas') || document.getElementById('dashboardCanvas') || document.getElementById('registerCanvas');
+        this.ensureOverlayElements();
         
         console.log('📹 Camera elements set up');
+    }
+
+    ensureOverlayElements() {
+        if (document.getElementById('cameraOverlay')) return;
+        const overlay = document.createElement('div');
+        overlay.id = 'cameraOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,23,.88);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+        overlay.innerHTML = `
+            <div style="width:min(720px,96vw);background:#0f172a;border:1px solid rgba(148,163,184,.2);border-radius:20px;padding:16px;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,.45);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <strong>التحقق ببصمة الوجه</strong>
+                    <button type="button" onclick="closeCamera()" style="background:#ef4444;color:#fff;border:none;border-radius:10px;padding:8px 12px;cursor:pointer">إغلاق</button>
+                </div>
+                <div style="position:relative;aspect-ratio:4/3;background:#020617;border-radius:16px;overflow:hidden;">
+                    <video id="video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
+                    <canvas id="canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+                    <div id="scanLine" style="position:absolute;left:10%;right:10%;top:12%;height:3px;background:linear-gradient(90deg,transparent,#38bdf8,transparent);box-shadow:0 0 18px #38bdf8;animation:scanline 2s linear infinite;"></div>
+                    <div id="matchResult" class="match-result" style="position:absolute;top:10px;left:10px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;"></div>
+                    <div id="stabilityRing" style="position:absolute;bottom:12px;left:12px;display:none;align-items:center;gap:10px;background:rgba(15,23,42,.75);padding:8px 10px;border-radius:12px;">
+                        <svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,.15)" stroke-width="4" fill="none"></circle><circle id="stabilityCircle" cx="24" cy="24" r="20" stroke="#10b981" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="126" stroke-dashoffset="126"></circle></svg>
+                        <strong id="stabilityText">0</strong>
+                    </div>
+                </div>
+                <div id="camStatus" style="margin-top:12px;text-align:center;color:#cbd5e1">جاهز</div>
+            </div>`;
+        document.body.appendChild(overlay);
+        const style = document.createElement('style');
+        style.textContent = '@keyframes scanline{0%{transform:translateY(0)}50%{transform:translateY(240px)}100%{transform:translateY(0)}}';
+        document.head.appendChild(style);
+        this.videoElement = document.getElementById('video') || this.videoElement;
+        this.canvasElement = document.getElementById('canvas') || this.canvasElement;
     }
 
     // ============================================
@@ -76,30 +111,29 @@ class FaceRecognitionManager {
             return true;
         }
 
-        const MODELS_URL = AppConfig?.faceRecognition?.models?.tinyFaceDetector || 
-                          'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
+        const MODELS_URL = AppConfig?.faceRecognition?.models?.baseUrl || AppConfig?.faceRecognition?.models?.fallbackUrl || 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
 
         try {
             setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
             updateSplashProgress?.(25);
             
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
+            try { await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL); } catch(e) { await faceapi.nets.tinyFaceDetector.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl); }
             window.lightModels = true;
 
             setStatus('جاري تحميل الذكاء الاصطناعي (2/4)...');
             updateSplashProgress?.(50);
             
-            await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODELS_URL);
+            try { await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODELS_URL); } catch(e) { await faceapi.nets.faceLandmark68TinyNet.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl); }
 
             setStatus('جاري تحميل الذكاء الاصطناعي (3/4)...');
             updateSplashProgress?.(75);
             
-            await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL);
+            try { await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL); } catch(e) { await faceapi.nets.faceLandmark68Net.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl); }
 
             setStatus('جاري تحميل الذكاء الاصطناعي (4/4)...');
             updateSplashProgress?.(100);
             
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL);
+            try { await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL); } catch(e) { await faceapi.nets.faceRecognitionNet.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl); }
             window.heavyModels = true;
 
             this.modelsLoaded = true;
@@ -171,7 +205,7 @@ class FaceRecognitionManager {
 
             // Show camera overlay
             const overlay = document.getElementById('cameraOverlay');
-            if (overlay) overlay.classList.add('active');
+            if (overlay) { overlay.style.display = 'flex'; overlay.classList.add('active'); }
 
             // Reset status text
             window.lastCamStatusText = '';
@@ -231,7 +265,7 @@ class FaceRecognitionManager {
 
         // Hide overlay
         const overlay = document.getElementById('cameraOverlay');
-        if (overlay) overlay.classList.remove('active');
+        if (overlay) { overlay.classList.remove('active'); overlay.style.display = 'none'; }
 
         // Hide scan line
         const scanLine = document.getElementById('scanLine');
@@ -243,7 +277,7 @@ class FaceRecognitionManager {
 
         // Hide stability ring
         const stabilityRing = document.getElementById('stabilityRing');
-        if (stabilityRing) stabilityRing.classList.remove('active');
+        if (stabilityRing) { stabilityRing.classList.remove('active'); stabilityRing.style.display = 'none'; }
 
         // Reset all modes
         window.regMode = false;
@@ -407,7 +441,7 @@ class FaceRecognitionManager {
                 setCamStatus?.('<i class="fas fa-camera" style="color:#10b981;"></i> تم الالتقاط!');
                 
                 const stabilityRing = document.getElementById('stabilityRing');
-                if (stabilityRing) stabilityRing.classList.remove('active');
+                if (stabilityRing) { stabilityRing.classList.remove('active'); stabilityRing.style.display = 'none'; }
 
                 if (!window.autoCaptureTimeout && !window.isProcessingCapture) {
                     window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 200);
@@ -426,7 +460,7 @@ class FaceRecognitionManager {
             }
 
             // Check liveness (حركة الرأس) - من الكود القديم
-            const livenessOk = updateLiveness?.(getHeadYaw?.(detection.landmarks));
+            const livenessOk = updateLiveness?.(getHeadYaw?.(detection.landmarks), detection.landmarks);
 
             if (livenessOk === false) {
                 if (window.autoCaptureTimeout) clearTimeout(window.autoCaptureTimeout);
@@ -442,7 +476,7 @@ class FaceRecognitionManager {
                 setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> تم الالتقاط!');
                 
                 const stabilityRing = document.getElementById('stabilityRing');
-                if (stabilityRing) stabilityRing.classList.remove('active');
+                if (stabilityRing) { stabilityRing.classList.remove('active'); stabilityRing.style.display = 'none'; }
 
                 if (!window.autoCaptureTimeout && !window.isProcessingCapture) {
                     window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 200);
@@ -574,29 +608,65 @@ class FaceRecognitionManager {
     resetLiveness() {
         window.livenessActive = true;
         window.livenessStartYaw = null;
+        window.livenessStartNoseY = null;
         window.livenessMoved = false;
+        window.livenessCounter = { blink: 0, turn: false, nod: false };
+        window.livenessBlinkClosed = false;
         window.stabilityCounter = 0;
     }
 
-    updateLiveness(yaw) {
+    updateLiveness(yaw, landmarks = null) {
         if (!window.livenessActive) return true;
-
-        const threshold = AppConfig?.liveness?.headMovementThreshold || 0.08;
-
+        const anti = AppConfig?.faceRecognition?.antiSpoof || {};
         if (window.livenessStartYaw === null) {
             window.livenessStartYaw = yaw;
-            setCamStatus?.('<i class="fas fa-arrow-left"></i> حرك رأسك قليلاً لليمين أو اليسار...');
+            const nose = landmarks?.getNose?.()?.[3];
+            window.livenessStartNoseY = nose ? nose.y : null;
+            setCamStatus?.('<i class="fas fa-eye"></i> ارمش ثم حرك رأسك يمين/يسار ثم ارفع أو اخفض رأسك قليلاً');
             return false;
         }
-
-        if (Math.abs(yaw - window.livenessStartYaw) > threshold) {
+        if (landmarks) {
+            const leftEAR = this.getEyeAspectRatio(landmarks.getLeftEye?.() || []);
+            const rightEAR = this.getEyeAspectRatio(landmarks.getRightEye?.() || []);
+            const ear = (leftEAR + rightEAR) / 2;
+            if (ear && ear < (anti.earBlinkThreshold || 0.19) && !window.livenessBlinkClosed) {
+                window.livenessBlinkClosed = true;
+            } else if (ear && ear >= (anti.earBlinkThreshold || 0.19) && window.livenessBlinkClosed) {
+                window.livenessCounter.blink += 1;
+                window.livenessBlinkClosed = false;
+            }
+            if (Math.abs(yaw - window.livenessStartYaw) > (anti.yawMovementPx || 12)) {
+                window.livenessCounter.turn = true;
+            }
+            const nose = landmarks.getNose?.()?.[3];
+            if (nose && window.livenessStartNoseY !== null && Math.abs(nose.y - window.livenessStartNoseY) > (anti.pitchMovementPx || 10)) {
+                window.livenessCounter.nod = true;
+            }
+        }
+        const blinkOk = !anti.requireBlink || window.livenessCounter.blink >= (anti.minBlinks || 1);
+        const turnOk = !anti.requireTurnLeftRight || !!window.livenessCounter.turn;
+        const nodOk = !anti.requireNod || !!window.livenessCounter.nod;
+        if (blinkOk && turnOk && nodOk) {
             window.livenessMoved = true;
             window.livenessActive = false;
-            setCamStatus?.('<i class="fas fa-check-circle"></i> تم التحقق من الحركة، ثبت وجهك...');
+            setCamStatus?.('<i class="fas fa-check-circle"></i> تم التحقق من الحيوية، ثبت وجهك...');
             return true;
         }
-
         return false;
+    }
+
+    getEyeAspectRatio(points) {
+        try {
+            if (!points || points.length < 6) return 0;
+            const dist = (a, b) => Math.hypot((a.x - b.x), (a.y - b.y));
+            const A = dist(points[1], points[5]);
+            const B = dist(points[2], points[4]);
+            const C = dist(points[0], points[3]);
+            if (!C) return 0;
+            return (A + B) / (2.0 * C);
+        } catch (e) {
+            return 0;
+        }
     }
 
     // ============================================
@@ -617,9 +687,9 @@ class FaceRecognitionManager {
         text.textContent = current;
 
         if (current > 0) {
-            ring.classList.add('active');
+            ring.classList.add('active'); ring.style.display = 'flex';
         } else {
-            ring.classList.remove('active');
+            ring.classList.remove('active'); ring.style.display = 'none';
         }
     }
 

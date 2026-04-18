@@ -267,8 +267,7 @@ class App {
     async loadModelsDirectly() {
         // Direct model loading (من الكود القديم)
         try {
-            const MODELS_URL = AppConfig?.faceRecognition?.models?.tinyFaceDetector || 
-                              'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
+            const MODELS_URL = AppConfig?.faceRecognition?.models?.baseUrl || AppConfig?.faceRecognition?.models?.fallbackUrl || 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
             
             setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
             await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
@@ -601,6 +600,7 @@ class App {
     }
 
     showMainApp() {
+        this.applyUserContextToDashboard();
         const loginPage = document.getElementById('loginPage');
         const registerPage = document.getElementById('registerPage');
         const forgotPasswordPage = document.getElementById('forgotPasswordPage');
