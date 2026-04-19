@@ -31,7 +31,12 @@ class SupabaseClient {
             this.client = window.supabase.createClient(config.url, config.anonKey, {
                 auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
                 db: { schema: 'public' },
-                global: { headers: { 'x-app-name': 'axentro-attendance', 'x-app-version': AppConfig?.app?.version || '5.0.0' } }
+                global: {
+                    headers: {
+                        'x-app-name': 'axentro-attendance',
+                        'x-app-version': AppConfig?.app?.version || '5.0.0'
+                    }
+                }
             });
             this.setupAuthListeners();
             this.isConnected = true;
@@ -99,14 +104,21 @@ class SupabaseClient {
             const params = isAdminLogin
                 ? { p_username: normalized.toLowerCase(), p_password: password }
                 : { p_code: normalized.toUpperCase(), p_password: password };
+
             const { data, error } = await this.rpc(fnName, params);
             if (error) throw error;
+
             const payload = Array.isArray(data) ? data[0] : data;
             if (!payload?.success) {
-                return { success: false, error: payload?.error || ErrorCodes.AUTH_INVALID_CREDENTIALS.message };
+                return {
+                    success: false,
+                    error: payload?.error || ErrorCodes.AUTH_INVALID_CREDENTIALS.message
+                };
             }
+
             const user = payload.user || {};
             await this.setUserContext(user);
+
             return {
                 success: true,
                 user,
@@ -116,7 +128,10 @@ class SupabaseClient {
             };
         } catch (error) {
             console.error('❌ Sign in error:', error);
-            return { success: false, error: error.message || ErrorCodes.AUTH_INVALID_CREDENTIALS.message };
+            return {
+                success: false,
+                error: error.message || ErrorCodes.AUTH_INVALID_CREDENTIALS.message
+            };
         }
     }
 
@@ -180,34 +195,62 @@ class SupabaseClient {
     async createEmployee(employeeData) {
         try {
             const adminUser = window.user?.username || 'admin';
+            const generatedPassword = Math.random().toString(36).slice(-8);
+
             const baseParams = {
                 p_admin_username: String(adminUser).toLowerCase(),
                 p_name: employeeData.name?.trim(),
-                p_email: employeeData.email || null
+                p_email: employeeData.email || null,
+                p_plain_password: generatedPassword,
+                p_face_descriptor: employeeData.faceDescriptor || null,
+                p_profile_image_url: employeeData.profileImageUrl || null
             };
 
             let data, error;
-            ({ data, error } = await this.rpc(AppConfig.supabase.rpc.createEmployee, {
-                ...baseParams,
-                p_plain_password: employeeData.password || null,
-                p_face_descriptor: employeeData.faceDescriptor || null,
-                p_profile_image_url: employeeData.profileImageUrl || null
-            }));
 
-            if (error && String(error.message || '').includes('Could not find the function')) {
-                ({ data, error } = await this.rpc(AppConfig.supabase.rpc.createEmployee, baseParams));
-            }
+            ({ data, error } = await this.rpc(AppConfig.supabase.rpc.createEmployee, baseParams));
+
             if (error) throw error;
+
             const payload = Array.isArray(data) ? data[0] : data;
-            return payload || { success: false, error: 'Unknown error' };
+            if (!payload?.success) {
+                return payload || { success: false, error: 'Unknown error' };
+            }
+
+            if (employeeData.email && AppConfig?.emailService?.url) {
+                await fetch(AppConfig.emailService.url, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'sendNewEmpEmails',
+                        name: employeeData.name?.trim(),
+                        code: payload.employee_code || payload.employeeCode || payload.code,
+                        email: employeeData.email,
+                        password: generatedPassword
+                    })
+                });
+            }
+
+            return {
+                success: true,
+                employee_code: payload.employee_code || payload.employeeCode || payload.code,
+                generatedPassword
+            };
         } catch (error) {
             console.error('❌ Create employee error:', error);
             const msg = String(error?.message || '');
             if (msg.includes('password_hash') || msg.includes('null value in column')) {
-                return { success: false, error: 'قاعدة البيانات الحالية تحتاج تحديث دالة create_employee_secure حتى تُنشئ password_hash تلقائياً. نفّذ ملف sql-patch-create-employee-secure.sql في Supabase ثم أعد المحاولة.' };
+                return {
+                    success: false,
+                    error: 'قاعدة البيانات الحالية تحتاج تحديث دالة create_employee_secure حتى تُنشئ password_hash تلقائياً.'
+                };
             }
             if (msg.includes('Could not find the function')) {
-                return { success: false, error: 'دالة إنشاء الموظف غير موجودة في قاعدة البيانات. نفّذ ملف sql-patch-create-employee-secure.sql ثم أعد المحاولة.' };
+                return {
+                    success: false,
+                    error: 'دالة إنشاء الموظف غير موجودة في قاعدة البيانات.'
+                };
             }
             return { success: false, error: msg || 'فشل إنشاء الحساب' };
         }
@@ -282,6 +325,21 @@ class SupabaseClient {
         }
     }
 
+    async getAdminByUsername(username) {
+        try {
+            const { data, error } = await this.from(AppConfig.supabase.tables.admins)
+                .select('username,display_name,email,is_first_login,face_enrolled')
+                .eq('username', String(username || '').trim().toLowerCase())
+                .single();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('❌ Get admin error:', error);
+            return null;
+        }
+    }
+
     async getAllEmployees() {
         try {
             const { data, error } = await this.from(AppConfig.supabase.tables.employees)
@@ -330,32 +388,118 @@ class SupabaseClient {
         return this.changeOwnPassword({ role: 'employee', code }, currentPassword, newPassword);
     }
 
-    async requestPasswordReset(code) {
+    async requestPasswordReset(identifier) {
         try {
-            const employee = await this.getEmployeeByCode(code);
-            if (!employee) {
-                return { success: false, error: ErrorCodes.AUTH_USER_NOT_FOUND.message };
+            const normalized = String(identifier || '').trim();
+            if (!normalized) {
+                return { success: false, error: 'يرجى إدخال الكود أو اسم المستخدم' };
             }
+
+            const isAdmin = normalized.toLowerCase() === 'admin';
+
+            if (isAdmin) {
+                const admin = await this.getAdminByUsername('admin');
+                if (!admin) {
+                    return { success: false, error: 'حساب الأدمن غير موجود' };
+                }
+
+                if (!admin.email) {
+                    return { success: false, error: 'لا يوجد بريد إلكتروني مسجل لحساب الأدمن' };
+                }
+
+                const newPassword = Math.random().toString(36).slice(-8);
+
+                const { data, error } = await this.rpc('reset_password_secure', {
+                    p_identifier: 'admin',
+                    p_new_password: newPassword
+                });
+
+                if (error) throw error;
+
+                const payload = Array.isArray(data) ? data[0] : data;
+                if (!payload?.success) {
+                    return { success: false, error: payload?.error || 'فشل تحديث كلمة مرور الأدمن' };
+                }
+
+                if (AppConfig?.emailService?.url) {
+                    await fetch(AppConfig.emailService.url, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'sendForgotPw',
+                            name: admin.display_name || 'مدير النظام',
+                            code: 'ADMIN',
+                            email: admin.email,
+                            password: newPassword
+                        })
+                    });
+                }
+
+                return {
+                    success: true,
+                    message: 'تم إرسال كلمة المرور الجديدة إلى بريد الأدمن الإلكتروني'
+                };
+            }
+
+            const employee = await this.getEmployeeByCode(normalized);
+            if (!employee) {
+                return { success: false, error: 'الحساب غير موجود' };
+            }
+
+            if (!employee.email) {
+                return { success: false, error: 'لا يوجد بريد إلكتروني مسجل لهذا الموظف' };
+            }
+
             const newPassword = Math.random().toString(36).slice(-8);
-            const changed = await this.adminChangeEmployeePassword(code, newPassword);
-            if (!changed?.success) return changed;
-            if (employee.email && AppConfig?.emailService?.url) {
+
+            const { data, error } = await this.rpc('reset_password_secure', {
+                p_identifier: String(normalized).toUpperCase(),
+                p_new_password: newPassword
+            });
+
+            if (error) throw error;
+
+            const payload = Array.isArray(data) ? data[0] : data;
+            if (!payload?.success) {
+                return { success: false, error: payload?.error || 'فشل تحديث كلمة مرور الموظف' };
+            }
+
+            if (AppConfig?.emailService?.url) {
                 await fetch(AppConfig.emailService.url, {
-                    method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'sendForgotPw', name: employee.name, code: employee.code, email: employee.email, password: newPassword })
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'sendForgotPw',
+                        name: employee.name,
+                        code: employee.code,
+                        email: employee.email,
+                        password: newPassword
+                    })
                 });
             }
-            return { success: true, message: 'تم إرسال كلمة المرور الجديدة إلى بريدك الإلكتروني' };
+
+            return {
+                success: true,
+                message: 'تم إرسال كلمة المرور الجديدة إلى بريدك الإلكتروني'
+            };
         } catch (error) {
             console.error('❌ Password reset error:', error);
-            return { success: false, error: 'فشل طلب استعادة كلمة المرور' };
+            return {
+                success: false,
+                error: error.message || 'فشل طلب استعادة كلمة المرور'
+            };
         }
     }
 
     async getTodayAttendance(employeeCode) {
         try {
-            const today = new Date(); today.setHours(0,0,0,0);
-            const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
             const { data, error } = await this.from(AppConfig.supabase.tables.attendance)
                 .select('*')
                 .eq('employee_code', String(employeeCode || '').toUpperCase())
@@ -388,8 +532,10 @@ class SupabaseClient {
 
     async getTodayAttendanceForAll() {
         try {
-            const today = new Date(); today.setHours(0,0,0,0);
-            const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
             const { data, error } = await this.from(AppConfig.supabase.tables.attendance)
                 .select('*')
                 .gte('created_at', today.toISOString())
@@ -404,7 +550,10 @@ class SupabaseClient {
 
     async getSystemStats() {
         try {
-            const [totalEmployees, todayAttendance] = await Promise.all([this.getEmployeesCount(), this.getTodayAttendanceForAll()]);
+            const [totalEmployees, todayAttendance] = await Promise.all([
+                this.getEmployeesCount(),
+                this.getTodayAttendanceForAll()
+            ]);
             return {
                 totalEmployees,
                 todayCheckIns: todayAttendance.filter(r => r.type === 'حضور').length,
@@ -423,7 +572,10 @@ class SupabaseClient {
             const response = await fetch(base64Image);
             const blob = await response.blob();
             const filePath = `${fileName}_${Date.now()}.jpg`;
-            const { error } = await this.storage.from(bucketName).upload(filePath, blob, { cacheControl: '3600', upsert: true });
+            const { error } = await this.storage.from(bucketName).upload(filePath, blob, {
+                cacheControl: '3600',
+                upsert: true
+            });
             if (error) throw error;
             const { data } = this.storage.from(bucketName).getPublicUrl(filePath);
             return data?.publicUrl || null;
