@@ -128,9 +128,10 @@ class App {
             
             setTimeout(() => {
                 this.hideSplashScreen();
+                this.hideAllPages();
                 
-                if (hasSession && this.isAuthenticated()) {
-                    this.navigateTo('dashboardPage');
+                if (hasSession && this.isAuthenticated() && !window.forceFaceEnrollment && !window.firstTimeSetupMode) {
+                    this.navigateTo(window.user?.role === 'admin' || window.user?.isAdmin ? 'adminPage' : 'dashboardPage');
                     this.initializeDashboard();
                 } else {
                     this.navigateTo('loginPage');
@@ -267,8 +268,7 @@ class App {
     async loadModelsDirectly() {
         // Direct model loading (من الكود القديم)
         try {
-            const MODELS_URL = AppConfig?.faceRecognition?.models?.tinyFaceDetector || 
-                              'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
+            const MODELS_URL = AppConfig?.faceRecognition?.models?.baseUrl || AppConfig?.faceRecognition?.models?.fallbackUrl || 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
             
             setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
             await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
@@ -447,42 +447,60 @@ class App {
         }
     }
 
+
+    async verifyRealConnection(expectedOnline = true) {
+        try {
+            if (expectedOnline && navigator.onLine === false) return false;
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 3500);
+            const testUrl = `${AppConfig?.supabase?.url || window.location.origin}/rest/v1/?ping=${Date.now()}`;
+            await fetch(testUrl, {
+                method: 'GET',
+                mode: 'no-cors',
+                cache: 'no-store',
+                signal: controller.signal
+            });
+            clearTimeout(timer);
+            return true;
+        } catch (_error) {
+            return false;
+        }
+    }
+
     // ============================================
     // 🌐 ONLINE/OFFLINE DETECTION (من الكود القديم)
     // ============================================
 
     setupGlobalEventListeners() {
         // Online/Offline detection
-        window.addEventListener('online', () => {
-            window.isOnline = true;
+        let offlineToastTimer = null;
+        const markConnectionState = async (expectedOnline) => {
             const connDot = document.getElementById('connDot');
             const connText = document.getElementById('connText');
-            
+            const pingOk = await this.verifyRealConnection(expectedOnline);
+
+            window.isOnline = pingOk;
             if (connDot) {
-                connDot.classList.remove('offline');
-                connDot.classList.add('online');
+                connDot.classList.toggle('online', pingOk);
+                connDot.classList.toggle('offline', !pingOk);
             }
-            if (connText) connText.textContent = 'متصل';
-        });
+            if (connText) connText.textContent = pingOk ? 'متصل' : 'غير متصل';
 
-        window.addEventListener('offline', async () => {
-            const stillReachable = await this.verifyInternetConnection();
-            window.isOnline = stillReachable;
-            const connDot = document.getElementById('connDot');
-            const connText = document.getElementById('connText');
-
-            if (connDot) {
-                connDot.classList.toggle('online', stillReachable);
-                connDot.classList.toggle('offline', !stillReachable);
+            if (!pingOk) {
+                if (offlineToastTimer) clearTimeout(offlineToastTimer);
+                offlineToastTimer = setTimeout(() => {
+                    if (window.isOnline === false) {
+                        showToast('تعذر التحقق من الاتصال حالياً، جاري المحاولة مجدداً...', 'warning');
+                    }
+                }, 3500);
+            } else if (offlineToastTimer) {
+                clearTimeout(offlineToastTimer);
+                offlineToastTimer = null;
             }
-            if (connText) connText.textContent = stillReachable ? 'متصل' : 'غير متصل';
+        };
 
-            if (!stillReachable && !window.__offlineToastShown) {
-                window.__offlineToastShown = true;
-                showToast('تعذر التحقق من الاتصال الآن', 'warning');
-                setTimeout(() => { window.__offlineToastShown = false; }, 15000);
-            }
-        });
+        window.addEventListener('online', () => markConnectionState(true));
+        window.addEventListener('offline', () => markConnectionState(false));
 
         // Unlock audio on first interaction (من الكود القديم)
         document.addEventListener('click', () => this.unlockAudio(), { once: true });
@@ -571,50 +589,123 @@ class App {
     // 🎨 UI HELPERS
     // ============================================
 
+    hideAllPages() {
+        const pages = ['loginPage', 'registerPage', 'forgotPasswordPage', 'dashboardPage', 'adminPage'];
+        pages.forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.remove('active');
+            el.style.display = 'none';
+        });
+    }
+
+
     navigateTo(pageId) {
-        // Hide all pages
         const appRoot = document.getElementById('app');
         if (appRoot) {
             appRoot.classList.remove('hidden');
             appRoot.style.display = 'block';
         }
 
-        const pages = ['loginPage', 'registerPage', 'forgotPasswordPage', 'dashboardPage'];
-        pages.forEach(p => {
-            const el = document.getElementById(p);
-            if (el) el.style.display = 'none';
-        });
+        this.hideAllPages();
 
-        // Show target page
         if (pageId === 'loginPage') {
             this.showLoginScreen();
-        } else if (pageId === 'dashboardPage') {
+        } else if (pageId === 'registerPage') {
+            this.showRegisterScreen();
+        } else if (pageId === 'forgotPasswordPage') {
+            window.showForgotPasswordScreen?.();
+        } else if (pageId === 'dashboardPage' || pageId === 'adminPage') {
             this.showMainApp();
         }
     }
 
     showLoginScreen() {
+        this.hideAllPages();
         const loginPage = document.getElementById('loginPage');
-        const registerPage = document.getElementById('registerPage');
-        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
-        const dashboardPage = document.getElementById('dashboardPage');
-
-        if (registerPage) registerPage.classList.remove('active');
-        if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
-        if (dashboardPage) dashboardPage.classList.remove('active');
-        if (loginPage) loginPage.classList.add('active');
+        if (loginPage) {
+            loginPage.style.display = 'block';
+            loginPage.classList.add('active');
+        }
     }
 
     showMainApp() {
-        const loginPage = document.getElementById('loginPage');
-        const registerPage = document.getElementById('registerPage');
-        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
-        const dashboardPage = document.getElementById('dashboardPage');
+        if (window.forceFaceEnrollment || window.firstTimeSetupMode) {
+            this.showLoginScreen();
+            return;
+        }
+        this.applyUserContextToDashboard();
+        this.hideAllPages();
 
-        if (loginPage) loginPage.classList.remove('active');
-        if (registerPage) registerPage.classList.remove('active');
-        if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
-        if (dashboardPage) dashboardPage.classList.add('active');
+        const dashboardPage = document.getElementById('dashboardPage');
+        const adminPage = document.getElementById('adminPage');
+
+        if (window.user?.role === 'admin' || window.user?.isAdmin) {
+            if (adminPage) {
+                adminPage.style.display = 'block';
+                adminPage.classList.add('active');
+            }
+            if (typeof loadEmployees === 'function') {
+                Promise.resolve(loadEmployees()).catch(err => console.warn('loadEmployees failed:', err));
+            }
+        } else {
+            if (dashboardPage) {
+                dashboardPage.style.display = 'block';
+                dashboardPage.classList.add('active');
+            }
+        }
+    }
+
+    applyUserContextToDashboard() {
+        const user = window.user || {};
+        const isAdmin = user.role === 'admin' || user.isAdmin === true;
+        const displayName = isAdmin ? (user.name || 'مدير النظام') : (user.name || 'موظف');
+        const displayCode = isAdmin ? (user.username || 'admin') : (user.code || '----');
+
+        const userName = document.getElementById('userName');
+        const userCodeDisplay = document.getElementById('userCodeDisplay');
+        const adminPanelBtn = document.getElementById('adminPanelBtn');
+        const adminLogoutBtn = document.getElementById('adminLogoutBtn');
+        const adminHeaderName = document.getElementById('adminHeaderName');
+        const adminHeaderCode = document.getElementById('adminHeaderCode');
+        const totalEmployeesStat = document.getElementById('totalEmployeesStat');
+
+        if (userName) {
+            userName.textContent = `مرحباً، ${displayName}`;
+        }
+
+        if (userCodeDisplay) {
+            userCodeDisplay.textContent = `CODE: ${displayCode}`;
+        }
+
+        if (adminPanelBtn) {
+            adminPanelBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+            adminPanelBtn.onclick = (e) => {
+                e?.preventDefault?.();
+                this.navigateTo(isAdmin ? 'adminPage' : 'dashboardPage');
+            };
+        }
+
+        if (adminHeaderName) adminHeaderName.textContent = displayName;
+        if (adminHeaderCode) adminHeaderCode.textContent = isAdmin ? `ADMIN: ${displayCode}` : `CODE: ${displayCode}`;
+        if (adminLogoutBtn) adminLogoutBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+
+        document.querySelectorAll('.admin-only').forEach((el) => {
+            el.style.display = isAdmin ? '' : 'none';
+        });
+
+        const attendanceSection = document.querySelector('.attendance-section');
+        const statsGrid = document.querySelector('.stats-grid');
+        if (attendanceSection) attendanceSection.style.display = isAdmin ? 'none' : '';
+        if (statsGrid && isAdmin && totalEmployeesStat) {
+            totalEmployeesStat.textContent = totalEmployeesStat.textContent || '0';
+        }
+
+        document.querySelectorAll('.nav-link').forEach((link) => {
+            const target = link.getAttribute('data-page');
+            const shouldBeActive = isAdmin ? target === 'adminPage' : target === 'dashboardPage';
+            link.classList.toggle('active', !!shouldBeActive);
+        });
     }
 
     hideLoginScreen() {
@@ -623,15 +714,12 @@ class App {
     }
 
     showRegisterScreen() {
-        const loginPage = document.getElementById('loginPage');
+        this.hideAllPages();
         const registerPage = document.getElementById('registerPage');
-        const forgotPasswordPage = document.getElementById('forgotPasswordPage');
-        const dashboardPage = document.getElementById('dashboardPage');
-
-        if (loginPage) loginPage.classList.remove('active');
-        if (forgotPasswordPage) forgotPasswordPage.classList.remove('active');
-        if (dashboardPage) dashboardPage.classList.remove('active');
-        if (registerPage) registerPage.classList.add('active');
+        if (registerPage) {
+            registerPage.style.display = 'block';
+            registerPage.classList.add('active');
+        }
     }
 
     // ============================================
@@ -710,23 +798,6 @@ class App {
         }
     }
 
-    async verifyInternetConnection() {
-        try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 4000);
-            await fetch(AppConfig?.supabase?.url + '/rest/v1/', {
-                method: 'HEAD',
-                mode: 'no-cors',
-                cache: 'no-store',
-                signal: controller.signal
-            });
-            clearTimeout(timer);
-            return true;
-        } catch (e) {
-            return navigator.onLine === true;
-        }
-    }
-
     // ============================================
     // ⏰ UTILITY
     // ============================================
@@ -754,25 +825,37 @@ class App {
 
 // Toast notification
 function showToast(msg, type = 'info') {
-    if (typeof ui !== 'undefined' && ui && typeof ui.showToast === 'function') {
-        ui.showToast(msg, type || 'info');
-        return;
-    }
     const container = document.getElementById('toastContainer');
     if (!container) {
-        alert(msg);
+        console.log('[TOAST]', type, msg);
         return;
     }
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type || 'info'} show`;
-    toast.innerHTML = `<div class="toast-content"><p>${msg}</p></div>`;
+    toast.className = `app-toast app-toast-${type}`;
+    const iconMap = { success: 'check-circle', error: 'triangle-exclamation', warning: 'circle-exclamation', info: 'circle-info' };
+    toast.innerHTML = `<div class="app-toast-icon"><i class="fas fa-${iconMap[type] || iconMap.info}"></i></div><div class="app-toast-body"><strong>${type === 'success' ? 'تم بنجاح' : type === 'error' ? 'تنبيه مهم' : type === 'warning' ? 'ملاحظة' : 'إشعار'}</strong><span>${msg}</span></div><button class="app-toast-close" aria-label="close">&times;</button>`;
+    const close = () => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 240); };
+    toast.querySelector('.app-toast-close')?.addEventListener('click', close);
     container.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.remove('show');
-        toast.classList.add('hide');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    setTimeout(close, (AppConfig?.ui?.toast?.defaultDuration || 4500));
 }
+
+function showAppDialog(message, title = 'تنبيه') {
+    let modal = document.getElementById('appDialog');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'appDialog';
+        modal.className = 'app-dialog-backdrop';
+        modal.innerHTML = `<div class="app-dialog"><div class="app-dialog-header"><i class="fas fa-shield-halved"></i><strong id="appDialogTitle"></strong></div><div class="app-dialog-message" id="appDialogMessage"></div><div class="app-dialog-actions"><button id="appDialogOk" class="btn btn-primary">حسنًا</button></div></div>`;
+        document.body.appendChild(modal);
+        modal.querySelector('#appDialogOk')?.addEventListener('click', () => modal.classList.remove('show'));
+    }
+    modal.querySelector('#appDialogTitle').textContent = title;
+    modal.querySelector('#appDialogMessage').textContent = message;
+    modal.classList.add('show');
+}
+if (typeof window !== 'undefined') { window.alert = (msg) => showAppDialog(String(msg || ''), 'رسالة النظام'); }
 
 // Status update
 function setStatus(txt) {

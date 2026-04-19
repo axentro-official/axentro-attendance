@@ -35,7 +35,7 @@ class AdminManager {
     }
 
     canAccessAdmin() {
-        return window.user?.isAdmin === true || 
+        return window.user?.role === 'admin' || window.user?.isAdmin === true || 
                (typeof auth !== 'undefined' && auth?.isAdmin?.());
     }
 
@@ -372,26 +372,15 @@ class AdminManager {
     async changeEmployeePassword(code, newPassword) {
         try {
             if (typeof db === 'undefined') throw new Error('Database not available');
-
-            const { error } = await db.from('employees')
-                .update({ 
-                    password: newPassword,
-                    is_first_login: false 
-                })
-                .eq('code', code);
-
-            if (!error) {
-                playSound?.('login-success');
-                showToast?.('تم تغيير كلمة سر الموظف بنجاح', 'success');
-                return true;
-            } else {
-                throw error;
-            }
-
-        } catch(e) {
+            const result = await db.adminChangeEmployeePassword(code, newPassword);
+            if (!result?.success) throw new Error(result?.error || 'فشل تغيير كلمة السر');
+            playSound?.('login-success');
+            showToast?.('تم تغيير كلمة سر الموظف بنجاح', 'success');
+            return true;
+        } catch (e) {
             console.error('❌ Password change error:', e);
             playSound?.('login-error');
-            showToast?.('فشل تغيير كلمة السر', 'error');
+            showToast?.(e.message || 'فشل تغيير كلمة السر', 'error');
             return false;
         }
     }
@@ -571,141 +560,123 @@ document.addEventListener('DOMContentLoaded', () => {
 // Global functions for use by other modules
 window.handleRegistrationCapture = async function(descriptor) {
     try {
-        if (!window.regData) {
-            throw new Error('Missing registration data');
-        }
-
+        if (!descriptor || !window.regData) throw new Error('Missing data');
         setCamStatus?.('<i class="fas fa-upload"></i> جاري حفظ البيانات...');
-        if (typeof db === 'undefined' || !db || typeof db.registerEmployee !== 'function') {
-            throw new Error('Database not available');
+        if (typeof db === 'undefined') throw new Error('Database not available');
+        const tempPass = (window.regData.password || Math.random().toString(36).slice(-8)).trim();
+        let imageUrl = null;
+        if (typeof faceRecognition !== 'undefined') {
+            const imgBlob = await faceRecognition.createStorageImageBlob();
+            if (imgBlob) {
+                const tempName = `emp_${Date.now()}_face.jpg`;
+                await db.storage.from('faces').upload(tempName, imgBlob, { upsert: true });
+                const { data: imgData } = db.storage.from('faces').getPublicUrl(tempName);
+                imageUrl = imgData?.publicUrl || null;
+            }
         }
-
-        const result = await db.registerEmployee({
+        const result = await db.createEmployee({
             name: window.regData.name,
             email: window.regData.email,
-            faceDescriptor: descriptor
+            password: tempPass,
+            faceDescriptor: descriptor,
+            profileImageUrl: imageUrl
         });
-
-        if (!result?.success) throw new Error(result?.details || result?.error || 'حدث خطأ أثناء التسجيل');
-
+        if (!result?.success) throw new Error(result?.error || 'فشل إنشاء الحساب');
         playSound?.('faceid-success');
-        showToast?.(`تم إنشاء الحساب! (الكود: ${result.employee?.code || ''})`, 'success');
+        showToast?.(`تم إنشاء الحساب! (الكود: ${result.employee_code || result.code})`, 'success');
         closeCamera?.();
         showLoginScreen?.();
-    } catch(e) {
+        if (AppConfig?.emailService?.url) {
+            fetch(AppConfig.emailService.url, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'sendNewEmpEmails',
+                    name: window.regData.name,
+                    code: result.employee_code || result.code,
+                    password: tempPass,
+                    email: window.regData.email
+                })
+            }).catch(e => console.log('Welcome email error:', e));
+        }
+    } catch (e) {
         console.error('❌ Registration error:', e);
         playSound?.('faceid-error');
-        showToast?.(e?.message || 'حدث خطأ أثناء التسجيل', 'error');
+        showToast?.(e.message || 'حدث خطأ أثناء التسجيل', 'error');
         closeCamera?.();
     }
 };
 
 window.handleFirstTimeSetupCapture = async function(descriptor) {
-    // Called when user registers face for first time after forced password change
     try {
-        if (!descriptor || !window.user?.code) {
-            throw new Error('Missing data');
-        }
-
+        if (!descriptor || !window.user) throw new Error('Missing data');
         setCamStatus?.('<i class="fas fa-upload"></i> جاري حفظ البصمة...');
-
-        if (typeof db === 'undefined') throw new Error('Database not available');
-
-        // Create image blob
+        let imageUrl = null;
         if (typeof faceRecognition !== 'undefined') {
             const imgBlob = await faceRecognition.createStorageImageBlob();
-            
             if (imgBlob) {
-                await db.storage.from('faces')
-                    .upload(`${window.user.code}_face.jpg`, imgBlob, { upsert: true });
-                
-                const { data: imgData } = db.storage.from('faces')
-                    .getPublicUrl(`${window.user.code}_face.jpg`);
-                
-                if (imgData?.publicUrl) {
-                    window.userImage = imgData.publicUrl;
-                    
-                    const profileImg = document.querySelector('.emp-profile-img');
-                    if (profileImg) profileImg.src = window.userImage;
-                }
+                const faceKey = `${window.user.role || 'employee'}_${window.user.username || window.user.code}_face.jpg`;
+                await db.storage.from('faces').upload(faceKey, imgBlob, { upsert: true });
+                const { data: imgData } = db.storage.from('faces').getPublicUrl(faceKey);
+                imageUrl = imgData?.publicUrl || null;
             }
         }
-
-        // Update employee with face descriptor
-        const updatePayload = { face_descriptor: descriptor };
-        if ('face_enrolled' in (window.user || {})) updatePayload.face_enrolled = true;
-        const result = typeof db.updateEmployee === 'function'
-            ? await db.updateEmployee(window.user.code, updatePayload)
-            : await db.from('employees').update(updatePayload).eq('code', window.user.code);
-        const error = result?.success === false ? new Error(result.error) : result?.error;
-
-        if (error) throw error;
-
-        // Success!
+        const result = await db.saveFaceEnrollment(window.user, descriptor, imageUrl);
+        if (!result?.success) throw new Error(result?.error || 'فشل حفظ البصمة');
         playSound?.('faceid-success');
         window.sessionDescriptor = descriptor;
+        window.user.face_enrolled = true;
+        window.user.face_descriptor = descriptor;
+        window.forceFaceEnrollment = false;
+        window.firstTimeSetupMode = false;
+        if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
         showMatchResult?.(true);
         showToast?.('تم تسجيل البصمة بنجاح!', 'success');
-
-        setTimeout(() => {
+        setTimeout(async () => {
             closeCamera?.();
+            if (window.auth?.finalizePendingLogin) {
+                await window.auth.finalizePendingLogin(window.user);
+            }
             showApp?.();
         }, 800);
-
-    } catch(e) {
+    } catch (e) {
         console.error('❌ First time setup error:', e);
         playSound?.('faceid-error');
         showMatchResult?.(false);
-        showToast?.('فشل حفظ البصمة', 'error');
+        showToast?.(e.message || 'فشل حفظ البصمة', 'error');
         faceRecognition?.restartCamLoop();
     }
 };
 
 window.handleFaceUpdateCapture = async function(descriptor) {
-    // Called when user updates their own face
     try {
-        if (!descriptor || !window.user?.code) {
-            throw new Error('Missing data');
-        }
-
-        const targetCode = window.user.code;
-        const targetName = window.user.name;
-
+        if (!descriptor || !window.user) throw new Error('Missing data');
         setCamStatus?.('<i class="fas fa-upload"></i> جاري تحديث البصمة...');
-
-        if (typeof db === 'undefined') throw new Error('Database not available');
-
-        // Create image blob
+        let imageUrl = null;
         if (typeof faceRecognition !== 'undefined') {
             const imgBlob = await faceRecognition.createStorageImageBlob();
-            
             if (imgBlob) {
-                await db.storage.from('faces')
-                    .upload(`${targetCode}_face.jpg`, imgBlob, { upsert: true });
+                const faceKey = `${window.user.role || 'employee'}_${window.user.username || window.user.code}_face.jpg`;
+                await db.storage.from('faces').upload(faceKey, imgBlob, { upsert: true });
+                const { data: imgData } = db.storage.from('faces').getPublicUrl(faceKey);
+                imageUrl = imgData?.publicUrl || null;
             }
         }
-
-        // Update face descriptor
-        const { error } = await db.from('employees')
-            .update({ face_descriptor: descriptor })
-            .eq('code', targetCode);
-
-        if (error) throw error;
-
-        // Success!
+        const result = await db.saveFaceEnrollment(window.user, descriptor, imageUrl);
+        if (!result?.success) throw new Error(result?.error || 'فشل تحديث البصمة');
         playSound?.('faceid-success');
+        window.sessionDescriptor = descriptor;
+        window.user.face_enrolled = true;
+        window.user.face_descriptor = descriptor;
+        if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
         showMatchResult?.(true);
-        showToast?.(`تم تحديث بصمتك بنجاح`, 'success');
-
+        showToast?.('تم تحديث البصمة بنجاح', 'success');
         setTimeout(() => closeCamera?.(), 800);
-        
-        if (typeof showApp === 'function') showApp();
-
-    } catch(e) {
+        showApp?.();
+    } catch (e) {
         console.error('❌ Face update error:', e);
         playSound?.('faceid-error');
         showMatchResult?.(false);
-        showToast?.('فشل تحديث البصمة', 'error');
+        showToast?.(e.message || 'فشل تحديث البصمة', 'error');
         faceRecognition?.restartCamLoop();
     }
 };

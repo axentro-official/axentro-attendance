@@ -1,140 +1,127 @@
 /**
  * ============================================
- * 🔧 AXENTRO CONFIGURATION v4.2 - COMPLETE EDITION
- * ✅ Enhanced with All Legacy Features
- * 🚀 متوافق مع الكود القديم 100%
+ * 🔧 AXENTRO CONFIGURATION v5.0 - SECURE ADMIN/EMPLOYEE MODE
  * ============================================
  */
 
 const AppConfig = {
-    
-    // ============================================
-    // 📡 SUPABASE DATABASE CONFIGURATION
-    // ============================================
     supabase: {
         url: 'https://qgbokzzynieoedhloxqt.supabase.co',
         anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnYm9renp5bmllb2VkaGxveHF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjc1NzUsImV4cCI6MjA5MDcwMzU3NX0.AE7w-36tFYHL8m7I6GkMM25PhhBTibKyVE4AZVpLCbc',
-        
-        // Tables
         tables: {
+            admins: 'admins',
             employees: 'employees',
             attendance: 'attendance',
-            passwordResets: 'password_resets',
-            auditLog: 'audit_log'
+            worksites: 'worksites',
+            securityAuditLog: 'security_audit_log'
         },
-        
-        // Storage
         storage: {
             bucketName: 'faces',
-            maxFileSize: 5 * 1024 * 1024, // 5MB
+            maxFileSize: 5 * 1024 * 1024,
             allowedTypes: ['image/jpeg', 'image/png', 'image/webp']
+        },
+        rpc: {
+            adminLogin: 'admin_login',
+            employeeLogin: 'employee_login',
+            createEmployee: 'create_employee_secure',
+            changeOwnPassword: 'change_own_password_secure',
+            adminChangeEmployeePassword: 'admin_change_employee_password_secure',
+            recordAttendance: 'record_attendance_secure',
+            enrollFace: 'save_face_enrollment',
+            getFaceContext: 'get_face_context',
+            logSensitiveAction: 'log_sensitive_action'
         }
     },
 
-    // ============================================
-    // 📧 GOOGLE APPS SCRIPT (Email Service)
-    // ============================================
     emailService: {
         url: 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec',
         adminEmail: 'axentroteam@gmail.com',
         upperMgmtEmail: 'axentroofficial@gmail.com'
     },
 
-    // ============================================
-    // 🎭 FACE RECOGNITION CONFIGURATION
-    // ============================================
     faceRecognition: {
-        // Model URLs
         models: {
-            tinyFaceDetector: 'https://justadudewhohacks.github.io/face-api.js/weights/',
-            faceLandmark68Tiny: 'https://justadudewhohacks.github.io/face-api.js/weights/',
-            faceRecognition: 'https://justadudewhohacks.github.io/face-api.js/weights/',
-            faceLandmark68Net: 'https://justadudewhohacks.github.io/face-api.js/weights/'
+            baseUrl: './models/',
+            fallbackUrl: 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/'
         },
-        
-        // Detection Settings
         detection: {
-            inputSize: 320,          // Size for processing
-            scoreThreshold: 0.12,      // Minimum confidence (خفضناها من 0.5)
-            minFaceSize: 100,
+            inputSize: 320,
+            scoreThreshold: 0.18,
+            minFaceSize: 120,
             maxFaces: 1
         },
-        
-        // Recognition Settings (من الكود القديم)
         recognition: {
-            threshold: 0.55,          // Match threshold (من الكود القديم)
-            labelDistance: 0.55       // Euclidean distance threshold
+            threshold: 0.48,
+            adminThreshold: 0.45,
+            labelDistance: 0.48,
+            minSamples: 3
         },
-        
-        // Camera Settings
         camera: {
             width: 640,
             height: 480,
-            facingMode: 'user',      // Front camera
+            facingMode: 'user',
             frameRate: 30
         },
-        
-        // Timeout settings
         timeout: {
-            modelLoad: 15000,       // 15 seconds
-            cameraStart: 10000       // 10 seconds
+            modelLoad: 15000,
+            cameraStart: 10000
         },
-        
-        // Image Storage Settings (من الكود القديم)
         imageStorage: {
-            maxWidth: 400,           // STORE_IMG_MAX
-            quality: 0.8             // JPEG quality
+            maxWidth: 480,
+            quality: 0.9
+        },
+        antiSpoof: {
+            enabled: true,
+            requireBlink: true,
+            requireTurnLeftRight: true,
+            requireNod: true,
+            minStableFrames: 4,
+            earBlinkThreshold: 0.19,
+            minBlinks: 1,
+            yawMovementPx: 12,
+            pitchMovementPx: 10,
+            challengeTimeoutMs: 15000,
+            consecutiveSingleFaceFrames: 5
         }
     },
 
-    // ============================================
-    // 📍 GPS LOCATION SETTINGS (من الكود القديم)
-    // ============================================
     location: {
         office: {
-            latitude: 30.1407941,     // OFFICE_LAT
-            longitude: 31.3800838     // OFFICE_LON
+            latitude: 30.1407941,
+            longitude: 31.3800838,
+            name: 'المقر الرئيسي'
         },
-        maxDistanceMeters: 500,      // MAX_DISTANCE_METERS
+        maxDistanceMeters: 500,
+        maxAccuracyMeters: 50,
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 20000,
         maximumAge: 0
     },
 
-    // ============================================
-    // ⏰ ATTENDANCE CONFIGURATION
-    // ============================================
     attendance: {
         shifts: [
             { id: 'EARLY SHIFT', name: 'صباحي', start: '09:00', end: '17:00' },
             { id: 'BETWEEN SHIFT', name: 'بعد الظهر', start: '14:00', end: '22:00' },
             { id: 'NIGHT SHIFT', name: 'مسائي', start: '22:00', end: '06:00' }
         ],
-        
         normalHours: 9,
         overtimeThreshold: 9,
-        cooldownPeriod: 60000,      // 1 minute between check-in/out
-        
-        // Auto-refresh interval (من الكود القديم)
-        autoRefreshInterval: 30000  // 30 seconds
+        cooldownPeriod: 60000,
+        autoRefreshInterval: 30000,
+        requireFaceEveryAction: true,
+        requireLocationForAttendance: true
     },
 
-    // ============================================
-    // 🎭 LIVENESS DETECTION SETTINGS (من الكود القديم)
-    // ============================================
     liveness: {
         enabled: true,
-        headMovementThreshold: 0.08,   // Minimum head yaw change
-        stableFramesRequired: 2,        // STABLE_FRAMES_REQUIRED
+        headMovementThreshold: 0.08,
+        stableFramesRequired: 4,
         stabilityRing: {
-            circumference: 126,         // 2 * PI * 20
+            circumference: 126,
             radius: 20
         }
     },
 
-    // ============================================
-    // 🔐 SECURITY CONFIGURATION
-    // ============================================
     security: {
         password: {
             minLength: 4,
@@ -144,189 +131,107 @@ const AppConfig = {
             requireNumbers: false,
             requireSpecialChars: false
         },
-        
         session: {
-            timeout: 10 * 60 * 60 * 1000,      // 10 hours (من الكود القديم)
-            rememberMeDuration: 7 * 24 * 60 * 1000  // 7 days
+            timeout: 10 * 60 * 60 * 1000,
+            rememberMeDuration: 7 * 24 * 60 * 60 * 1000
         },
-        
         rateLimit: {
             maxLoginAttempts: 5,
-            lockoutDuration: 15 * 60 * 1000,  // 15 minutes
+            lockoutDuration: 15 * 60 * 1000,
             maxRequestsPerMinute: 20
         },
-        
         adminVerification: {
-            requiredForDelete: true,           // Must verify face to delete employee
-            requiredForManualAtt: true,        // Must verify face for manual attendance
-            matchThreshold: 0.55               // Same as face recognition
+            requiredForDelete: true,
+            requiredForManualAtt: true,
+            requiredForPasswordReset: true,
+            requiredForFaceReset: true,
+            matchThreshold: 0.45,
+            verificationWindowMs: 120000
         }
     },
 
-    // ============================================
-    // 🎨 UI/UX CONFIGURATION
-    // ============================================
     ui: {
-        animations: {
-            fast: 150,
-            normal: 250,
-            slow: 350,
-            pageTransition: 300
-        },
-        
         toast: {
-            defaultDuration: 4500,   // من الكود القديم
+            defaultDuration: 4500,
             successDuration: 4500,
             errorDuration: 4500,
             warningDuration: 4500,
             maxVisible: 3
         },
-        
         loading: {
             minDisplayTime: 800,
             maxRetries: 3,
             retryDelay: 1000
         },
-        
         splashScreen: {
             show: true,
             minDisplayTime: 2000,
-            showErrorActions: true   // Show retry/skip buttons on error
+            showErrorActions: true
         }
     },
 
-    // ============================================
-    // 🌐 APP METADATA
-    // ============================================
     app: {
         name: 'Axentro System',
-        version: '4.2.0',           // Updated version
-        description: 'نظام إدارة الحضور والانصراف بالذكاء الاصطناعي',
+        version: '5.0.0',
+        description: 'نظام حضور وانصراف آمن مع تحقق الوجه والموقع',
         author: 'Axentro Team',
-        
         urls: {
             login: 'https://axentro-official.github.io/axentro-attendance/',
             website: 'https://axentro-official.github.io/axentro-website/links.html',
             github: 'https://github.com/axentro-official/axentro-attendance'
         },
-        
         features: {
-            biometricAuth: true,         // Fingerprint (WebAuthn)
-            offlineSupport: true,        // PWA
+            biometricAuth: true,
+            offlineSupport: true,
             pushNotifications: false,
             darkMode: true,
-            livenessDetection: true,     // NEW: Head movement detection
-            gpsVerification: true,       // NEW: Location verification
-            adminFaceVerify: true        // NEW: Admin must verify face for sensitive ops
+            livenessDetection: true,
+            gpsVerification: true,
+            adminFaceVerify: true
         },
-        
         fallbacks: {
-            allowBasicMode: true,        // Allow app without face recognition
-            showSkipOption: true         // Show skip button if loading fails
+            allowBasicMode: false,
+            showSkipOption: false
         }
     },
 
-    // ============================================
-    // 📊 REPORTING CONFIGURATION
-    // ============================================
     reporting: {
         dateFormats: {
             display: 'DD/MM/YYYY',
             input: 'YYYY-MM-DD',
             api: 'YYYY-MM-DDTHH:mm:ssZ'
         },
-        
         timeFormat: {
             locale: 'ar-EG',
-            hour12: true,                // 12-hour format as requested!
+            hour12: true,
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit'
         },
-        
-        exportFormats: ['pdf', 'excel', 'csv'],
-        
-        defaultDateRange: {
-            start: () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-            end: () => new Date()
-        }
+        exportFormats: ['pdf', 'excel', 'csv']
     },
 
-    // ============================================
-    // 🐛 DEBUGGING & LOGGING
-    // ============================================
+    employeeCode: {
+        prefix: 'EMP',
+        padStart: 3
+    },
+
     debug: {
         enabled: true,
-        level: 'info',                 // trace, debug, info, warn, error
-        remoteLogging: false,
-        performanceTracking: true
-    },
-
-    // ============================================
-    // 🔄 RETRY CONFIGURATION
-    // ============================================
-    retry: {
-        maxAttempts: 3,
-        baseDelay: 1000,
-        maxDelay: 10000,
-        backoffMultiplier: 2
-    },
-
-    // ============================================
-    // 📱 PWA CONFIGURATION
-    // ============================================
-    pwa: {
-        cacheName: 'axentro-v4-2',
-        cacheVersion: '4.2.0',
-        offlinePages: ['./'],
-        precacheAssets: []
-    },
-
-    // ============================================
-    // 🔊 AUDIO CONFIGURATION (من الكود القديم)
-    // ============================================
-    audio: {
-        sounds: {
-            loginSuccess: 'login-success.mp3',
-            loginError: 'login-error.mp3',
-            logoutSuccess: 'logout-success.mp3',
-            faceidSuccess: 'faceid-success.mp3',
-            faceidError: 'faceid-error.mp3'
-        },
-        autoUnlock: true,              // Unlock on first user interaction
-        preload: true                   // Preload all sounds
-    },
-
-    // ============================================
-    // 👤 EMPLOYEE CODE GENERATION (احترافي)
-    // ============================================
-    employeeCode: {
-        prefix: 'EMP',                  // مثال: EMP001, EMP002
-        padStart: 3,                    // عدد الأرقام
-        startFrom: 1                    // يبدأ العد من 1
-    },
-
-    // ============================================
-    // 🔑 ADMIN CREDENTIALS (كما طلبت)
-    // ============================================
-    admin: {
-        defaultCode: 'admin',           // ← small letters كما طلبت!
-        defaultPassword: 'Admin@2024',
-        defaultName: 'مدير النظام',
-        defaultEmail: 'axentroteam@gmail.com'
+        level: 'info'
     }
 };
 
-// ============================================
-// 🌍 EXPORT FOR MODULES
-// ============================================
+const ErrorCodes = {
+    AUTH_INVALID_CREDENTIALS: { code: 'AUTH_INVALID_CREDENTIALS', message: 'بيانات الدخول غير صحيحة' },
+    AUTH_FACE_REQUIRED: { code: 'AUTH_FACE_REQUIRED', message: 'يجب تسجيل بصمة الوجه أولاً' },
+    AUTH_USER_NOT_FOUND: { code: 'AUTH_USER_NOT_FOUND', message: 'المستخدم غير موجود' },
+    GEO_OUTSIDE_ALLOWED_RADIUS: { code: 'GEO_OUTSIDE_ALLOWED_RADIUS', message: 'أنت خارج نطاق العمل المسموح' },
+    GEO_ACCURACY_TOO_LOW: { code: 'GEO_ACCURACY_TOO_LOW', message: 'دقة الموقع غير كافية، حاول مرة أخرى في مكان مفتوح' }
+};
 
-// Make available globally
-if (typeof window !== 'undefined') {
-    window.AppConfig = AppConfig;
-}
-
-// Export for ES modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = AppConfig;
-}
+const SuccessMessages = {
+    LOGIN_SUCCESS: 'تم تسجيل الدخول بنجاح',
+    FACE_ENROLLED: 'تم حفظ بصمة الوجه بنجاح',
+    ATTENDANCE_RECORDED: 'تم تسجيل العملية بنجاح'
+};
