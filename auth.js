@@ -398,7 +398,6 @@ class AuthManager {
         window.firstTimeSetupMode = false;
     }
 
-
     handleFirstTimeLogin(user) {
         this.currentUser = user;
         window.user = user;
@@ -573,10 +572,7 @@ class AuthManager {
                 throw new Error('Database service not available');
             }
 
-            const result = await db.changeOwnPassword(window.user, 
-                oldPw,
-                newPw
-            );
+            const result = await db.changeOwnPassword(window.user, oldPw, newPw);
 
             if (result?.success) {
                 if (typeof app !== 'undefined' && app?.playSound) {
@@ -645,10 +641,10 @@ class AuthManager {
 
     async submitForgotPw() {
         const codeInput = document.getElementById('forgotCode');
-        const code = codeInput?.value?.trim()?.toUpperCase();
+        const identifier = codeInput?.value?.trim();
 
-        if (!code) {
-            return this.toast('يرجى إدخال الكود', 'error');
+        if (!identifier) {
+            return this.toast('يرجى إدخال كود الموظف أو اسم مستخدم الأدمن', 'error');
         }
 
         try {
@@ -656,7 +652,7 @@ class AuthManager {
                 throw new Error('Database service not available');
             }
 
-            const result = await db.requestPasswordReset(code);
+            const result = await db.requestPasswordReset(identifier);
 
             if (result?.success) {
                 if (typeof app !== 'undefined' && app?.playSound) {
@@ -673,11 +669,16 @@ class AuthManager {
                     app.playSound('login-error');
                 }
 
-                this.toast(result?.error || 'الكود غير صحيح', 'error');
+                this.toast(result?.error || 'تعذر إرسال كلمة المرور', 'error');
             }
         } catch (error) {
             console.error('Forgot password error:', error);
-            this.toast('حدث خطأ', 'error');
+
+            if (typeof app !== 'undefined' && app?.playSound) {
+                app.playSound('login-error');
+            }
+
+            this.toast('حدث خطأ أثناء استعادة كلمة المرور', 'error');
         }
     }
 
@@ -689,7 +690,7 @@ class AuthManager {
         if (typeof app !== 'undefined' && app?.hideAllPages) {
             app.hideAllPages();
         }
-        ['loginPage','forgotPasswordPage','dashboardPage','adminPage'].forEach((id) => {
+        ['loginPage', 'forgotPasswordPage', 'dashboardPage', 'adminPage'].forEach((id) => {
             const el = document.getElementById(id);
             if (el) { el.classList.remove('active'); el.style.display = 'none'; }
         });
@@ -705,7 +706,7 @@ class AuthManager {
         if (typeof app !== 'undefined' && app?.hideAllPages) {
             app.hideAllPages();
         }
-        ['registerPage','forgotPasswordPage','dashboardPage','adminPage'].forEach((id) => {
+        ['registerPage', 'forgotPasswordPage', 'dashboardPage', 'adminPage'].forEach((id) => {
             const el = document.getElementById(id);
             if (el) { el.classList.remove('active'); el.style.display = 'none'; }
         });
@@ -969,7 +970,11 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('loginPage')?.classList.remove('active');
             document.getElementById('registerPage')?.classList.remove('active');
             document.getElementById('dashboardPage')?.classList.remove('active');
-            const forgot = document.getElementById('forgotPasswordPage'); if (forgot) { forgot.style.display='block'; forgot.classList.add('active'); }
+            const forgot = document.getElementById('forgotPasswordPage');
+            if (forgot) {
+                forgot.style.display = 'block';
+                forgot.classList.add('active');
+            }
         }
     });
 
