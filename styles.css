@@ -2011,3 +2011,58 @@ body{background-color:#06132d !important;}
 .back-btn,.btn,.nav-link,.icon-btn{transition:all .2s ease;}
 .back-btn:hover,.btn:hover,.icon-btn:hover{transform:translateY(-1px);}
 @media (max-width:768px){.auth-container{margin:10px auto 10px !important;border-radius:24px;overflow:hidden}.global-app-footer{padding:16px 10px 24px}.global-qr-code,.qr-code{width:96px;height:96px}}
+
+
+/* Remember me modern checkbox */
+.remember-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    direction: rtl;
+}
+
+.remember-checkbox {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    border: 2px solid rgba(191, 219, 254, 0.9);
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    position: relative;
+    flex: 0 0 24px;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, .18);
+    transition: all .18s ease;
+    outline: none;
+}
+
+.remember-checkbox:hover {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+.remember-checkbox:checked {
+    background: linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%);
+    border-color: rgba(191, 219, 254, 1);
+}
+
+.remember-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 2px;
+    width: 6px;
+    height: 12px;
+    border: solid #fff;
+    border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg);
+}
+
+.remember-label {
+    color: #dbeafe;
+    font-size: 0.98rem;
+    font-weight: 600;
+    line-height: 1.5;
+    user-select: none;
+}

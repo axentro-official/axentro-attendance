@@ -41,13 +41,13 @@ const AppConfig = {
 
     faceRecognition: {
         models: {
-            baseUrl: './models/',
+            baseUrl: 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/',
             fallbackUrl: 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/'
         },
         detection: {
-            inputSize: 320,
-            scoreThreshold: 0.18,
-            minFaceSize: 120,
+            inputSize: 416,
+            scoreThreshold: 0.08,
+            minFaceSize: 96,
             maxFaces: 1
         },
         recognition: {
@@ -57,10 +57,10 @@ const AppConfig = {
             minSamples: 3
         },
         camera: {
-            width: 640,
-            height: 480,
+            width: 480,
+            height: 360,
             facingMode: 'user',
-            frameRate: 30
+            frameRate: 24
         },
         timeout: {
             modelLoad: 15000,
@@ -115,7 +115,7 @@ const AppConfig = {
     liveness: {
         enabled: true,
         headMovementThreshold: 0.08,
-        stableFramesRequired: 4,
+        stableFramesRequired: 3,
         stabilityRing: {
             circumference: 126,
             radius: 20

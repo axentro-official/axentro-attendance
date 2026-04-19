@@ -429,7 +429,7 @@ class SupabaseClient {
                         body: JSON.stringify({
                             action: 'sendForgotPw',
                             name: admin.display_name || 'مدير النظام',
-                            code: 'ADMIN',
+                            code: 'admin',
                             email: admin.email,
                             password: newPassword
                         })
