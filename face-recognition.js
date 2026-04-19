@@ -1,8 +1,8 @@
 /**
  * ============================================
- * 📷 AXENTRO FACE RECOGNITION v4.3 - ENHANCED
- * ✅ Faster Auto Capture + Better UX Feedback
- * 🔥 Auto-capture, Success/Fail Indicators, Anti-Spoof
+ * 📷 AXENTRO FACE RECOGNITION v4.4 - STABLE TRACKING
+ * ✅ Stable Face Box + Faster Auto Capture
+ * 🔥 Anti-flicker, Auto-capture, Success/Fail Indicators
  * ============================================
  */
 
@@ -21,6 +21,15 @@ class FaceRecognitionManager {
         this.lastDetectionAt = 0;
         this.captureCooldownMs = 1200;
         this.extractTimeoutMs = 9000;
+
+        // Stable tracking
+        this.lastTrackedBox = null;
+        this.lastTrackedBoxAt = 0;
+        this.facePersistenceMs = 650;
+        this.missedDetections = 0;
+        this.maxMissedDetections = 4;
+        this.smoothedBox = null;
+        this.lastDetectionRaw = null;
 
         // Mode flags
         window.regMode = false;
@@ -397,6 +406,8 @@ class FaceRecognitionManager {
             }
 
             this.clearMatchResult();
+            this.clearTrackedFace();
+
             window.lastCamStatusText = '';
             window.currentFaceDetected = false;
             window.stabilityCounter = 0;
@@ -451,6 +462,7 @@ class FaceRecognitionManager {
         }
 
         this.clearMatchResult();
+        this.clearTrackedFace();
 
         window.regMode = false;
         window.attMode = false;
@@ -482,6 +494,93 @@ class FaceRecognitionManager {
 
     isCameraRunning() {
         return this.isCameraActive;
+    }
+
+    // ============================================
+    // 🔍 TRACKING HELPERS
+    // ============================================
+
+    getCoverMetrics(video, canvas) {
+        const videoW = video.videoWidth || canvas.width || 1;
+        const videoH = video.videoHeight || canvas.height || 1;
+        const canvasW = canvas.width || videoW;
+        const canvasH = canvas.height || videoH;
+
+        const videoRatio = videoW / videoH;
+        const canvasRatio = canvasW / canvasH;
+
+        let drawWidth, drawHeight, offsetX, offsetY;
+
+        if (videoRatio > canvasRatio) {
+            drawHeight = canvasH;
+            drawWidth = drawHeight * videoRatio;
+            offsetX = (canvasW - drawWidth) / 2;
+            offsetY = 0;
+        } else {
+            drawWidth = canvasW;
+            drawHeight = drawWidth / videoRatio;
+            offsetX = 0;
+            offsetY = (canvasH - drawHeight) / 2;
+        }
+
+        return {
+            videoW,
+            videoH,
+            canvasW,
+            canvasH,
+            drawWidth,
+            drawHeight,
+            offsetX,
+            offsetY,
+            scaleX: drawWidth / videoW,
+            scaleY: drawHeight / videoH
+        };
+    }
+
+    mapVideoBoxToCanvas(box, video, canvas) {
+        const metrics = this.getCoverMetrics(video, canvas);
+
+        return {
+            x: (box.x * metrics.scaleX) + metrics.offsetX,
+            y: (box.y * metrics.scaleY) + metrics.offsetY,
+            width: box.width * metrics.scaleX,
+            height: box.height * metrics.scaleY
+        };
+    }
+
+    smoothTrackedBox(newBox) {
+        if (!this.smoothedBox) {
+            this.smoothedBox = { ...newBox };
+            return this.smoothedBox;
+        }
+
+        const alpha = 0.32;
+        this.smoothedBox = {
+            x: this.smoothedBox.x + ((newBox.x - this.smoothedBox.x) * alpha),
+            y: this.smoothedBox.y + ((newBox.y - this.smoothedBox.y) * alpha),
+            width: this.smoothedBox.width + ((newBox.width - this.smoothedBox.width) * alpha),
+            height: this.smoothedBox.height + ((newBox.height - this.smoothedBox.height) * alpha)
+        };
+
+        return this.smoothedBox;
+    }
+
+    storeTrackedFace(box) {
+        this.lastTrackedBox = { ...box };
+        this.lastTrackedBoxAt = Date.now();
+        this.missedDetections = 0;
+    }
+
+    getTrackedFace() {
+        if (!this.lastTrackedBox) return null;
+        if ((Date.now() - this.lastTrackedBoxAt) > this.facePersistenceMs) return null;
+        return this.lastTrackedBox;
+    }
+
+    clearTrackedFace() {
+        this.lastTrackedBox = null;
+        this.lastTrackedBoxAt = 0;
+        this.smoothedBox = null;
     }
 
     // ============================================
@@ -521,45 +620,60 @@ class FaceRecognitionManager {
             return;
         }
 
-        try {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        try {
             const detection = await faceapi
                 .detectSingleFace(
                     video,
                     new faceapi.TinyFaceDetectorOptions({
-                        inputSize: AppConfig?.faceRecognition?.detection?.inputSize || 320,
-                        scoreThreshold: AppConfig?.faceRecognition?.detection?.scoreThreshold || 0.08
+                        inputSize: 256,
+                        scoreThreshold: 0.06
                     })
                 )
                 .withFaceLandmarks(true);
 
-            if (!detection) {
-                window.currentFaceDetected = false;
-                window.stabilityCounter = 0;
-                updateStabilityRing?.(0, 2);
-                setCamStatus?.('<i class="fas fa-spinner fa-spin"></i> وجّه الكاميرا إلى وجهك الأمامي داخل الإطار...');
+            if (detection?.detection?.box) {
+                window.currentFaceDetected = true;
+                this.lastDetectionRaw = detection;
+
+                const mappedBox = this.mapVideoBoxToCanvas(detection.detection.box, video, canvas);
+                const trackedBox = this.smoothTrackedBox(mappedBox);
+
+                this.storeTrackedFace(trackedBox);
+                this.drawTrackedGuides(ctx, trackedBox);
+                this.handleDetectionModes(detection);
                 return;
             }
 
-            window.currentFaceDetected = true;
-            const box = detection.detection.box;
-            this.drawGuides(ctx, box);
-            this.handleDetectionModes(detection);
+            window.currentFaceDetected = false;
+            this.missedDetections++;
+
+            const tracked = this.getTrackedFace();
+            if (tracked && this.missedDetections <= this.maxMissedDetections) {
+                this.drawTrackedGuides(ctx, tracked);
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
+                return;
+            }
+
+            this.clearTrackedFace();
+            window.stabilityCounter = 0;
+            updateStabilityRing?.(0, 2);
+            setCamStatus?.('<i class="fas fa-spinner fa-spin"></i> وجّه الكاميرا إلى وجهك الأمامي داخل الإطار...');
         } catch (e) {
             console.error('Face detection error:', e);
         }
     }
 
-    drawGuides(ctx, box) {
+    drawTrackedGuides(ctx, box) {
         if (!ctx || !box) return;
 
         ctx.strokeStyle = '#38bdf8';
         ctx.lineWidth = 3;
         ctx.strokeRect(box.x, box.y, box.width, box.height);
 
-        const cLen = 25;
+        const cLen = 24;
         ctx.strokeStyle = '#10b981';
         ctx.lineWidth = 4;
 
@@ -605,31 +719,32 @@ class FaceRecognitionManager {
         const yOffset = Math.abs(centerY - (video.videoHeight / 2)) / video.videoHeight;
 
         return (
-            faceWidthRatio >= 0.16 &&
-            faceHeightRatio >= 0.18 &&
-            xOffset <= 0.24 &&
-            yOffset <= 0.26
+            faceWidthRatio >= 0.13 &&
+            faceHeightRatio >= 0.15 &&
+            xOffset <= 0.30 &&
+            yOffset <= 0.32
         );
     }
 
     handleDetectionModes(detection) {
         const video = this.videoElement || document.getElementById('video');
         const box = detection?.detection?.box;
+
         const enrollmentMode = !!(
             window.regMode ||
             window.updateFaceMode ||
             window.firstTimeSetupMode ||
             window.adminResetFaceMode
         );
-        const verificationMode = !!(window.attMode || window.adminVerifyMode);
 
+        const verificationMode = !!(window.attMode || window.adminVerifyMode);
         const stableFramesRequired = enrollmentMode ? 2 : 2;
         const faceReady = this.isFaceWellPositioned(box, video);
 
         if (!faceReady) {
             window.stabilityCounter = 0;
             updateStabilityRing?.(0, stableFramesRequired);
-            setCamStatus?.('<i class="fas fa-face-smile"></i> قرّب وجهك داخل الإطار وثبّته لثانية واحدة...');
+            setCamStatus?.('<i class="fas fa-face-smile"></i> قرّب وجهك داخل الإطار وثبّته...');
             return;
         }
 
@@ -643,7 +758,7 @@ class FaceRecognitionManager {
             updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
 
             if (window.stabilityCounter >= stableFramesRequired) {
-                setCamStatus?.('<i class="fas fa-camera"></i> تم اكتشاف الوجه - جاري الالتقاط التلقائي...');
+                setCamStatus?.('<i class="fas fa-camera"></i> تم اكتشاف الوجه - جارٍ الالتقاط التلقائي...');
                 const now = Date.now();
 
                 if (
@@ -651,11 +766,12 @@ class FaceRecognitionManager {
                     (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
                 ) {
                     this.lastAutoCaptureAt = now;
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 80);
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 60);
                 }
             } else {
                 setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
             }
+
             return;
         }
 
@@ -666,6 +782,7 @@ class FaceRecognitionManager {
             }
 
             const livenessOk = updateLiveness?.(getHeadYaw?.(detection.landmarks), detection.landmarks);
+
             if (livenessOk === false) {
                 if (window.autoCaptureTimeout) clearTimeout(window.autoCaptureTimeout);
                 window.stabilityCounter = 0;
@@ -677,7 +794,7 @@ class FaceRecognitionManager {
             updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
 
             if (window.stabilityCounter >= stableFramesRequired) {
-                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> تم التحقق - جاري الالتقاط...');
+                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> تم التحقق - جارٍ الالتقاط...');
                 const now = Date.now();
 
                 if (
@@ -685,7 +802,7 @@ class FaceRecognitionManager {
                     (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
                 ) {
                     this.lastAutoCaptureAt = now;
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 80);
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 60);
                 }
             } else {
                 setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
@@ -767,12 +884,12 @@ class FaceRecognitionManager {
         const video = this.videoElement || document.getElementById('video');
         if (!video) return null;
 
-        if (this.cachedDescriptor && (Date.now() - this.cachedDescriptorAt < 5000)) {
+        if (this.cachedDescriptor && (Date.now() - this.cachedDescriptorAt < 4000)) {
             return this.cachedDescriptor;
         }
 
         const descriptors = [];
-        const attempts = 4;
+        const attempts = 3;
 
         for (let i = 0; i < attempts; i++) {
             try {
@@ -782,12 +899,12 @@ class FaceRecognitionManager {
                             video,
                             new faceapi.TinyFaceDetectorOptions({
                                 inputSize: 320,
-                                scoreThreshold: 0.06
+                                scoreThreshold: 0.05
                             })
                         )
                         .withFaceLandmarks()
                         .withFaceDescriptor(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('descriptor-timeout')), 2200))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('descriptor-timeout')), 2400))
                 ]);
 
                 if (det?.descriptor) {
@@ -800,16 +917,16 @@ class FaceRecognitionManager {
                 }
             } catch (_e) {}
 
-            await new Promise((resolve) => setTimeout(resolve, 120));
+            await new Promise((resolve) => setTimeout(resolve, 100));
         }
 
         if (!descriptors.length) return null;
         if (descriptors.length === 1) return descriptors[0];
 
         const avg = new Array(descriptors[0].length).fill(0);
-        for (const s of descriptors) {
-            for (let j = 0; j < s.length; j++) {
-                avg[j] += s[j] / descriptors.length;
+        for (const d of descriptors) {
+            for (let i = 0; i < d.length; i++) {
+                avg[i] += d[i] / descriptors.length;
             }
         }
 
@@ -1188,7 +1305,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = FaceRecognitionManager;
-};
+}
 
 window.switchFaceCamera = async function () {
     try {
