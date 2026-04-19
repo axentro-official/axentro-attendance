@@ -108,11 +108,10 @@
                 </div>
 
                 <div class="form-options">
-                    <label class="checkbox-wrapper" for="rememberMe">
-                        <input type="checkbox" id="rememberMe" checked>
-                        <span class="checkmark" aria-hidden="true"><i class="fas fa-check"></i></span>
-                        <span class="checkbox-label-text">تذكرني (حفظ جلسة الدخول)</span>
-                    </label>
+                    <div class="remember-control">
+                        <input type="checkbox" id="rememberMe" class="remember-checkbox" checked>
+                        <span class="remember-label">تذكرني (حفظ جلسة الدخول)</span>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block btn-login" id="loginBtn">
@@ -197,13 +196,13 @@
 
             <div class="info-box">
                 <i class="fas fa-info-circle"></i>
-                <p>سيتم إرسال كلمة مرور جديدة إلى بريدك الإلكتروني المسجل</p>
+                <p>أدخل كود الموظف أو اسم مستخدم الأدمن وسيتم إرسال كلمة مرور جديدة إلى البريد الإلكتروني المسجل.</p>
             </div>
 
             <form id="forgotPasswordForm" class="auth-form">
                 <div class="input-group">
-                    <label for="forgotCode"><i class="fas fa-id-badge"></i> كود الموظف</label>
-                    <input type="text" id="forgotCode" placeholder="أدخل كود الموظف" required>
+                    <label for="forgotCode"><i class="fas fa-id-badge"></i> كود الموظف أو اسم مستخدم الأدمن</label>
+                    <input type="text" id="forgotCode" placeholder="مثال: EMP001 أو admin" required>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block" id="forgotPasswordBtn">
@@ -796,9 +795,9 @@
                     <input type="email" id="newEmpEmail" placeholder="example@email.com">
                 </div>
                 
-                <div class="input-group">
-                    <label><i class="fas fa-lock"></i> كلمة المرور المؤقتة</label>
-                    <input type="password" id="newEmpPassword" value="" placeholder="سيتم إنشاؤله تلقائياً">
+                <div class="info-box onboarding-box">
+                    <i class="fas fa-envelope-circle-check"></i>
+                    <p>سيتم إنشاء كلمة مرور مؤقتة تلقائياً وإرسالها مع كود الموظف إلى بريده الإلكتروني.</p>
                 </div>
                 
                 <div style="display:flex; gap:10px; justify-content:center; margin-top:25px;">
@@ -1214,29 +1213,57 @@
     background: var(--primary);
 }
 
-.checkmark {
+.remember-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    direction: rtl;
+}
+
+.remember-checkbox {
+    -webkit-appearance: none;
+    appearance: none;
     width: 24px;
     height: 24px;
-    border: 2px solid var(--border-color);
     border-radius: 8px;
-    background: var(--bg-success);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border: 2px solid rgba(191, 219, 254, 0.9);
+    background: rgba(255, 255, 255, 0.06);
     cursor: pointer;
-    transition: all 0.2s ease;
+    position: relative;
+    flex: 0 0 24px;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, .18);
+    transition: all .18s ease;
+    outline: none;
 }
 
-.checkmark::after {
-    content: '\f00c';
-    font-family: 'Font Awesome 6 Free';
-    font-weight: 900;
-    font-size: 14px;
-    color: white;
+.remember-checkbox:hover {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
 }
 
-.remembered .checkmark::after {
-    background: var(--success);
+.remember-checkbox:checked {
+    background: linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%);
+    border-color: rgba(191, 219, 254, 1);
+}
+
+.remember-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 2px;
+    width: 6px;
+    height: 12px;
+    border: solid #fff;
+    border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg);
+}
+
+.remember-label {
+    color: #dbeafe;
+    font-size: 0.98rem;
+    font-weight: 600;
+    line-height: 1.5;
+    user-select: none;
 }
 
 /* ============================================ 
@@ -1376,6 +1403,10 @@
     text-decoration: underline;
 }
 
+.form-options {
+    margin: 20px 0;
+}
+
 /* ============================================ 
    💬 FOOTER 
    ============================================ */
@@ -1444,6 +1475,23 @@
     margin-top: 8px;
 }
 </style>
+
+
+<audio id="login-success" preload="auto">
+    <source src="login-success.mp3" type="audio/mpeg">
+</audio>
+<audio id="login-error" preload="auto">
+    <source src="login-error.mp3" type="audio/mpeg">
+</audio>
+<audio id="logout-success" preload="auto">
+    <source src="logout-success.mp3" type="audio/mpeg">
+</audio>
+<audio id="faceid-success" preload="auto">
+    <source src="faceid-success.mp3" type="audio/mpeg">
+</audio>
+<audio id="faceid-error" preload="auto">
+    <source src="faceid-error.mp3" type="audio/mpeg">
+</audio>
 
 <script src="config.js"></script>
 <script src="utils.js"></script>
