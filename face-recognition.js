@@ -1,776 +1,1178 @@
 /**
- * ================================================
- * 🎭 AXENTRO FACE RECOGNITION v6.1 - HYBRID SMART
- * ✅ Primary: Human library with multi-CDN fallback
- * ✅ Fallback: face-api.js with local models
- * ✅ Guaranteed to work in all network conditions
- * ================================================
+ * ============================================
+ * 📷 AXENTRO FACE RECOGNITION v4.3 - ENHANCED
+ * ✅ Faster Auto Capture + Better UX Feedback
+ * 🔥 Auto-capture, Success/Fail Indicators, Anti-Spoof
+ * ============================================
  */
 
 class FaceRecognitionManager {
     constructor() {
-        // Core elements
-        this.video = null;
-        this.canvas = null;
-        this.overlay = null;
-        this.ctx = null;
-        this.stream = null;
-        
-        // Detection engine ('human' or 'faceapi')
-        this.engine = null;
-        this.human = null;
-        
-        // State
-        this.isActive = false;
-        this.isModelsLoaded = false;
-        this.currentMode = null;
-        this.modeOptions = {};
+        this.modelsLoaded = false;
+        this.isCameraActive = false;
+        this.currentStream = null;
+        this.videoElement = null;
+        this.canvasElement = null;
+        this.detectionInterval = null;
 
-        // Detection loop
-        this.rafId = null;
-        this.lastDetectionTime = 0;
-        this.detectionThrottleMs = 100;
-
-        // Face tracking history
-        this.faceHistory = [];
-        this.maxHistory = 5;
-        this.stabilityScore = 0;
-        this.stabilityThreshold = 0.8;
-        this.captureDelayMs = 400;
-        this.captureTimer = null;
-
-        // Descriptor caching
+        this.lastAutoCaptureAt = 0;
         this.cachedDescriptor = null;
         this.cachedDescriptorAt = 0;
-
-        // Liveness state
-        this.liveness = {
-            active: false,
-            completed: false
-        };
-
-        // UI elements
-        this.statusElement = null;
-        this.stabilityRing = null;
-        this.matchResult = null;
-
-        // Cooldown
-        this.lastCaptureTime = 0;
-        this.captureCooldown = 1500;
-        this.isProcessing = false;
-
-        console.log('🎭 FaceRecognitionManager v6.1 (Hybrid) initialized');
-    }
-
-    // ============================================
-    // 🚀 INITIALIZATION (HYBRID WITH FALLBACK)
-    // ============================================
-
-    async init() {
-        console.log('🎭 Initializing Face Recognition...');
-        try {
-            // محاولة تحميل مكتبة Human أولاً (الأفضل)
-            await this.initHumanEngine();
-        } catch (humanError) {
-            console.warn('⚠️ Human library failed, falling back to face-api.js:', humanError);
-            try {
-                // الرجوع إلى face-api.js مع النماذج المحلية
-                await this.initFaceApiEngine();
-            } catch (faceApiError) {
-                console.error('❌ All face recognition engines failed:', faceApiError);
-                this.showNonBlockingMessage(
-                    'تعذر تحميل نماذج التعرف على الوجه. يمكنك استخدام كلمة المرور فقط.',
-                    'warning'
-                );
-                this.isModelsLoaded = false;
-                return;
-            }
-        }
-
-        this.setupOverlay();
-        console.log('✅ Face Recognition ready with engine:', this.engine);
-    }
-
-    async initHumanEngine() {
-        // تحميل مكتبة Human من عدة روابط CDN احتياطية
-        await this.loadHumanLibraryWithFallback();
-        
-        // تكوين Human
-        const humanConfig = {
-            debug: false,
-            backend: 'webgl',
-            modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/models/',
-            face: {
-                enabled: true,
-                detector: { rotation: false, maxDetected: 1 },
-                mesh: { enabled: true },
-                description: { enabled: true },
-                antispoof: { enabled: true },
-                liveness: { enabled: true }
-            },
-            body: { enabled: false },
-            hand: { enabled: false },
-            filter: { enabled: true, equalization: true, flip: false }
-        };
-
-        this.human = new Human(humanConfig);
-        await this.human.load();
-        this.engine = 'human';
-        this.isModelsLoaded = true;
-        console.log('✅ Human engine ready');
-    }
-
-    async loadHumanLibraryWithFallback() {
-        const cdnUrls = [
-            'https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/dist/human.js',
-            'https://unpkg.com/@vladmandic/human@3.3.6/dist/human.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/human/3.3.6/human.js',
-            'https://cdn.skypack.dev/@vladmandic/human@3.3.6'
-        ];
-
-        if (typeof Human !== 'undefined') return;
-
-        for (const url of cdnUrls) {
-            try {
-                await this.loadScript(url);
-                if (typeof Human !== 'undefined') {
-                    console.log('✅ Human library loaded from:', url);
-                    return;
-                }
-            } catch (e) {
-                console.warn(`Failed to load Human from ${url}`);
-            }
-        }
-        throw new Error('Could not load Human library from any CDN');
-    }
-
-    loadScript(src) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = src;
-            script.onload = resolve;
-            script.onerror = reject;
-            script.crossOrigin = 'anonymous';
-            document.head.appendChild(script);
-            setTimeout(() => reject(new Error('Script load timeout')), 10000);
-        });
-    }
-
-    async initFaceApiEngine() {
-        // التأكد من وجود face-api.js
-        if (typeof faceapi === 'undefined') {
-            await this.loadScript('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js');
-        }
-
-        // مسارات النماذج (المسار المحلي أولاً)
-        const modelPaths = [
-            '/models',
-            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model'
-        ];
-
-        for (const baseUrl of modelPaths) {
-            try {
-                await faceapi.nets.ssdMobilenetv1.loadFromUri(baseUrl);
-                await faceapi.nets.faceLandmark68Net.loadFromUri(baseUrl);
-                await faceapi.nets.faceRecognitionNet.loadFromUri(baseUrl);
-                this.engine = 'faceapi';
-                this.isModelsLoaded = true;
-                console.log('✅ face-api.js models loaded from:', baseUrl);
-                return;
-            } catch (e) {
-                console.warn(`Failed to load face-api models from ${baseUrl}`);
-            }
-        }
-        throw new Error('Could not load face-api models');
-    }
-
-    // ============================================
-    // 📹 CAMERA OPERATIONS (موحدة)
-    // ============================================
-
-    async openCamera(mode = null, options = {}) {
-        if (this.isActive) this.closeCamera();
-
-        if (!this.isModelsLoaded) {
-            this.setStatusText('جاري تحميل النماذج...');
-            try {
-                await this.init();
-            } catch (e) {
-                this.setStatusText('❌ فشل تحميل نماذج التعرف. تحقق من الاتصال.');
-                return false;
-            }
-        }
-
-        this.currentMode = mode || this.detectModeFromGlobals();
-        this.modeOptions = options;
-
-        this.ensureOverlayElements();
-        this.overlay.style.display = 'flex';
-        this.overlay.classList.add('active');
-
-        this.resetDetectionState();
-        this.isProcessing = false;
-
-        try {
-            this.stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: AppConfig?.faceRecognition?.camera?.facingMode || 'user',
-                    width: { ideal: 640 },
-                    height: { ideal: 480 }
-                },
-                audio: false
-            });
-
-            this.video.srcObject = this.stream;
-            this.video.setAttribute('playsinline', 'true');
-            this.video.muted = true;
-
-            await new Promise((resolve) => {
-                this.video.onloadedmetadata = resolve;
-                setTimeout(resolve, 500);
-            });
-
-            await this.video.play();
-
-            this.canvas.width = this.video.videoWidth || 640;
-            this.canvas.height = this.video.videoHeight || 480;
-            this.ctx = this.canvas.getContext('2d');
-
-            this.isActive = true;
-            this.setStatusText(this.getInitialStatusMessage());
-
-            this.startDetectionLoop();
-            return true;
-        } catch (error) {
-            console.error('Camera error:', error);
-            this.flashFailure('فشل الوصول للكاميرا');
-            this.closeCamera();
-            return false;
-        }
-    }
-
-    closeCamera() {
-        this.isActive = false;
-        this.isProcessing = false;
-
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-            this.stream = null;
-        }
-
-        if (this.video) this.video.srcObject = null;
-
-        if (this.rafId) {
-            cancelAnimationFrame(this.rafId);
-            this.rafId = null;
-        }
-
-        if (this.captureTimer) {
-            clearTimeout(this.captureTimer);
-            this.captureTimer = null;
-        }
-
-        if (this.overlay) {
-            this.overlay.style.display = 'none';
-            this.overlay.classList.remove('active');
-        }
-
-        this.clearGlobalFlags();
-        console.log('📴 Camera closed');
-    }
-
-    // ============================================
-    // 🖥️ UI SETUP (مبسطة)
-    // ============================================
-
-    setupOverlay() {
-        if (document.getElementById('cameraOverlay')) return;
-
-        this.overlay = document.createElement('div');
-        this.overlay.id = 'cameraOverlay';
-        this.overlay.innerHTML = this.getOverlayHTML();
-        document.body.appendChild(this.overlay);
-        this.injectStyles();
-
-        this.cacheDOMElements();
-        this.bindEvents();
-    }
-
-    ensureOverlayElements() {
-        this.overlay = document.getElementById('cameraOverlay');
-        this.video = document.getElementById('video');
-        this.canvas = document.getElementById('canvas');
-        this.statusElement = document.getElementById('camStatus');
-        this.cacheDOMElements();
-        this.ctx = this.canvas?.getContext('2d');
-    }
-
-    cacheDOMElements() {
-        this.stabilityRing = {
-            container: document.getElementById('stabilityRing'),
-            circle: document.getElementById('stabilityCircle'),
-            text: document.getElementById('stabilityText')
-        };
-        this.matchResult = {
-            container: document.getElementById('matchResult'),
-            icon: document.getElementById('matchResultIcon')
-        };
-    }
-
-    bindEvents() {
-        const closeBtn = this.overlay.querySelector('#closeCameraBtn');
-        if (closeBtn) closeBtn.addEventListener('click', () => this.closeCamera());
-
-        const switchBtn = this.overlay.querySelector('#switchCameraBtn');
-        if (switchBtn) {
-            switchBtn.addEventListener('click', async () => {
-                if (AppConfig) {
-                    AppConfig.faceRecognition.camera.facingMode =
-                        AppConfig.faceRecognition.camera.facingMode === 'user' ? 'environment' : 'user';
-                    await this.openCamera(this.currentMode, this.modeOptions);
-                }
-            });
-        }
-    }
-
-    getOverlayHTML() {
-        return `
-            <div id="cameraCard" style="
-                width:min(720px,96vw);
-                background:#0f172a;
-                border:1px solid rgba(148,163,184,.2);
-                border-radius:24px;
-                padding:16px;
-                color:#fff;
-                box-shadow:0 20px 40px rgba(0,0,0,.5);
-            ">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                    <strong style="font-size:1.1rem;">التحقق ببصمة الوجه</strong>
-                    <div style="display:flex;gap:8px;">
-                        <button id="switchCameraBtn" type="button" style="background:#334155;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;">🔄 تبديل</button>
-                        <button id="closeCameraBtn" type="button" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;">✕ إغلاق</button>
-                    </div>
-                </div>
-
-                <div id="cameraViewport" style="position:relative;aspect-ratio:4/3;background:#020617;border-radius:16px;overflow:hidden;">
-                    <video id="video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
-                    <canvas id="canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
-                    <div style="position:absolute;top:15%;left:15%;right:15%;bottom:15%;border:2px dashed rgba(56,189,248,0.6);border-radius:24px;pointer-events:none;"></div>
-                    <div id="stabilityRing" style="position:absolute;bottom:16px;left:16px;display:none;align-items:center;gap:8px;background:rgba(15,23,42,0.8);padding:6px 12px;border-radius:40px;backdrop-filter:blur(4px);">
-                        <svg width="36" height="36" viewBox="0 0 36 36">
-                            <circle cx="18" cy="18" r="15" stroke="rgba(255,255,255,0.2)" stroke-width="3" fill="none"></circle>
-                            <circle id="stabilityCircle" cx="18" cy="18" r="15" stroke="#10b981" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="94.2" stroke-dashoffset="94.2" transform="rotate(-90 18 18)"></circle>
-                        </svg>
-                        <span id="stabilityText" style="font-weight:600;min-width:24px;">0</span>
-                    </div>
-                    <div id="matchResult" style="position:absolute;top:16px;right:16px;width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.5);border:2px solid rgba(255,255,255,0.1);opacity:0;transform:scale(0.8);transition:all 0.2s;backdrop-filter:blur(4px);">
-                        <span id="matchResultIcon" style="font-size:24px;font-weight:700;color:#fff;"></span>
-                    </div>
-                </div>
-                <div id="camStatus" style="margin-top:12px;text-align:center;color:#cbd5e1;font-size:0.95rem;">جاهز</div>
-            </div>
-        `;
-    }
-
-    injectStyles() {
-        if (document.getElementById('face-recognition-styles')) return;
-        const style = document.createElement('style');
-        style.id = 'face-recognition-styles';
-        style.textContent = `
-            .stability-pulse { animation: pulse-ring 1.5s infinite; }
-            .match-success {
-                opacity:1 !important;
-                transform:scale(1) !important;
-                background:rgba(16,185,129,0.95) !important;
-                border-color:rgba(255,255,255,0.3) !important;
-                box-shadow:0 0 0 4px rgba(16,185,129,0.3) !important;
-            }
-            .match-fail {
-                opacity:1 !important;
-                transform:scale(1) !important;
-                background:rgba(239,68,68,0.95) !important;
-                border-color:rgba(255,255,255,0.3) !important;
-                box-shadow:0 0 0 4px rgba(239,68,68,0.3) !important;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    // ============================================
-    // 🎯 DETECTION LOOP (موحد)
-    // ============================================
-
-    startDetectionLoop() {
-        const loop = async (timestamp) => {
-            if (!this.isActive) return;
-            if (timestamp - this.lastDetectionTime >= this.detectionThrottleMs) {
-                this.lastDetectionTime = timestamp;
-                await this.detectAndProcess();
-            }
-            this.rafId = requestAnimationFrame(loop);
-        };
-        this.rafId = requestAnimationFrame(loop);
-    }
-
-    async detectAndProcess() {
-        if (!this.isModelsLoaded || !this.video?.videoWidth) return;
-
-        try {
-            let face = null;
-            
-            if (this.engine === 'human') {
-                const result = await this.human.detect(this.video);
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.human.draw.face(this.canvas, result.face);
-                if (result.face && result.face.length > 0) {
-                    face = result.face[0];
-                }
-            } else {
-                // face-api fallback
-                const detection = await faceapi
-                    .detectSingleFace(this.video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
-                    .withFaceLandmarks()
-                    .withFaceDescriptor();
-                
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                if (detection) {
-                    this.drawFaceApiBox(detection.detection.box);
-                    face = {
-                        box: [detection.detection.box.x, detection.detection.box.y, detection.detection.box.width, detection.detection.box.height],
-                        embedding: detection.descriptor,
-                        real: 1, // face-api لا يدعم antispoofing لذا نفترض أنه حقيقي
-                        live: 1
-                    };
-                }
-            }
-
-            if (!face) {
-                this.handleNoFace();
-                return;
-            }
-
-            this.handleFaceDetected(face);
-        } catch (error) {
-            console.error('Detection error:', error);
-        }
-    }
-
-    drawFaceApiBox(box) {
-        this.ctx.strokeStyle = '#38bdf8';
-        this.ctx.lineWidth = 3;
-        this.ctx.strokeRect(box.x, box.y, box.width, box.height);
-    }
-
-    handleNoFace() {
-        this.resetStability();
-        this.cancelCaptureTimer();
-        this.setStatusText(this.getInstructionMessage());
-        window.currentFaceDetected = false;
-    }
-
-    handleFaceDetected(face) {
-        window.currentFaceDetected = true;
-        
-        this.updateFaceHistory(face);
-        this.calculateStability();
-        this.updateStabilityRingUI();
-
-        // التحقق من الحيوية إذا كان المحرك يدعمها
-        const isReal = face.real || 1;
-        const isLive = face.live || 1;
-        if (this.shouldCheckLiveness() && (isReal < 0.5 || isLive < 0.5)) {
-            this.setStatusText(`🔍 تأكد من أنك شخص حقيقي...`);
-            this.cancelCaptureTimer();
-            return;
-        }
-
-        if (this.stabilityScore >= this.stabilityThreshold) {
-            this.setStatusText('✅ الوجه ثابت - جاري الالتقاط...');
-            this.scheduleCapture(face);
-        } else {
-            this.cancelCaptureTimer();
-            this.setStatusText(this.getStabilityMessage());
-        }
-    }
-
-    // ============================================
-    // 📐 STABILITY CALCULATION
-    // ============================================
-
-    updateFaceHistory(face) {
-        const box = face.box;
-        const faceData = {
-            x: box[0],
-            y: box[1],
-            width: box[2],
-            height: box[3],
-            centerX: box[0] + box[2] / 2,
-            centerY: box[1] + box[3] / 2,
-            timestamp: Date.now()
-        };
-
-        this.faceHistory.push(faceData);
-        if (this.faceHistory.length > this.maxHistory) {
-            this.faceHistory.shift();
-        }
-    }
-
-    calculateStability() {
-        if (this.faceHistory.length < 3) {
-            this.stabilityScore = 0;
-            return;
-        }
-
-        const centers = this.faceHistory.map(f => ({ x: f.centerX, y: f.centerY }));
-        const widths = this.faceHistory.map(f => f.width);
-
-        const avgCenter = centers.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y }), { x: 0, y: 0 });
-        avgCenter.x /= centers.length;
-        avgCenter.y /= centers.length;
-
-        const centerDistances = centers.map(c => Math.hypot(c.x - avgCenter.x, c.y - avgCenter.y));
-        const avgDistance = centerDistances.reduce((a, b) => a + b, 0) / centerDistances.length;
-
-        const widthVariance = Math.max(...widths) - Math.min(...widths);
-        const avgWidth = widths.reduce((a, b) => a + b, 0) / widths.length;
-
-        const distanceScore = Math.max(0, 1 - (avgDistance / (avgWidth * 0.3)));
-        const sizeScore = Math.max(0, 1 - (widthVariance / (avgWidth * 0.2)));
-
-        this.stabilityScore = (distanceScore * 0.6 + sizeScore * 0.4);
-
-        const last = this.faceHistory[this.faceHistory.length - 1];
-        const videoWidth = this.video.videoWidth;
-        const videoHeight = this.video.videoHeight;
-        const isCentered = Math.abs(last.centerX - videoWidth/2) < videoWidth * 0.15 &&
-                          Math.abs(last.centerY - videoHeight/2) < videoHeight * 0.15;
-        const isGoodSize = last.width > videoWidth * 0.2 && last.width < videoWidth * 0.6;
-
-        if (!isCentered || !isGoodSize) {
-            this.stabilityScore *= 0.5;
-        }
-    }
-
-    resetStability() {
-        this.faceHistory = [];
-        this.stabilityScore = 0;
-        this.updateStabilityRingUI();
-    }
-
-    // ============================================
-    // 📸 CAPTURE LOGIC
-    // ============================================
-
-    scheduleCapture(face) {
-        if (this.captureTimer || this.isProcessing) return;
-
-        const now = Date.now();
-        if (now - this.lastCaptureTime < this.captureCooldown) return;
-
-        if (face.embedding) {
-            this.cachedDescriptor = Array.isArray(face.embedding) ? 
-                Array.from(face.embedding) : Object.values(face.embedding);
-            this.cachedDescriptorAt = now;
-        }
-
-        this.captureTimer = setTimeout(() => {
-            this.captureTimer = null;
-            this.performCapture();
-        }, this.captureDelayMs);
-    }
-
-    cancelCaptureTimer() {
-        if (this.captureTimer) {
-            clearTimeout(this.captureTimer);
-            this.captureTimer = null;
-        }
-    }
-
-    async performCapture() {
-        if (this.isProcessing || !this.isActive) return;
-
-        this.isProcessing = true;
-        this.lastCaptureTime = Date.now();
-        this.cancelCaptureTimer();
-
-        this.setStatusText('📸 جاري استخراج بصمة الوجه...');
-
-        try {
-            let descriptor = this.cachedDescriptor;
-            
-            // إذا لم يكن لدينا descriptor مخزن، نستخرجه الآن
-            if (!descriptor) {
-                if (this.engine === 'human') {
-                    const result = await this.human.detect(this.video);
-                    if (result.face?.[0]?.embedding) {
-                        descriptor = Array.from(result.face[0].embedding);
-                    }
-                } else {
-                    const detection = await faceapi
-                        .detectSingleFace(this.video)
-                        .withFaceDescriptor();
-                    if (detection?.descriptor) {
-                        descriptor = Array.from(detection.descriptor);
-                    }
-                }
-            }
-
-            if (!descriptor) throw new Error('تعذر استخراج بصمة الوجه');
-
-            const imageBlob = await this.captureImageBlob();
-            await this.handleModeAction(descriptor, imageBlob);
-
-            this.flashSuccess('تمت العملية بنجاح');
-        } catch (error) {
-            console.error('Capture error:', error);
-            this.flashFailure(error.message || 'فشل في معالجة بصمة الوجه');
-        } finally {
-            this.isProcessing = false;
-            this.resetStability();
-        }
-    }
-
-    async captureImageBlob() {
-        const canvas = document.createElement('canvas');
-        const maxDim = 400;
-        let w = this.video.videoWidth;
-        let h = this.video.videoHeight;
-        const ratio = Math.min(maxDim / w, maxDim / h);
-        if (ratio < 1) {
-            w = Math.round(w * ratio);
-            h = Math.round(h * ratio);
-        }
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext('2d').drawImage(this.video, 0, 0, w, h);
-        return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-    }
-
-    // ============================================
-    // 📊 UI HELPERS
-    // ============================================
-
-    setStatusText(text) {
-        if (this.statusElement) this.statusElement.innerHTML = text;
-        window.lastCamStatusText = text;
-    }
-
-    updateStabilityRingUI() {
-        const { container, circle, text } = this.stabilityRing;
-        if (!container) return;
-
-        if (this.stabilityScore > 0.1) {
-            container.style.display = 'flex';
-            const percent = Math.min(this.stabilityScore, 1);
-            const circumference = 94.2;
-            const offset = circumference - (percent * circumference);
-            circle.style.strokeDashoffset = offset;
-            text.textContent = Math.round(percent * 100);
-        } else {
-            container.style.display = 'none';
-        }
-    }
-
-    flashSuccess(message) {
-        this.showMatchResult(true);
-        playSound?.('faceid-success');
-        this.setStatusText(`<span style="color:#10b981;">✓ ${message}</span>`);
-    }
-
-    flashFailure(message) {
-        this.showMatchResult(false);
-        playSound?.('faceid-error');
-        this.setStatusText(`<span style="color:#ef4444;">✕ ${message}</span>`);
-    }
-
-    showMatchResult(success) {
-        const { container, icon } = this.matchResult;
-        if (!container) return;
-        container.classList.remove('match-success', 'match-fail');
-        if (success) {
-            icon.innerHTML = '✓';
-            container.classList.add('match-success');
-        } else {
-            icon.innerHTML = '✕';
-            container.classList.add('match-fail');
-        }
-        setTimeout(() => {
-            container.style.opacity = '0';
-        }, 1500);
-    }
-
-    getInitialStatusMessage() {
-        if (this.currentMode === 'register') return '📝 سجل وجهك - ضع وجهك داخل الإطار';
-        if (this.currentMode === 'verify' || this.currentMode === 'attendance') return '🔒 ضع وجهك للتحقق';
-        return '👤 ضع وجهك داخل الإطار';
-    }
-
-    getInstructionMessage() {
-        return '🔍 وجّه الكاميرا إلى وجهك';
-    }
-
-    getStabilityMessage() {
-        return `📐 ثبّت وجهك (${Math.round(this.stabilityScore * 100)}%)`;
-    }
-
-    showNonBlockingMessage(message, type = 'warning') {
-        if (typeof showToast === 'function') {
-            showToast(message, type);
-        } else if (typeof ui !== 'undefined' && ui.showWarning) {
-            ui.showWarning(message);
-        } else {
-            console.warn(message);
-        }
-    }
-
-    shouldCheckLiveness() {
-        return (this.currentMode === 'verify' || this.currentMode === 'attendance');
-    }
-
-    // ============================================
-    // 🔄 MODE HANDLING
-    // ============================================
-
-    detectModeFromGlobals() {
-        if (window.regMode || window.firstTimeSetupMode) return 'register';
-        if (window.updateFaceMode || window.adminResetFaceMode) return 'update';
-        if (window.attMode) return 'attendance';
-        if (window.adminVerifyMode) return 'verify';
-        return null;
-    }
-
-    clearGlobalFlags() {
+        this.lastDetectionAt = 0;
+        this.captureCooldownMs = 1200;
+        this.extractTimeoutMs = 9000;
+
+        // Mode flags
         window.regMode = false;
         window.attMode = false;
         window.updateFaceMode = false;
         window.adminVerifyMode = false;
         window.firstTimeSetupMode = false;
         window.adminResetFaceMode = false;
+        window.attType = '';
+        window.targetEmpForAdmin = null;
+        window.isProcessingCapture = false;
+
+        // Liveness detection
+        window.livenessActive = false;
+        window.livenessStartYaw = null;
+        window.livenessStartNoseY = null;
+        window.livenessMoved = false;
+        window.livenessCounter = { blink: 0, turn: false, nod: false };
+        window.livenessBlinkClosed = false;
+        window.stabilityCounter = 0;
+        window.currentFaceDetected = false;
+
+        console.log('🎭 Face Recognition Manager initialized');
     }
 
-    async handleModeAction(descriptor, imageBlob) {
-        if (this.currentMode === 'register' && typeof handleRegistrationCapture === 'function') {
-            await handleRegistrationCapture(descriptor, imageBlob);
-        } else if (this.currentMode === 'update' && typeof handleFaceUpdateCapture === 'function') {
-            await handleFaceUpdateCapture(descriptor, imageBlob);
-        } else if ((this.currentMode === 'verify' || this.currentMode === 'attendance') && typeof handleAttendanceOperation === 'function') {
-            await handleAttendanceOperation(descriptor, imageBlob);
-        } else {
-            console.warn('No handler found for mode:', this.currentMode);
+    // ============================================
+    // 🚀 INITIALIZATION
+    // ============================================
+
+    async init() {
+        console.log('🎭 Initializing Face Recognition System...');
+
+        try {
+            this.setupCameraElements();
+            await this.loadModelsWithSafetyNet();
+            console.log('✅ Face Recognition System Ready');
+        } catch (error) {
+            console.error('❌ Face Recognition Init Error:', error);
+
+            if (typeof ui !== 'undefined' && ui.showWarning) {
+                ui.showWarning('التعرف على الوجه غير متوفر - يمكنك استخدام الكود وكلمة المرور');
+            }
         }
     }
 
-    resetDetectionState() {
-        this.faceHistory = [];
-        this.stabilityScore = 0;
-        this.cancelCaptureTimer();
-        this.liveness.completed = false;
-        window.currentFaceDetected = false;
+    setupCameraElements() {
+        this.videoElement =
+            document.getElementById('video') ||
+            document.getElementById('dashboardVideo') ||
+            document.getElementById('registerVideo');
+
+        this.canvasElement =
+            document.getElementById('canvas') ||
+            document.getElementById('dashboardCanvas') ||
+            document.getElementById('registerCanvas');
+
+        this.ensureOverlayElements();
+
+        console.log('📹 Camera elements set up');
+    }
+
+    ensureOverlayElements() {
+        if (document.getElementById('cameraOverlay')) return;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'cameraOverlay';
+        overlay.style.cssText = `
+            position:fixed;
+            inset:0;
+            background:rgba(2,6,23,.88);
+            display:none;
+            align-items:center;
+            justify-content:center;
+            z-index:9999;
+            padding:16px;
+        `;
+
+        overlay.innerHTML = `
+            <div id="cameraCard" style="
+                width:min(720px,96vw);
+                background:#0f172a;
+                border:1px solid rgba(148,163,184,.2);
+                border-radius:20px;
+                padding:16px;
+                color:#fff;
+                box-shadow:0 20px 60px rgba(0,0,0,.45);
+                transition:transform .18s ease, box-shadow .18s ease;
+            ">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;">
+                    <strong>التحقق ببصمة الوجه</strong>
+                    <div style="display:flex;gap:8px;">
+                        <button type="button" onclick="closeCamera()" style="
+                            background:#ef4444;
+                            color:#fff;
+                            border:none;
+                            border-radius:10px;
+                            padding:8px 12px;
+                            cursor:pointer
+                        ">إغلاق</button>
+                    </div>
+                </div>
+
+                <div id="cameraViewport" style="
+                    position:relative;
+                    aspect-ratio:4/3;
+                    background:#020617;
+                    border-radius:16px;
+                    overflow:hidden;
+                ">
+                    <video id="video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
+                    <canvas id="canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+
+                    <div id="scanLine" style="
+                        position:absolute;
+                        left:10%;
+                        right:10%;
+                        top:12%;
+                        height:3px;
+                        background:linear-gradient(90deg,transparent,#38bdf8,transparent);
+                        box-shadow:0 0 18px #38bdf8;
+                        animation:scanline 2s linear infinite;
+                    "></div>
+
+                    <div id="matchResult" style="
+                        position:absolute;
+                        top:12px;
+                        left:12px;
+                        width:56px;
+                        height:56px;
+                        border-radius:50%;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        background:rgba(15,23,42,.4);
+                        border:2px solid rgba(255,255,255,.08);
+                        opacity:0;
+                        transform:scale(.85);
+                        transition:all .2s ease;
+                        box-shadow:0 12px 30px rgba(0,0,0,.25);
+                        backdrop-filter:blur(4px);
+                        z-index:4;
+                    ">
+                        <span id="matchResultIcon" style="font-size:24px;font-weight:700;color:#fff;"></span>
+                    </div>
+
+                    <div id="stabilityRing" style="
+                        position:absolute;
+                        bottom:12px;
+                        left:12px;
+                        display:none;
+                        align-items:center;
+                        gap:10px;
+                        background:rgba(15,23,42,.75);
+                        padding:8px 10px;
+                        border-radius:12px;
+                    ">
+                        <svg width="48" height="48" viewBox="0 0 48 48">
+                            <circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,.15)" stroke-width="4" fill="none"></circle>
+                            <circle id="stabilityCircle" cx="24" cy="24" r="20" stroke="#10b981" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="126" stroke-dashoffset="126"></circle>
+                        </svg>
+                        <strong id="stabilityText">0</strong>
+                    </div>
+                </div>
+
+                <div id="camStatus" style="margin-top:12px;text-align:center;color:#cbd5e1">جاهز</div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes scanline {
+                0% { transform:translateY(0) }
+                50% { transform:translateY(240px) }
+                100% { transform:translateY(0) }
+            }
+
+            @keyframes cameraShake {
+                0% { transform:translateX(0) }
+                20% { transform:translateX(-4px) }
+                40% { transform:translateX(4px) }
+                60% { transform:translateX(-3px) }
+                80% { transform:translateX(3px) }
+                100% { transform:translateX(0) }
+            }
+
+            .camera-shake {
+                animation: cameraShake .28s ease;
+            }
+
+            .match-success {
+                opacity:1 !important;
+                transform:scale(1) !important;
+                background:rgba(16,185,129,.95) !important;
+                border-color:rgba(255,255,255,.24) !important;
+                box-shadow:0 0 0 5px rgba(16,185,129,.18), 0 16px 32px rgba(0,0,0,.28) !important;
+            }
+
+            .match-fail {
+                opacity:1 !important;
+                transform:scale(1) !important;
+                background:rgba(239,68,68,.96) !important;
+                border-color:rgba(255,255,255,.22) !important;
+                box-shadow:0 0 0 5px rgba(239,68,68,.18), 0 16px 32px rgba(0,0,0,.28) !important;
+            }
+        `;
+        document.head.appendChild(style);
+
+        this.videoElement = document.getElementById('video') || this.videoElement;
+        this.canvasElement = document.getElementById('canvas') || this.canvasElement;
+    }
+
+    // ============================================
+    // 📚 MODEL LOADING
+    // ============================================
+
+    async loadModels() {
+        if (this.modelsLoaded) {
+            console.log('✅ Models already loaded');
+            return true;
+        }
+
+        const MODELS_URL =
+            AppConfig?.faceRecognition?.models?.baseUrl ||
+            AppConfig?.faceRecognition?.models?.fallbackUrl ||
+            'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
+
+        try {
+            setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
+            updateSplashProgress?.(25);
+            try {
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
+            } catch (e) {
+                await faceapi.nets.tinyFaceDetector.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl);
+            }
+            window.lightModels = true;
+
+            setStatus('جاري تحميل الذكاء الاصطناعي (2/4)...');
+            updateSplashProgress?.(50);
+            try {
+                await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODELS_URL);
+            } catch (e) {
+                await faceapi.nets.faceLandmark68TinyNet.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl);
+            }
+
+            setStatus('جاري تحميل الذكاء الاصطناعي (3/4)...');
+            updateSplashProgress?.(75);
+            try {
+                await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL);
+            } catch (e) {
+                await faceapi.nets.faceLandmark68Net.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl);
+            }
+
+            setStatus('جاري تحميل الذكاء الاصطناعي (4/4)...');
+            updateSplashProgress?.(100);
+            try {
+                await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL);
+            } catch (e) {
+                await faceapi.nets.faceRecognitionNet.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl);
+            }
+            window.heavyModels = true;
+
+            this.modelsLoaded = true;
+
+            setTimeout(() => updateSplashProgress?.(0), 600);
+            setStatus('النظام جاهز');
+
+            return true;
+        } catch (error) {
+            console.error('❌ Model loading error:', error);
+            throw error;
+        }
+    }
+
+    async loadModelsWithSafetyNet() {
+        try {
+            const timeoutMs = AppConfig?.faceRecognition?.timeout?.modelLoad || 15000;
+            const loadPromise = this.loadModels();
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('تجاوز وقت تحميل النماذج')), timeoutMs)
+            );
+
+            return await Promise.race([loadPromise, timeoutPromise]);
+        } catch (error) {
+            console.error('❌ Models failed to load:', error.message);
+            this.modelsLoaded = false;
+            return false;
+        }
+    }
+
+    areModelsLoaded() {
+        return this.modelsLoaded;
+    }
+
+    // ============================================
+    // 📹 CAMERA OPERATIONS
+    // ============================================
+
+    async openCamera() {
+        try {
+            this.stopCamera();
+
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw new Error('الكاميرا غير مدعومة في هذا المتصفح');
+            }
+
+            const overlay = document.getElementById('cameraOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                overlay.classList.add('active');
+            }
+
+            setCamStatus?.('<i class="fas fa-video"></i> جاري تشغيل الكاميرا...');
+
+            const facingMode = AppConfig?.faceRecognition?.camera?.facingMode || 'user';
+
+            const preferredConstraints = {
+                video: {
+                    facingMode,
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    frameRate: { ideal: 24, max: 30 }
+                },
+                audio: false
+            };
+
+            const fallbackConstraints = {
+                video: {
+                    facingMode,
+                    width: { ideal: 480 },
+                    height: { ideal: 360 }
+                },
+                audio: false
+            };
+
+            try {
+                window.currentStream = await navigator.mediaDevices.getUserMedia(preferredConstraints);
+            } catch (_e) {
+                window.currentStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+            }
+
+            const video = this.videoElement || document.getElementById('video');
+            if (!video) throw new Error('Video element not found');
+
+            video.srcObject = window.currentStream;
+            video.setAttribute('playsinline', 'true');
+            video.muted = true;
+
+            await new Promise((resolve) => {
+                let done = false;
+                const finish = () => {
+                    if (!done) {
+                        done = true;
+                        resolve();
+                    }
+                };
+                video.onloadedmetadata = finish;
+                video.oncanplay = finish;
+                setTimeout(finish, 700);
+            });
+
+            try {
+                await video.play();
+            } catch (_e) {}
+
+            const scanLine = document.getElementById('scanLine');
+            if (scanLine) scanLine.classList.add('active');
+
+            const canvas = this.canvasElement || document.getElementById('canvas');
+            if (canvas && video) {
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+            }
+
+            this.clearMatchResult();
+            window.lastCamStatusText = '';
+            window.currentFaceDetected = false;
+            window.stabilityCounter = 0;
+            window.isProcessingCapture = false;
+            window.autoCaptureTimeout = null;
+
+            updateStabilityRing?.(0, 2);
+
+            if (window.attMode || window.adminVerifyMode || window.adminResetFaceMode) {
+                resetLiveness?.();
+            }
+
+            setCamStatus?.(
+                window.lightModels && window.heavyModels
+                    ? '<i class="fas fa-spinner fa-spin"></i> ضع الوجه داخل الإطار وسيتم الالتقاط تلقائياً...'
+                    : '<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج الذكاء الاصطناعي...'
+            );
+
+            this.isCameraActive = true;
+            this.startDetectionLoop();
+            return true;
+        } catch (e) {
+            console.error('❌ Camera error:', e);
+            this.flashFailure('فشل الوصول للكاميرا');
+            showToast?.('فشل الوصول للكاميرا', 'error');
+            return false;
+        }
+    }
+
+    closeCamera() {
+        if (window.currentStream) {
+            window.currentStream.getTracks().forEach((track) => track.stop());
+            window.currentStream = null;
+        }
+
+        const video = this.videoElement || document.getElementById('video');
+        if (video) video.srcObject = null;
+
+        const overlay = document.getElementById('cameraOverlay');
+        if (overlay) {
+            overlay.classList.remove('active');
+            overlay.style.display = 'none';
+        }
+
+        const scanLine = document.getElementById('scanLine');
+        if (scanLine) scanLine.classList.remove('active');
+
+        const stabilityRing = document.getElementById('stabilityRing');
+        if (stabilityRing) {
+            stabilityRing.classList.remove('active');
+            stabilityRing.style.display = 'none';
+        }
+
+        this.clearMatchResult();
+
+        window.regMode = false;
+        window.attMode = false;
+        window.updateFaceMode = false;
+        window.adminVerifyMode = false;
+        window.firstTimeSetupMode = false;
+        window.adminResetFaceMode = false;
+        window.attType = '';
+        window.targetEmpForAdmin = null;
+        window.isProcessingCapture = false;
+
+        if (window.autoCaptureTimeout) {
+            clearTimeout(window.autoCaptureTimeout);
+            window.autoCaptureTimeout = null;
+        }
+        if (window.detectionLoopTimeout) {
+            clearTimeout(window.detectionLoopTimeout);
+            window.detectionLoopTimeout = null;
+        }
+
+        window.stabilityCounter = 0;
+        window.livenessActive = false;
+        this.isCameraActive = false;
+    }
+
+    stopCamera() {
+        this.closeCamera();
+    }
+
+    isCameraRunning() {
+        return this.isCameraActive;
+    }
+
+    // ============================================
+    // 🔍 DETECTION LOOP
+    // ============================================
+
+    startDetectionLoop() {
+        if (window.detectionLoopTimeout) {
+            clearTimeout(window.detectionLoopTimeout);
+        }
+
+        const detect = async () => {
+            const video = this.videoElement || document.getElementById('video');
+            const overlay = document.getElementById('cameraOverlay');
+
+            if (!video?.srcObject || !overlay?.classList.contains('active')) {
+                return;
+            }
+
+            if (!window.isProcessingCapture) {
+                await this.drawFaceBox();
+            }
+
+            window.detectionLoopTimeout = setTimeout(detect, 140);
+        };
+
+        detect();
+    }
+
+    async drawFaceBox() {
+        const video = this.videoElement || document.getElementById('video');
+        const canvas = this.canvasElement || document.getElementById('canvas');
+
+        if (!video?.srcObject || !video.videoWidth || !canvas) return;
+        if (!window.lightModels) {
+            setCamStatus?.('<i class="fas fa-cog fa-spin"></i> جاري تحميل النماذج...');
+            return;
+        }
+
+        try {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const detection = await faceapi
+                .detectSingleFace(
+                    video,
+                    new faceapi.TinyFaceDetectorOptions({
+                        inputSize: AppConfig?.faceRecognition?.detection?.inputSize || 320,
+                        scoreThreshold: AppConfig?.faceRecognition?.detection?.scoreThreshold || 0.08
+                    })
+                )
+                .withFaceLandmarks(true);
+
+            if (!detection) {
+                window.currentFaceDetected = false;
+                window.stabilityCounter = 0;
+                updateStabilityRing?.(0, 2);
+                setCamStatus?.('<i class="fas fa-spinner fa-spin"></i> وجّه الكاميرا إلى وجهك الأمامي داخل الإطار...');
+                return;
+            }
+
+            window.currentFaceDetected = true;
+            const box = detection.detection.box;
+            this.drawGuides(ctx, box);
+            this.handleDetectionModes(detection);
+        } catch (e) {
+            console.error('Face detection error:', e);
+        }
+    }
+
+    drawGuides(ctx, box) {
+        if (!ctx || !box) return;
+
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+        const cLen = 25;
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 4;
+
+        // Top-left
+        ctx.beginPath();
+        ctx.moveTo(box.x, box.y + cLen);
+        ctx.lineTo(box.x, box.y);
+        ctx.lineTo(box.x + cLen, box.y);
+        ctx.stroke();
+
+        // Top-right
+        ctx.beginPath();
+        ctx.moveTo(box.x + box.width - cLen, box.y);
+        ctx.lineTo(box.x + box.width, box.y);
+        ctx.lineTo(box.x + box.width, box.y + cLen);
+        ctx.stroke();
+
+        // Bottom-left
+        ctx.beginPath();
+        ctx.moveTo(box.x, box.y + box.height - cLen);
+        ctx.lineTo(box.x, box.y + box.height);
+        ctx.lineTo(box.x + cLen, box.y + box.height);
+        ctx.stroke();
+
+        // Bottom-right
+        ctx.beginPath();
+        ctx.moveTo(box.x + box.width - cLen, box.y + box.height);
+        ctx.lineTo(box.x + box.width, box.y + box.height);
+        ctx.lineTo(box.x + box.width, box.y + box.height - cLen);
+        ctx.stroke();
+    }
+
+    isFaceWellPositioned(box, video) {
+        if (!box || !video?.videoWidth || !video?.videoHeight) return false;
+
+        const faceWidthRatio = box.width / video.videoWidth;
+        const faceHeightRatio = box.height / video.videoHeight;
+
+        const centerX = box.x + (box.width / 2);
+        const centerY = box.y + (box.height / 2);
+
+        const xOffset = Math.abs(centerX - (video.videoWidth / 2)) / video.videoWidth;
+        const yOffset = Math.abs(centerY - (video.videoHeight / 2)) / video.videoHeight;
+
+        return (
+            faceWidthRatio >= 0.16 &&
+            faceHeightRatio >= 0.18 &&
+            xOffset <= 0.24 &&
+            yOffset <= 0.26
+        );
+    }
+
+    handleDetectionModes(detection) {
+        const video = this.videoElement || document.getElementById('video');
+        const box = detection?.detection?.box;
+        const enrollmentMode = !!(
+            window.regMode ||
+            window.updateFaceMode ||
+            window.firstTimeSetupMode ||
+            window.adminResetFaceMode
+        );
+        const verificationMode = !!(window.attMode || window.adminVerifyMode);
+
+        const stableFramesRequired = enrollmentMode ? 2 : 2;
+        const faceReady = this.isFaceWellPositioned(box, video);
+
+        if (!faceReady) {
+            window.stabilityCounter = 0;
+            updateStabilityRing?.(0, stableFramesRequired);
+            setCamStatus?.('<i class="fas fa-face-smile"></i> قرّب وجهك داخل الإطار وثبّته لثانية واحدة...');
+            return;
+        }
+
+        if (enrollmentMode) {
+            if (!window.heavyModels) {
+                setCamStatus?.('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف...');
+                return;
+            }
+
+            window.stabilityCounter++;
+            updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
+
+            if (window.stabilityCounter >= stableFramesRequired) {
+                setCamStatus?.('<i class="fas fa-camera"></i> تم اكتشاف الوجه - جاري الالتقاط التلقائي...');
+                const now = Date.now();
+
+                if (
+                    !window.isProcessingCapture &&
+                    (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
+                ) {
+                    this.lastAutoCaptureAt = now;
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 80);
+                }
+            } else {
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
+            }
+            return;
+        }
+
+        if (verificationMode) {
+            if (!window.heavyModels) {
+                setCamStatus?.('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف...');
+                return;
+            }
+
+            const livenessOk = updateLiveness?.(getHeadYaw?.(detection.landmarks), detection.landmarks);
+            if (livenessOk === false) {
+                if (window.autoCaptureTimeout) clearTimeout(window.autoCaptureTimeout);
+                window.stabilityCounter = 0;
+                updateStabilityRing?.(0, stableFramesRequired);
+                return;
+            }
+
+            window.stabilityCounter++;
+            updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
+
+            if (window.stabilityCounter >= stableFramesRequired) {
+                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> تم التحقق - جاري الالتقاط...');
+                const now = Date.now();
+
+                if (
+                    !window.isProcessingCapture &&
+                    (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
+                ) {
+                    this.lastAutoCaptureAt = now;
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 80);
+                }
+            } else {
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
+            }
+        }
+    }
+
+    // ============================================
+    // 🎯 CAPTURE OPERATIONS
+    // ============================================
+
+    async performCapture() {
+        if (window.isProcessingCapture) return;
+
+        window.isProcessingCapture = true;
+        window.autoCaptureTimeout = null;
+
+        if (window.detectionLoopTimeout) {
+            clearTimeout(window.detectionLoopTimeout);
+            window.detectionLoopTimeout = null;
+        }
+
+        const scanLine = document.getElementById('scanLine');
+        if (scanLine) scanLine.classList.remove('active');
+
+        setCamStatus?.('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
+
+        let newDescriptor = null;
+
+        try {
+            newDescriptor = await Promise.race([
+                this.extractStableDescriptor(),
+                new Promise((resolve) => setTimeout(() => resolve(null), this.extractTimeoutMs))
+            ]);
+        } catch (_e) {}
+
+        if (!newDescriptor) {
+            this.flashFailure('تعذر استخراج بصمة الوجه، ثبّت وجهك وجرّب ثانية.');
+            window.isProcessingCapture = false;
+            window.stabilityCounter = 0;
+            updateStabilityRing?.(0, 2);
+
+            if (scanLine) scanLine.classList.add('active');
+            this.startDetectionLoop();
+            return;
+        }
+
+        try {
+            if (window.regMode) {
+                await this.handleRegistration(newDescriptor);
+                this.flashSuccess('تم تسجيل البصمة بنجاح');
+            } else if (window.firstTimeSetupMode) {
+                await this.handleFirstTimeSetup(newDescriptor);
+                this.flashSuccess('تم تسجيل البصمة بنجاح');
+            } else if (window.updateFaceMode || window.adminResetFaceMode) {
+                await this.handleFaceUpdate(newDescriptor);
+                this.flashSuccess('تم تحديث البصمة بنجاح');
+            } else if (window.adminVerifyMode) {
+                await this.handleAdminVerification(newDescriptor);
+                this.flashSuccess('تم التحقق بنجاح');
+            } else if (window.attMode) {
+                await this.handleAttendanceCapture(newDescriptor);
+                this.flashSuccess('تم التحقق بنجاح');
+            }
+        } catch (error) {
+            console.error('Capture handler error:', error);
+            this.flashFailure(error?.message || 'فشل الإجراء ببصمة الوجه');
+            throw error;
+        } finally {
+            window.isProcessingCapture = false;
+        }
+    }
+
+    // ============================================
+    // 🧬 STABLE DESCRIPTOR EXTRACTION
+    // ============================================
+
+    async extractStableDescriptor() {
+        const video = this.videoElement || document.getElementById('video');
+        if (!video) return null;
+
+        if (this.cachedDescriptor && (Date.now() - this.cachedDescriptorAt < 5000)) {
+            return this.cachedDescriptor;
+        }
+
+        const descriptors = [];
+        const attempts = 4;
+
+        for (let i = 0; i < attempts; i++) {
+            try {
+                const det = await Promise.race([
+                    faceapi
+                        .detectSingleFace(
+                            video,
+                            new faceapi.TinyFaceDetectorOptions({
+                                inputSize: 320,
+                                scoreThreshold: 0.06
+                            })
+                        )
+                        .withFaceLandmarks()
+                        .withFaceDescriptor(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('descriptor-timeout')), 2200))
+                ]);
+
+                if (det?.descriptor) {
+                    const arr = Array.from(det.descriptor);
+                    descriptors.push(arr);
+                    this.cachedDescriptor = arr;
+                    this.cachedDescriptorAt = Date.now();
+
+                    if (descriptors.length >= 2) break;
+                }
+            } catch (_e) {}
+
+            await new Promise((resolve) => setTimeout(resolve, 120));
+        }
+
+        if (!descriptors.length) return null;
+        if (descriptors.length === 1) return descriptors[0];
+
+        const avg = new Array(descriptors[0].length).fill(0);
+        for (const s of descriptors) {
+            for (let j = 0; j < s.length; j++) {
+                avg[j] += s[j] / descriptors.length;
+            }
+        }
+
+        this.cachedDescriptor = avg;
+        this.cachedDescriptorAt = Date.now();
+        return avg;
+    }
+
+    // ============================================
+    // 🎭 LIVENESS DETECTION
+    // ============================================
+
+    getHeadYaw(landmarks) {
+        try {
+            const nose = landmarks.getNose()[3];
+            const leftEye = landmarks.getLeftEye()[0];
+            const rightEye = landmarks.getRightEye()[3];
+
+            return nose.x - ((leftEye.x + rightEye.x) / 2);
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    resetLiveness() {
+        window.livenessActive = true;
+        window.livenessStartYaw = null;
+        window.livenessStartNoseY = null;
+        window.livenessMoved = false;
+        window.livenessCounter = { blink: 0, turn: false, nod: false };
+        window.livenessBlinkClosed = false;
+        window.stabilityCounter = 0;
+    }
+
+    updateLiveness(yaw, landmarks = null) {
+        if (!window.livenessActive) return true;
+
+        const anti = AppConfig?.faceRecognition?.antiSpoof || {};
+
+        if (window.livenessStartYaw === null) {
+            window.livenessStartYaw = yaw;
+            const nose = landmarks?.getNose?.()?.[3];
+            window.livenessStartNoseY = nose ? nose.y : null;
+            setCamStatus?.('<i class="fas fa-eye"></i> ارمش ثم حرك رأسك يمين/يسار ثم ارفع أو اخفض رأسك قليلاً');
+            return false;
+        }
+
+        if (landmarks) {
+            const leftEAR = this.getEyeAspectRatio(landmarks.getLeftEye?.() || []);
+            const rightEAR = this.getEyeAspectRatio(landmarks.getRightEye?.() || []);
+            const ear = (leftEAR + rightEAR) / 2;
+
+            if (ear && ear < (anti.earBlinkThreshold || 0.19) && !window.livenessBlinkClosed) {
+                window.livenessBlinkClosed = true;
+            } else if (ear && ear >= (anti.earBlinkThreshold || 0.19) && window.livenessBlinkClosed) {
+                window.livenessCounter.blink += 1;
+                window.livenessBlinkClosed = false;
+            }
+
+            if (Math.abs(yaw - window.livenessStartYaw) > (anti.yawMovementPx || 12)) {
+                window.livenessCounter.turn = true;
+            }
+
+            const nose = landmarks.getNose?.()?.[3];
+            if (nose && window.livenessStartNoseY !== null && Math.abs(nose.y - window.livenessStartNoseY) > (anti.pitchMovementPx || 10)) {
+                window.livenessCounter.nod = true;
+            }
+        }
+
+        const blinkOk = !anti.requireBlink || window.livenessCounter.blink >= (anti.minBlinks || 1);
+        const turnOk = !anti.requireTurnLeftRight || !!window.livenessCounter.turn;
+        const nodOk = !anti.requireNod || !!window.livenessCounter.nod;
+
+        if (blinkOk && turnOk && nodOk) {
+            window.livenessMoved = true;
+            window.livenessActive = false;
+            setCamStatus?.('<i class="fas fa-check-circle"></i> تم التحقق من الحيوية، ثبت وجهك...');
+            return true;
+        }
+
+        return false;
+    }
+
+    getEyeAspectRatio(points) {
+        try {
+            if (!points || points.length < 6) return 0;
+
+            const dist = (a, b) => Math.hypot((a.x - b.x), (a.y - b.y));
+            const A = dist(points[1], points[5]);
+            const B = dist(points[2], points[4]);
+            const C = dist(points[0], points[3]);
+
+            if (!C) return 0;
+            return (A + B) / (2.0 * C);
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    // ============================================
+    // 📊 STABILITY RING
+    // ============================================
+
+    updateStabilityRing(current, max) {
+        const circle = document.getElementById('stabilityCircle');
+        const text = document.getElementById('stabilityText');
+        const ring = document.getElementById('stabilityRing');
+
+        if (!circle || !text || !ring) return;
+
+        const circumference = 2 * Math.PI * (AppConfig?.liveness?.stabilityRing?.radius || 20);
+        const offset = circumference - (current / max) * circumference;
+
+        circle.style.strokeDashoffset = offset;
+        text.textContent = current;
+
+        if (current > 0) {
+            ring.classList.add('active');
+            ring.style.display = 'flex';
+        } else {
+            ring.classList.remove('active');
+            ring.style.display = 'none';
+        }
+    }
+
+    showMatchResult(success) {
+        const el = document.getElementById('matchResult');
+        const icon = document.getElementById('matchResultIcon');
+        if (!el || !icon) return;
+
+        el.classList.remove('match-success', 'match-fail', 'camera-shake');
+
+        if (success) {
+            icon.innerHTML = '✓';
+            el.classList.add('match-success');
+        } else {
+            icon.innerHTML = '✕';
+            el.classList.add('match-fail', 'camera-shake');
+        }
+
+        setTimeout(() => {
+            this.clearMatchResult();
+        }, 1400);
+    }
+
+    clearMatchResult() {
+        const el = document.getElementById('matchResult');
+        const icon = document.getElementById('matchResultIcon');
+        if (!el || !icon) return;
+
+        el.classList.remove('match-success', 'match-fail', 'camera-shake');
+        el.style.opacity = '0';
+        el.style.transform = 'scale(.85)';
+        icon.innerHTML = '';
+    }
+
+    flashSuccess(message = 'تم التحقق بنجاح') {
+        this.showMatchResult(true);
+        playSound?.('faceid-success');
+        setCamStatus?.(`<i class="fas fa-check-circle" style="color:#10b981;"></i> ${message}`);
+    }
+
+    flashFailure(message = 'فشل التحقق') {
+        this.showMatchResult(false);
+        playSound?.('faceid-error');
+        setCamStatus?.(`<i class="fas fa-times-circle" style="color:#ef4444;"></i> ${message}`);
+    }
+
+    // ============================================
+    // 🖼️ IMAGE PROCESSING
+    // ============================================
+
+    createStorageImageBlob() {
+        const video = this.videoElement || document.getElementById('video');
+        if (!video) return Promise.resolve(null);
+
+        const canvas = document.createElement('canvas');
+        let w = video.videoWidth;
+        let h = video.videoHeight;
+
+        const maxDim = AppConfig?.faceRecognition?.imageStorage?.maxWidth || 400;
+        const ratio = Math.min(maxDim / w, maxDim / h);
+
+        if (ratio < 1) {
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+        }
+
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+
+        const quality = AppConfig?.faceRecognition?.imageStorage?.quality || 0.8;
+        return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+    }
+
+    // ============================================
+    // 📏 DISTANCE CALCULATION
+    // ============================================
+
+    euclideanDistance(desc1, desc2) {
+        if (!desc1 || !desc2 || desc1.length !== desc2.length) return Infinity;
+
+        let sum = 0;
+        for (let i = 0; i < desc1.length; i++) {
+            sum += (desc1[i] - desc2[i]) ** 2;
+        }
+        return Math.sqrt(sum);
+    }
+
+    // ============================================
+    // 🎯 MODE HANDLERS
+    // ============================================
+
+    async handleRegistration(descriptor) {
+        if (typeof handleRegistrationCapture === 'function') {
+            await handleRegistrationCapture(descriptor);
+        }
+    }
+
+    async handleFirstTimeSetup(descriptor) {
+        if (typeof handleFirstTimeSetupCapture === 'function') {
+            await handleFirstTimeSetupCapture(descriptor);
+        }
+    }
+
+    async handleFaceUpdate(descriptor) {
+        if (typeof handleFaceUpdateCapture === 'function') {
+            await handleFaceUpdateCapture(descriptor);
+        }
+    }
+
+    async handleAdminVerification(descriptor) {
+        if (typeof handleAdminVerificationCapture === 'function') {
+            await handleAdminVerificationCapture(descriptor);
+        }
+    }
+
+    async handleAttendanceCapture(descriptor) {
+        if (typeof handleAttendanceOperation === 'function') {
+            await handleAttendanceOperation(descriptor);
+        }
+    }
+
+    restartCamLoop() {
+        window.isProcessingCapture = false;
+        window.stabilityCounter = 0;
+        updateStabilityRing?.(0, 2);
+
+        const scanLine = document.getElementById('scanLine');
+        if (scanLine) scanLine.classList.add('active');
+
+        this.startDetectionLoop();
     }
 }
 
 // ============================================
-// 🌍 GLOBAL COMPATIBILITY
+// 🌍 GLOBAL FUNCTIONS
+// ============================================
+
+window.manualFaceCapture = async function () {
+    if (typeof faceRecognition !== 'undefined') {
+        return await faceRecognition.performCapture();
+    }
+    return false;
+};
+
+window.openCamera = async function () {
+    if (typeof faceRecognition !== 'undefined') {
+        return await faceRecognition.openCamera();
+    }
+    return false;
+};
+
+window.closeCamera = function () {
+    if (typeof faceRecognition !== 'undefined') {
+        faceRecognition.closeCamera();
+    }
+};
+
+window.setCamStatus = function (html) {
+    if (html !== window.lastCamStatusText) {
+        const el = document.getElementById('camStatus');
+        if (el) el.innerHTML = html;
+        window.lastCamStatusText = html;
+    }
+};
+
+window.resetLiveness = function () {
+    if (typeof faceRecognition !== 'undefined') {
+        faceRecognition.resetLiveness();
+    }
+};
+
+window.updateLiveness = function (yaw, landmarks) {
+    if (typeof faceRecognition !== 'undefined') {
+        return faceRecognition.updateLiveness(yaw, landmarks);
+    }
+    return true;
+};
+
+window.getHeadYaw = function (landmarks) {
+    if (typeof faceRecognition !== 'undefined') {
+        return faceRecognition.getHeadYaw(landmarks);
+    }
+    return 0;
+};
+
+window.updateStabilityRing = function (current, max) {
+    if (typeof faceRecognition !== 'undefined') {
+        faceRecognition.updateStabilityRing(current, max);
+    }
+};
+
+window.showMatchResult = function (success) {
+    if (typeof faceRecognition !== 'undefined') {
+        faceRecognition.showMatchResult(success);
+    }
+};
+
+window.bufferToBase64 = function (buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+};
+
+window.base64ToBuffer = function (base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+};
+
+window.playSound = function (id) {
+    if (typeof app !== 'undefined' && app.playSound) {
+        app.playSound(id);
+    }
+};
+
+window.showToast = function (msg, type) {
+    if (typeof showToast === 'function') {
+        showToast(msg, type);
+    }
+};
+
+window.setStatus = function (txt) {
+    if (typeof setStatus === 'function') {
+        setStatus(txt);
+    }
+};
+
+window.updateSplashProgress = function (percent) {
+    const bar = document.getElementById('loadProgress');
+    if (bar) bar.style.width = `${percent}%`;
+};
+
+// ============================================
+// 🚀 INITIALIZE FACE RECOGNITION
 // ============================================
 
 let faceRecognition;
@@ -784,33 +1186,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// الدوال العامة
-window.openCamera = async () => faceRecognition?.openCamera();
-window.closeCamera = () => faceRecognition?.closeCamera();
-window.manualFaceCapture = async () => faceRecognition?.performCapture();
-window.setCamStatus = (html) => faceRecognition?.setStatusText(html);
-window.switchFaceCamera = async () => {
-    if (AppConfig) {
-        AppConfig.faceRecognition.camera.facingMode =
-            AppConfig.faceRecognition.camera.facingMode === 'user' ? 'environment' : 'user';
-        await faceRecognition?.openCamera();
-    }
-};
-
-// Utility functions
-window.bufferToBase64 = (buffer) => {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
-};
-window.base64ToBuffer = (base64) => {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes.buffer;
-};
-
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = FaceRecognitionManager;
-}
+};
+
+window.switchFaceCamera = async function () {
+    try {
+        AppConfig.faceRecognition.camera.facingMode =
+            AppConfig.faceRecognition.camera.facingMode === 'user' ? 'environment' : 'user';
+
+        if (typeof faceRecognition !== 'undefined') {
+            await faceRecognition.openCamera();
+        }
+    } catch (e) {
+        console.warn('switch camera failed', e);
+    }
+};
