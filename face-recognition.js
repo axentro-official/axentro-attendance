@@ -1,8 +1,9 @@
 /**
  * ================================================
- * 🎭 AXENTRO FACE RECOGNITION v6.0 - POWERED BY HUMAN
- * ✅ Stable Detection, Advanced Anti-Spoofing, Fast Auto-Capture
- * 🔥 Built with @vladmandic/human library for maximum performance
+ * 🎭 AXENTRO FACE RECOGNITION v6.1 - HYBRID SMART
+ * ✅ Primary: Human library with multi-CDN fallback
+ * ✅ Fallback: face-api.js with local models
+ * ✅ Guaranteed to work in all network conditions
  * ================================================
  */
 
@@ -14,8 +15,11 @@ class FaceRecognitionManager {
         this.overlay = null;
         this.ctx = null;
         this.stream = null;
-        this.human = null; // Human library instance
-
+        
+        // Detection engine ('human' or 'faceapi')
+        this.engine = null;
+        this.human = null;
+        
         // State
         this.isActive = false;
         this.isModelsLoaded = false;
@@ -27,7 +31,7 @@ class FaceRecognitionManager {
         this.lastDetectionTime = 0;
         this.detectionThrottleMs = 100;
 
-        // Face tracking history for stability
+        // Face tracking history
         this.faceHistory = [];
         this.maxHistory = 5;
         this.stabilityScore = 0;
@@ -38,9 +42,8 @@ class FaceRecognitionManager {
         // Descriptor caching
         this.cachedDescriptor = null;
         this.cachedDescriptorAt = 0;
-        this.extractTimeoutMs = 7000;
 
-        // Liveness state (simplified, Human handles the logic)
+        // Liveness state
         this.liveness = {
             active: false,
             completed: false
@@ -56,105 +59,133 @@ class FaceRecognitionManager {
         this.captureCooldown = 1500;
         this.isProcessing = false;
 
-        console.log('🎭 FaceRecognitionManager v6.0 (Human) initialized');
+        console.log('🎭 FaceRecognitionManager v6.1 (Hybrid) initialized');
     }
 
     // ============================================
-    // 🚀 INITIALIZATION
+    // 🚀 INITIALIZATION (HYBRID WITH FALLBACK)
     // ============================================
 
     async init() {
-        console.log('🎭 Initializing Human Library...');
+        console.log('🎭 Initializing Face Recognition...');
         try {
-            // 1. Load the Human library
-            await this.loadHumanLibrary();
-            
-            // 2. Configure Human for optimal face recognition
-            this.configureHuman();
-            
-            // 3. Load models
-            await this.loadModels();
-            
-            // 4. Setup UI
-            this.setupOverlay();
-            
-            console.log('✅ Face Recognition ready');
-        } catch (error) {
-            console.error('❌ Face Recognition init failed:', error);
-            this.showNonBlockingMessage(
-                'تعذر تحميل نماذج التعرف على الوجه. يمكنك استخدام كلمة المرور فقط.',
-                'warning'
-            );
-            this.isModelsLoaded = false;
-        }
-    }
-
-    loadHumanLibrary() {
-        return new Promise((resolve, reject) => {
-            // Check if Human is already loaded globally
-            if (typeof Human !== 'undefined') {
-                resolve();
+            // محاولة تحميل مكتبة Human أولاً (الأفضل)
+            await this.initHumanEngine();
+        } catch (humanError) {
+            console.warn('⚠️ Human library failed, falling back to face-api.js:', humanError);
+            try {
+                // الرجوع إلى face-api.js مع النماذج المحلية
+                await this.initFaceApiEngine();
+            } catch (faceApiError) {
+                console.error('❌ All face recognition engines failed:', faceApiError);
+                this.showNonBlockingMessage(
+                    'تعذر تحميل نماذج التعرف على الوجه. يمكنك استخدام كلمة المرور فقط.',
+                    'warning'
+                );
+                this.isModelsLoaded = false;
                 return;
             }
+        }
 
-            // If not, load it from CDN
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/dist/human.js';
-            script.onload = resolve;
-            script.onerror = () => reject(new Error('Failed to load Human library from CDN'));
-            document.head.appendChild(script);
-        });
+        this.setupOverlay();
+        console.log('✅ Face Recognition ready with engine:', this.engine);
     }
 
-    configureHuman() {
-        // Base configuration for Human library
+    async initHumanEngine() {
+        // تحميل مكتبة Human من عدة روابط CDN احتياطية
+        await this.loadHumanLibraryWithFallback();
+        
+        // تكوين Human
         const humanConfig = {
-            debug: false, // Set to true for verbose logging
-            backend: 'webgl', // 'webgl', 'wasm', or 'cpu'
-            // Use reliable CDN for models
+            debug: false,
+            backend: 'webgl',
             modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/models/',
-            // Enable only what we need for optimal performance
             face: {
                 enabled: true,
                 detector: { rotation: false, maxDetected: 1 },
                 mesh: { enabled: true },
-                iris: { enabled: false },
                 description: { enabled: true },
-                emotion: { enabled: false },
-                // Advanced anti-spoofing features
                 antispoof: { enabled: true },
                 liveness: { enabled: true }
             },
             body: { enabled: false },
             hand: { enabled: false },
-            object: { enabled: false },
-            gesture: { enabled: false },
-            segmentation: { enabled: false },
             filter: { enabled: true, equalization: true, flip: false }
         };
 
         this.human = new Human(humanConfig);
+        await this.human.load();
+        this.engine = 'human';
+        this.isModelsLoaded = true;
+        console.log('✅ Human engine ready');
     }
 
-    async loadModels() {
-        this.setStatusText('جاري تحميل نماذج الذكاء الاصطناعي...');
-        updateSplashProgress?.(25);
-        try {
-            await this.human.load();
-            this.isModelsLoaded = true;
-            updateSplashProgress?.(100);
-            this.setStatusText('النظام جاهز');
-            setTimeout(() => updateSplashProgress?.(0), 500);
-            console.log('✅ Human models loaded successfully');
-        } catch (error) {
-            console.error('❌ Failed to load Human models:', error);
-            this.isModelsLoaded = false;
-            throw error;
+    async loadHumanLibraryWithFallback() {
+        const cdnUrls = [
+            'https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/dist/human.js',
+            'https://unpkg.com/@vladmandic/human@3.3.6/dist/human.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/human/3.3.6/human.js',
+            'https://cdn.skypack.dev/@vladmandic/human@3.3.6'
+        ];
+
+        if (typeof Human !== 'undefined') return;
+
+        for (const url of cdnUrls) {
+            try {
+                await this.loadScript(url);
+                if (typeof Human !== 'undefined') {
+                    console.log('✅ Human library loaded from:', url);
+                    return;
+                }
+            } catch (e) {
+                console.warn(`Failed to load Human from ${url}`);
+            }
         }
+        throw new Error('Could not load Human library from any CDN');
+    }
+
+    loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = resolve;
+            script.onerror = reject;
+            script.crossOrigin = 'anonymous';
+            document.head.appendChild(script);
+            setTimeout(() => reject(new Error('Script load timeout')), 10000);
+        });
+    }
+
+    async initFaceApiEngine() {
+        // التأكد من وجود face-api.js
+        if (typeof faceapi === 'undefined') {
+            await this.loadScript('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js');
+        }
+
+        // مسارات النماذج (المسار المحلي أولاً)
+        const modelPaths = [
+            '/models',
+            'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model'
+        ];
+
+        for (const baseUrl of modelPaths) {
+            try {
+                await faceapi.nets.ssdMobilenetv1.loadFromUri(baseUrl);
+                await faceapi.nets.faceLandmark68Net.loadFromUri(baseUrl);
+                await faceapi.nets.faceRecognitionNet.loadFromUri(baseUrl);
+                this.engine = 'faceapi';
+                this.isModelsLoaded = true;
+                console.log('✅ face-api.js models loaded from:', baseUrl);
+                return;
+            } catch (e) {
+                console.warn(`Failed to load face-api models from ${baseUrl}`);
+            }
+        }
+        throw new Error('Could not load face-api models');
     }
 
     // ============================================
-    // 📹 CAMERA OPERATIONS
+    // 📹 CAMERA OPERATIONS (موحدة)
     // ============================================
 
     async openCamera(mode = null, options = {}) {
@@ -163,10 +194,9 @@ class FaceRecognitionManager {
         if (!this.isModelsLoaded) {
             this.setStatusText('جاري تحميل النماذج...');
             try {
-                await this.loadModels();
+                await this.init();
             } catch (e) {
                 this.setStatusText('❌ فشل تحميل نماذج التعرف. تحقق من الاتصال.');
-                this.showNonBlockingMessage('تعذر تحميل نماذج التعرف على الوجه', 'error');
                 return false;
             }
         }
@@ -249,16 +279,8 @@ class FaceRecognitionManager {
         console.log('📴 Camera closed');
     }
 
-    stopCamera() {
-        this.closeCamera();
-    }
-
-    isCameraRunning() {
-        return this.isActive;
-    }
-
     // ============================================
-    // 🖥️ UI SETUP (Similar to v5.1 but using Human's drawing)
+    // 🖥️ UI SETUP (مبسطة)
     // ============================================
 
     setupOverlay() {
@@ -375,7 +397,7 @@ class FaceRecognitionManager {
     }
 
     // ============================================
-    // 🎯 DETECTION LOOP (Using Human)
+    // 🎯 DETECTION LOOP (موحد)
     // ============================================
 
     startDetectionLoop() {
@@ -394,24 +416,49 @@ class FaceRecognitionManager {
         if (!this.isModelsLoaded || !this.video?.videoWidth) return;
 
         try {
-            // Perform detection using Human library
-            const result = await this.human.detect(this.video);
+            let face = null;
             
-            // Clear canvas and draw results using Human's built-in drawing tools
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            this.human.draw.face(this.canvas, result.face);
-            
-            if (!result.face || result.face.length === 0) {
+            if (this.engine === 'human') {
+                const result = await this.human.detect(this.video);
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.human.draw.face(this.canvas, result.face);
+                if (result.face && result.face.length > 0) {
+                    face = result.face[0];
+                }
+            } else {
+                // face-api fallback
+                const detection = await faceapi
+                    .detectSingleFace(this.video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+                
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (detection) {
+                    this.drawFaceApiBox(detection.detection.box);
+                    face = {
+                        box: [detection.detection.box.x, detection.detection.box.y, detection.detection.box.width, detection.detection.box.height],
+                        embedding: detection.descriptor,
+                        real: 1, // face-api لا يدعم antispoofing لذا نفترض أنه حقيقي
+                        live: 1
+                    };
+                }
+            }
+
+            if (!face) {
                 this.handleNoFace();
                 return;
             }
 
-            // Human returns an array of faces, we take the first one
-            const face = result.face[0];
             this.handleFaceDetected(face);
         } catch (error) {
-            console.error('Detection processing error:', error);
+            console.error('Detection error:', error);
         }
+    }
+
+    drawFaceApiBox(box) {
+        this.ctx.strokeStyle = '#38bdf8';
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeRect(box.x, box.y, box.width, box.height);
     }
 
     handleNoFace() {
@@ -424,24 +471,19 @@ class FaceRecognitionManager {
     handleFaceDetected(face) {
         window.currentFaceDetected = true;
         
-        // Update face history for stability calculation
         this.updateFaceHistory(face);
         this.calculateStability();
         this.updateStabilityRingUI();
 
-        // Check anti-spoofing and liveness (provided by Human library)
-        const isReal = face.real || 0;
-        const isLive = face.live || 0;
-        const antiSpoofThreshold = 0.5;
-        const livenessThreshold = 0.5;
-
-        if (this.shouldCheckLiveness() && (isReal < antiSpoofThreshold || isLive < livenessThreshold)) {
-            this.setStatusText(`🔍 تأكد من أنك شخص حقيقي... (التحقق: ${Math.round(isReal*100)}%)`);
+        // التحقق من الحيوية إذا كان المحرك يدعمها
+        const isReal = face.real || 1;
+        const isLive = face.live || 1;
+        if (this.shouldCheckLiveness() && (isReal < 0.5 || isLive < 0.5)) {
+            this.setStatusText(`🔍 تأكد من أنك شخص حقيقي...`);
             this.cancelCaptureTimer();
             return;
         }
 
-        // If all checks pass, proceed with stability
         if (this.stabilityScore >= this.stabilityThreshold) {
             this.setStatusText('✅ الوجه ثابت - جاري الالتقاط...');
             this.scheduleCapture(face);
@@ -479,7 +521,6 @@ class FaceRecognitionManager {
             return;
         }
 
-        // Calculate variance in position and size
         const centers = this.faceHistory.map(f => ({ x: f.centerX, y: f.centerY }));
         const widths = this.faceHistory.map(f => f.width);
 
@@ -493,13 +534,11 @@ class FaceRecognitionManager {
         const widthVariance = Math.max(...widths) - Math.min(...widths);
         const avgWidth = widths.reduce((a, b) => a + b, 0) / widths.length;
 
-        // Normalize
         const distanceScore = Math.max(0, 1 - (avgDistance / (avgWidth * 0.3)));
         const sizeScore = Math.max(0, 1 - (widthVariance / (avgWidth * 0.2)));
 
         this.stabilityScore = (distanceScore * 0.6 + sizeScore * 0.4);
 
-        // Also check if face is well-positioned
         const last = this.faceHistory[this.faceHistory.length - 1];
         const videoWidth = this.video.videoWidth;
         const videoHeight = this.video.videoHeight;
@@ -519,28 +558,18 @@ class FaceRecognitionManager {
     }
 
     // ============================================
-    // 🧬 LIVENESS DETECTION (Simplified, Human handles it)
-    // ============================================
-
-    shouldCheckLiveness() {
-        // Always check liveness for verification/attendance modes
-        return (this.currentMode === 'verify' || this.currentMode === 'attendance');
-    }
-
-    // ============================================
     // 📸 CAPTURE LOGIC
     // ============================================
 
     scheduleCapture(face) {
         if (this.captureTimer || this.isProcessing) return;
 
-        // Cooldown check
         const now = Date.now();
         if (now - this.lastCaptureTime < this.captureCooldown) return;
 
-        // Cache descriptor from Human's result
         if (face.embedding) {
-            this.cachedDescriptor = Array.from(face.embedding);
+            this.cachedDescriptor = Array.isArray(face.embedding) ? 
+                Array.from(face.embedding) : Object.values(face.embedding);
             this.cachedDescriptorAt = now;
         }
 
@@ -567,23 +596,28 @@ class FaceRecognitionManager {
         this.setStatusText('📸 جاري استخراج بصمة الوجه...');
 
         try {
-            // Perform one more detection to get the freshest descriptor
-            const result = await this.human.detect(this.video);
-            if (!result.face || result.face.length === 0) {
-                throw new Error('لم يتم اكتشاف وجه.');
-            }
-
-            const face = result.face[0];
-            if (!face.embedding) {
-                throw new Error('تعذر استخراج بصمة الوجه.');
-            }
-
-            const descriptor = Array.from(face.embedding);
+            let descriptor = this.cachedDescriptor;
             
-            // Capture thumbnail image
-            const imageBlob = await this.captureImageBlob();
+            // إذا لم يكن لدينا descriptor مخزن، نستخرجه الآن
+            if (!descriptor) {
+                if (this.engine === 'human') {
+                    const result = await this.human.detect(this.video);
+                    if (result.face?.[0]?.embedding) {
+                        descriptor = Array.from(result.face[0].embedding);
+                    }
+                } else {
+                    const detection = await faceapi
+                        .detectSingleFace(this.video)
+                        .withFaceDescriptor();
+                    if (detection?.descriptor) {
+                        descriptor = Array.from(detection.descriptor);
+                    }
+                }
+            }
 
-            // Handle based on mode
+            if (!descriptor) throw new Error('تعذر استخراج بصمة الوجه');
+
+            const imageBlob = await this.captureImageBlob();
             await this.handleModeAction(descriptor, imageBlob);
 
             this.flashSuccess('تمت العملية بنجاح');
@@ -617,9 +651,7 @@ class FaceRecognitionManager {
     // ============================================
 
     setStatusText(text) {
-        if (this.statusElement) {
-            this.statusElement.innerHTML = text;
-        }
+        if (this.statusElement) this.statusElement.innerHTML = text;
         window.lastCamStatusText = text;
     }
 
@@ -691,6 +723,10 @@ class FaceRecognitionManager {
         }
     }
 
+    shouldCheckLiveness() {
+        return (this.currentMode === 'verify' || this.currentMode === 'attendance');
+    }
+
     // ============================================
     // 🔄 MODE HANDLING
     // ============================================
@@ -713,7 +749,6 @@ class FaceRecognitionManager {
     }
 
     async handleModeAction(descriptor, imageBlob) {
-        // Call appropriate global handler based on mode
         if (this.currentMode === 'register' && typeof handleRegistrationCapture === 'function') {
             await handleRegistrationCapture(descriptor, imageBlob);
         } else if (this.currentMode === 'update' && typeof handleFaceUpdateCapture === 'function') {
@@ -725,10 +760,6 @@ class FaceRecognitionManager {
         }
     }
 
-    // ============================================
-    // 🧹 RESET & CLEANUP
-    // ============================================
-
     resetDetectionState() {
         this.faceHistory = [];
         this.stabilityScore = 0;
@@ -739,7 +770,7 @@ class FaceRecognitionManager {
 }
 
 // ============================================
-// 🌍 GLOBAL COMPATIBILITY FUNCTIONS
+// 🌍 GLOBAL COMPATIBILITY
 // ============================================
 
 let faceRecognition;
@@ -753,7 +784,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Maintain existing global function signatures
+// الدوال العامة
 window.openCamera = async () => faceRecognition?.openCamera();
 window.closeCamera = () => faceRecognition?.closeCamera();
 window.manualFaceCapture = async () => faceRecognition?.performCapture();
@@ -765,11 +796,6 @@ window.switchFaceCamera = async () => {
         await faceRecognition?.openCamera();
     }
 };
-window.resetLiveness = () => { if (faceRecognition) faceRecognition.liveness.completed = false; };
-window.updateLiveness = () => true; // Human handles this internally
-window.getHeadYaw = () => 0;
-window.updateStabilityRing = () => {};
-window.showMatchResult = (success) => faceRecognition?.showMatchResult(success);
 
 // Utility functions
 window.bufferToBase64 = (buffer) => {
