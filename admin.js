@@ -276,14 +276,9 @@ class AdminManager {
 
     async deleteEmployeeWithVerification(targetEmp) {
         try {
-            // Delete attendance records first
-            const { error: attErr } = await db.from('attendance')
-                .delete()
-                .eq('employee_code', targetEmp.code);
-
-            // Delete employee
+            // Soft delete employee للحفاظ على السجل التاريخي
             const { error: empErr } = await db.from('employees')
-                .delete()
+                .update({ is_deleted: true })
                 .eq('code', targetEmp.code);
 
             // Try to delete face image from storage
@@ -332,15 +327,19 @@ class AdminManager {
                 second: '2-digit' 
             })}`;
 
-            const { error } = await db.from('attendance').insert({
+            const result = await db.recordAttendanceSecure({
                 employee_code: targetEmp.code,
                 employee_name: targetEmp.name,
                 type: targetEmp.type,
                 location_link: window.currentLoc || 'غير متوفر',
-                shift: 'تسجيل يدوي بواسطة الأدمن'
+                shift: 'تسجيل يدوي بواسطة الأدمن',
+                latitude: window.currentLat,
+                longitude: window.currentLon,
+                gps_accuracy: window.currentAccuracy || null,
+                face_verified: true
             });
 
-            if (!error) {
+            if (result?.success) {
                 playSound?.('faceid-success');
                 showToast?.(`تم تسجيل ${targetEmp.type} لـ ${targetEmp.name} بنجاح`, 'success');
 
@@ -354,7 +353,7 @@ class AdminManager {
                 }, 800);
 
             } else {
-                throw error;
+                throw new Error(result?.error || 'فشل تنفيذ العملية');
             }
 
         } catch(e) {
@@ -401,16 +400,26 @@ class AdminManager {
                         .single();
 
                     if (emp) {
-                        fetch(AppConfig.emailService.url, {
-                            method: 'POST',
-                            body: JSON.stringify({
+                        if (typeof db !== 'undefined' && typeof db.sendEmailService === 'function') {
+                            db.sendEmailService({
                                 action: 'sendForgotPw',
                                 name: emp.name,
                                 code: code,
                                 password: tempPass,
                                 email: emp.email
-                            })
-                        }).catch(e => console.log('Email error:', e));
+                            }).catch(e => console.log('Email error:', e));
+                        } else {
+                            fetch(AppConfig.emailService.url, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    action: 'sendForgotPw',
+                                    name: emp.name,
+                                    code: code,
+                                    password: tempPass,
+                                    email: emp.email
+                                })
+                            }).catch(e => console.log('Email error:', e));
+                        }
                     }
                 } catch(emailError) {
                     console.warn('Could not send email notification');
@@ -586,18 +595,6 @@ window.handleRegistrationCapture = async function(descriptor) {
         showToast?.(`تم إنشاء الحساب! (الكود: ${result.employee_code || result.code})`, 'success');
         closeCamera?.();
         showLoginScreen?.();
-        if (AppConfig?.emailService?.url) {
-            fetch(AppConfig.emailService.url, {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'sendNewEmpEmails',
-                    name: window.regData.name,
-                    code: result.employee_code || result.code,
-                    password: tempPass,
-                    email: window.regData.email
-                })
-            }).catch(e => console.log('Welcome email error:', e));
-        }
     } catch (e) {
         console.error('❌ Registration error:', e);
         playSound?.('faceid-error');

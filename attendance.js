@@ -324,22 +324,23 @@ class AttendanceManager {
                 second: '2-digit' 
             })}`;
 
-            // Step 4: Record to database
-            const recordData = {
+            // Step 4: Record to database عبر الدالة الآمنة
+            if (typeof db === 'undefined') throw new Error('Database not available');
+
+            const result = await db.recordAttendanceSecure({
                 employee_code: window.user.code,
                 employee_name: window.user.name,
                 type: type,
                 location_link: window.currentLoc || 'غير متوفر',
                 shift: selectedShift || 'لم يتم التحديد',
                 hours_worked: hoursWorked,
-                overtime: overtime
-            };
+                latitude: window.currentLat,
+                longitude: window.currentLon,
+                gps_accuracy: this.currentLocation?.accuracy || window.currentAccuracy || null,
+                face_verified: true
+            });
 
-            if (typeof db === 'undefined') throw new Error('Database not available');
-
-            const { error } = await db.from('attendance').insert(recordData);
-
-            if (error) throw error;
+            if (!result?.success) throw new Error(result?.error || 'فشل تسجيل الحضور');
 
             // Success!
             playSound?.('faceid-success');
@@ -389,6 +390,11 @@ class AttendanceManager {
             hoursWorked: hoursWorked || '-',
             overtime: overtime || 'لا يوجد'
         };
+
+        if (typeof db !== 'undefined' && typeof db.sendEmailService === 'function') {
+            db.sendEmailService(emailData).catch(e => console.log('Email notification error:', e));
+            return;
+        }
 
         fetch(AppConfig.emailService.url, {
             method: 'POST',
