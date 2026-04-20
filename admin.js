@@ -276,91 +276,74 @@ class AdminManager {
 
     async deleteEmployeeWithVerification(targetEmp) {
         try {
-            // Delete attendance records first
-            const { error: attErr } = await db.from('attendance')
-                .delete()
-                .eq('employee_code', targetEmp.code);
+            const result = await db.updateEmployee(targetEmp.code, { is_deleted: true });
+            if (!result?.success) throw new Error(result?.error || 'فشل حذف الموظف');
 
-            // Delete employee
-            const { error: empErr } = await db.from('employees')
-                .delete()
-                .eq('code', targetEmp.code);
-
-            // Try to delete face image from storage
             try {
                 if (typeof db !== 'undefined' && db.storage) {
-                    await db.storage.from('faces').remove([`${targetEmp.code}_face.jpg`]);
+                    await db.storage.from('faces').remove([
+                        `${targetEmp.code}_face.jpg`,
+                        `employee_${targetEmp.code}_face.jpg`,
+                        `${targetEmp.code}.jpg`
+                    ]);
                 }
             } catch(storageError) {
                 console.warn('⚠️ Could not delete storage image:', storageError.message);
             }
 
-            if (!empErr) {
-                playSound?.('faceid-success');
-                showToast?.(`تم حذف ${targetEmp.name} بنجاح`, 'success');
+            playSound?.('faceid-success');
+            showToast?.(`تم حذف ${targetEmp.name} بنجاح`, 'success');
 
-                setTimeout(async () => {
-                    closeCamera?.();
-                    
-                    // Reload employees list
-                    if (typeof loadEmployees === 'function') {
-                        await loadEmployees();
-                    } else if (typeof attendance !== 'undefined') {
-                        await attendance.loadEmployees();
-                    }
-                }, 800);
-
-            } else {
-                throw empErr;
-            }
-
+            setTimeout(async () => {
+                closeCamera?.();
+                if (typeof loadEmployees === 'function') {
+                    await loadEmployees();
+                } else if (typeof attendance !== 'undefined') {
+                    await attendance.loadEmployees();
+                }
+            }, 800);
         } catch(e) {
             console.error('❌ Delete employee error:', e);
             playSound?.('faceid-error');
-            showToast?.('فشل حذف الموظف', 'error');
+            showToast?.(e.message || 'فشل حذف الموظف', 'error');
             faceRecognition?.restartCamLoop();
         }
     }
 
     async recordManualAttendance(targetEmp) {
         try {
-            const now = new Date();
-            const datetime = `${now.toLocaleDateString('ar-EG')} - ${now.toLocaleString('ar-EG', { 
-                hour12: true, 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-            })}`;
-
-            const { error } = await db.from('attendance').insert({
-                employee_code: targetEmp.code,
-                employee_name: targetEmp.name,
-                type: targetEmp.type,
-                location_link: window.currentLoc || 'غير متوفر',
-                shift: 'تسجيل يدوي بواسطة الأدمن'
-            });
-
-            if (!error) {
-                playSound?.('faceid-success');
-                showToast?.(`تم تسجيل ${targetEmp.type} لـ ${targetEmp.name} بنجاح`, 'success');
-
-                setTimeout(async () => {
-                    closeCamera?.();
-                    
-                    // Reload data
-                    if (typeof loadEmployees === 'function') {
-                        await loadEmployees();
-                    }
-                }, 800);
-
-            } else {
-                throw error;
+            if (typeof attendance !== 'undefined' && attendance.getCurrentLocation) {
+                await attendance.getCurrentLocation();
             }
 
+            const result = await db.recordAttendanceSecure({
+                employee_code: targetEmp.code,
+                type: targetEmp.type,
+                shift: 'تسجيل يدوي بواسطة الأدمن',
+                location_link: window.currentLoc || null,
+                latitude: window.currentLat ?? null,
+                longitude: window.currentLon ?? null,
+                gps_accuracy: window.currentAccuracy ?? null,
+                face_verified: true
+            });
+
+            if (!result?.success) {
+                throw new Error(result?.error || 'فشل التسجيل اليدوي');
+            }
+
+            playSound?.('faceid-success');
+            showToast?.(`تم تسجيل ${targetEmp.type} لـ ${targetEmp.name} بنجاح`, 'success');
+
+            setTimeout(async () => {
+                closeCamera?.();
+                if (typeof loadEmployees === 'function') {
+                    await loadEmployees();
+                }
+            }, 800);
         } catch(e) {
             console.error('❌ Manual attendance error:', e);
             playSound?.('faceid-error');
-            showToast?.('فشل التسجيل اليدوي', 'error');
+            showToast?.(e.message || 'فشل التسجيل اليدوي', 'error');
             faceRecognition?.restartCamLoop();
         }
     }
@@ -586,18 +569,6 @@ window.handleRegistrationCapture = async function(descriptor) {
         showToast?.(`تم إنشاء الحساب! (الكود: ${result.employee_code || result.code})`, 'success');
         closeCamera?.();
         showLoginScreen?.();
-        if (AppConfig?.emailService?.url) {
-            fetch(AppConfig.emailService.url, {
-                method: 'POST',
-                body: JSON.stringify({
-                    action: 'sendNewEmpEmails',
-                    name: window.regData.name,
-                    code: result.employee_code || result.code,
-                    password: tempPass,
-                    email: window.regData.email
-                })
-            }).catch(e => console.log('Welcome email error:', e));
-        }
     } catch (e) {
         console.error('❌ Registration error:', e);
         playSound?.('faceid-error');

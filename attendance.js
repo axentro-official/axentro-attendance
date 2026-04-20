@@ -242,32 +242,27 @@ class AttendanceManager {
     }
 
     async recordAttendance(type) {
-        // Prevent double-clicks
         if (this.isProcessing) {
             showToast?.('جاري المعالجة... يرجى الانتظار', 'warning');
             return;
         }
 
-        // Check cooldown
         if (this.isOnCooldown()) {
             showToast?.('يرجى الانتظار قبل المحاولة مرة أخرى', 'error');
             return;
         }
 
-        // Validate user is authenticated
         if (!window.user) {
             showToast?.('يجب تسجيل الدخول أولاً', 'error');
             return;
         }
 
-        // Validate shift selection
         const selectedShift = this.getSelectedShift();
         if (!selectedShift && type === 'حضور') {
             showToast?.('يرجى اختيار الوردية', 'error');
             return;
         }
 
-        // Check if opposite action already exists
         if (type === 'حضور' && this.currentStatus === 'in') {
             showToast?.('لقد سجلت حضورك بالفعل', 'error');
             return;
@@ -278,428 +273,56 @@ class AttendanceManager {
             return;
         }
 
-        // Start processing
+        if (!window.sessionDescriptor) {
+            window.firstTimeSetupMode = true;
+            showToast?.('لا توجد بصمة وجه مسجلة لهذا الحساب. سنفتح الكاميرا الآن لتسجيلها.', 'warning');
+            const opened = typeof openCamera === 'function' ? await openCamera() : false;
+            if (!opened) {
+                showToast?.('تعذر فتح الكاميرا لتسجيل بصمة الوجه', 'error');
+            }
+            return;
+        }
+
         this.isProcessing = true;
+        window.attType = type;
+        window.attMode = true;
+        window.regMode = false;
+        window.updateFaceMode = false;
+        window.adminVerifyMode = false;
+        window.adminResetFaceMode = false;
+        window.firstTimeSetupMode = false;
 
         const btnId = type === 'حضور' ? 'checkInBtn' : 'checkOutBtn';
         const btn = document.getElementById(btnId);
-        const loadingText = type === 'حضور' ? 'جاري تسجيل الحضور...' : 'جاري تسجيل الانصراف...';
-
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + loadingText;
-        }
+        const originalHtml = btn?.innerHTML || '';
+        const loadingText = type === 'حضور' ? 'التحقق من الوجه لتسجيل الحضور...' : 'التحقق من الوجه لتسجيل الانصراف...';
 
         try {
-            // Step 1: Get location (non-blocking)
             await this.getCurrentLocation();
 
-            // Step 2: Calculate hours worked (for check-out only)
-            let hoursWorked = null;
-            let overtime = null;
-
-            if (type === 'انصراف' && this.lastCheckIn) {
-                const checkInTime = new Date(this.lastCheckIn.created_at);
-                const now = new Date();
-                const diff = (now - checkInTime) / (1000 * 60 * 60);
-                hoursWorked = diff.toFixed(2);
-
-                // Calculate overtime
-                const normalHours = AppConfig?.attendance?.normalHours || 9;
-                if (parseFloat(hoursWorked) > normalHours) {
-                    const ot = parseFloat(hoursWorked) - normalHours;
-                    overtime = `${ot.toFixed(1)} ساعة`;
-                } else {
-                    overtime = 'لا يوجد';
-                }
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + loadingText;
             }
 
-            // Step 3: Format datetime (12-hour format as requested)
-            const now = new Date();
-            const timeFormat = AppConfig?.reporting?.timeFormat || {};
-            const datetime = `${now.toLocaleDateString('ar-EG')} - ${now.toLocaleString('ar-EG', { 
-                hour12: timeFormat.hour12 !== false, 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-            })}`;
+            const opened = typeof openCamera === 'function' ? await openCamera() : false;
+            if (!opened) {
+                throw new Error('فشل فتح الكاميرا');
+            }
 
-            // Step 4: Record to database
-            const recordData = {
-                employee_code: window.user.code,
-                employee_name: window.user.name,
-                type: type,
-                location_link: window.currentLoc || 'غير متوفر',
-                shift: selectedShift || 'لم يتم التحديد',
-                hours_worked: hoursWorked,
-                overtime: overtime
-            };
-
-            if (typeof db === 'undefined') throw new Error('Database not available');
-
-            const { error } = await db.from('attendance').insert(recordData);
-
-            if (error) throw error;
-
-            // Success!
-            playSound?.('faceid-success');
-            showToast?.(`تم تسجيل ${type} بنجاح ${hoursWorked ? '(' + hoursWorked + ' ساعة)' : ''}`, 'success');
-
-            // Reload today's records
-            await this.loadTodayRecords();
-
-            // Send email alert in background (من الكود القديم)
-            this.sendAttendanceEmail(type, datetime, selectedShift, hoursWorked, overtime);
-
+            showToast?.('ثبّت وجهك داخل الإطار. سيتم التحقق ثم تسجيل العملية تلقائياً.', 'info');
         } catch (error) {
-            console.error('❌ Attendance recording error:', error);
-            playSound?.('faceid-error');
-            showToast?.('فشل تسجيل ' + type, 'error');
-        } finally {
+            console.error('❌ Start attendance flow error:', error);
+            showToast?.(error.message || 'تعذر بدء التحقق بالوجه', 'error');
             this.isProcessing = false;
-
-            // Reset button
+            window.attMode = false;
+            window.attType = '';
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = type === 'حضور' ? 
-                    '<i class="fas fa-sign-in-alt"></i> حضور' : 
-                    '<i class="fas fa-sign-out-alt"></i> انصراف';
-            }
-
-            // Update cooldown
-            this.lastActionTime = Date.now();
-        }
-    }
-
-    // ============================================
-    // 📧 EMAIL NOTIFICATIONS (من الكود القديم)
-    // ============================================
-
-    sendAttendanceEmail(type, datetime, shift, hoursWorked, overtime) {
-        if (!AppConfig?.emailService?.url) return;
-
-        const emailData = {
-            action: 'sendAttAlert',
-            name: window.user?.name,
-            code: window.user?.code,
-            type: type,
-            datetime: datetime,
-            location: window.currentLoc || '-',
-            shift: shift || '',
-            hoursWorked: hoursWorked || '-',
-            overtime: overtime || 'لا يوجد'
-        };
-
-        fetch(AppConfig.emailService.url, {
-            method: 'POST',
-            body: JSON.stringify(emailData)
-        }).catch(e => console.log('Email notification error:', e));
-    }
-
-    // ============================================
-    // 📊 MONTHLY HOURS CALCULATION (من الكود القديم)
-    // ============================================
-
-    async calculateMonthlyHours() {
-        try {
-            if (!window.user?.code) return;
-
-            const now = new Date();
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-            if (typeof db === 'undefined') return;
-
-            const { data } = await db.from('attendance')
-                .select('created_at, type, hours_worked')
-                .eq('employee_code', window.user.code)
-                .gte('created_at', startOfMonth);
-
-            if (data) {
-                let totalHours = 0;
-
-                data.forEach(record => {
-                    if (record.type === 'انصراف' && record.hours_worked) {
-                        totalHours += parseFloat(record.hours_worked) || 0;
-                    }
-                });
-
-                const monthHoursEl = document.getElementById('monthHoursValue');
-                if (monthHoursEl) {
-                    monthHoursEl.textContent = totalHours > 0 ? 
-                        `${totalHours.toFixed(2)} ساعة` : 
-                        '0 ساعة';
-                }
-            }
-
-        } catch(e) {
-            console.error('Monthly hours calculation error:', e);
-            
-            const monthHoursEl = document.getElementById('monthHoursValue');
-            if (monthHoursEl) monthHoursEl.textContent = '--';
-        }
-    }
-
-    // ============================================
-    // 👥 EMPLOYEE DATA LOADING (للأدمن)
-    // ============================================
-
-    async loadEmployees() {
-        try {
-            if (typeof db === 'undefined') throw new Error('Database not available');
-            const emps = await db.getAllEmployees();
-            window.employeesList = emps || [];
-            const countEl = document.getElementById('empCount') || document.getElementById('totalEmployeesStat');
-            if (countEl) countEl.textContent = (emps || []).length;
-            this.renderEmployeeList(emps || []);
-            setStatus?.('متصل');
-        } catch (e) {
-            console.error('❌ Load employees error:', e);
-            setStatus?.('غير متصل');
-        }
-    }
-
-    renderEmployeeList(employees) {
-        const container = document.getElementById('searchResults');
-        if (!container) return;
-
-        if (!employees || !employees.length) {
-            container.innerHTML = '<p style="text-align:center; color:#64748b; padding:30px;">لا يوجد موظفين مسجلين</p>';
-            return;
-        }
-
-        container.innerHTML = employees.map(emp => `
-            <div class="emp-item">
-                <div class="emp-info">
-                    <h4>${emp.name}</h4>
-                    <p>${emp.code}</p>
-                </div>
-                <div class="emp-actions">
-                    <button class="btn btn-sm btn-att" onclick="adminDirectAtt('حضور', '${emp.code}', '${emp.name}')">
-                        <i class="fas fa-check"></i>
-                    </button>
-                    <button class="btn btn-sm btn-leave" onclick="adminDirectAtt('انصراف', '${emp.code}', '${emp.name}')">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <button class="btn btn-sm btn-report" onclick="loadEmpReport('${emp.code}', '${emp.name}')">
-                        <i class="fas fa-chart-bar"></i>
-                    </button>
-                    <button class="btn btn-sm btn-reg" onclick="adminResetFace('${emp.code}', '${emp.name}')" title="إعادة تسجيل بصمة">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${emp.code}', '${emp.name}')" title="حذف الموظف"><i class="fas fa-trash"></i></button>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    // Search functionality
-    setupSearch() {
-        const searchInput = document.getElementById('searchInput');
-        if (!searchInput) return;
-
-        searchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase().trim();
-            
-            if (!query) {
-                this.renderEmployeeList(window.employeesList || []);
-                return;
-            }
-
-            const filtered = (window.employeesList || []).filter(emp =>
-                emp.name.toLowerCase().includes(query) ||
-                emp.code.toLowerCase().includes(query)
-            );
-
-            this.renderEmployeeList(filtered);
-        });
-    }
-
-    // ============================================
-    // 👔 ADMIN OPERATIONS (من الكود القديم)
-    // ============================================
-
-    async adminDirectAtt(type, code, name) {
-        // Verify admin has face registered
-        if (!window.sessionDescriptor) {
-            showToast?.('لا توجد بصمة أدمن مسجلة، جاري فتح الكاميرا للتسجيل...', 'warning');
-            window.firstTimeSetupMode = true;
-            
-            if (typeof openCamera === 'function') {
-                await openCamera();
-            }
-            return;
-        }
-
-        // Open camera for admin face verification
-        window.adminVerifyMode = true;
-        window.targetEmpForAdmin = { type, code, name };
-        window.attMode = false;
-        window.regMode = false;
-        window.updateFaceMode = false;
-        window.adminResetFaceMode = false;
-
-        if (typeof openCamera === 'function') {
-            const success = await openCamera();
-            if (!success) {
-                window.adminVerifyMode = false;
-                showToast?.('فشل فتح الكاميرا', 'error');
+                btn.innerHTML = originalHtml || (type === 'حضور' ? 'حضور' : 'انصراف');
             }
         }
     }
-
-    async adminDeleteEmp(code, name) {
-        if (!window.sessionDescriptor) {
-            showToast?.('لا توجد بصمة أدمن مسجلة', 'warning');
-            window.firstTimeSetupMode = true;
-            
-            if (typeof openCamera === 'function') {
-                await openCamera();
-            }
-            return;
-        }
-
-        window.adminVerifyMode = true;
-        window.targetEmpForAdmin = { type: 'حذف موظف', code, name };
-        window.attMode = false;
-        window.regMode = false;
-        window.updateFaceMode = false;
-        window.adminResetFaceMode = false;
-
-        if (typeof openCamera === 'function') {
-            const success = await openCamera();
-            if (!success) {
-                window.adminVerifyMode = false;
-                showToast?.('فشل فتح الكاميرا', 'error');
-            }
-        }
-    }
-
-    async adminResetFace(code, name) {
-        window.targetEmpForAdmin = { code, name };
-        window.adminResetFaceMode = true;
-        window.regMode = false;
-        window.attMode = false;
-        window.updateFaceMode = false;
-        window.adminVerifyMode = false;
-        window.firstTimeSetupMode = false;
-
-        showToast?.(`جاري فتح الكاميرا لتسجيل بصمة جديدة لـ ${name}`, 'warning');
-
-        if (typeof openCamera === 'function') {
-            const success = await openCamera();
-            if (!success) {
-                window.adminResetFaceMode = false;
-                showToast?.('فشل فتح الكاميرا', 'error');
-            }
-        }
-    }
-
-    // ============================================
-    // 📋 REPORTS (من الكود القديم)
-    // ============================================
-
-    async loadMyReport() {
-        if (!window.user?.code) return;
-
-        const titleEl = document.getElementById('reportTitle');
-        const bodyEl = document.getElementById('reportBody');
-        const modal = document.getElementById('reportModal');
-
-        if (titleEl) titleEl.textContent = `تقرير ${window.user.name}`;
-        if (bodyEl) bodyEl.innerHTML = '<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>';
-        if (modal) modal.classList.add('active');
-
-        await this.fetchAndRenderReport(window.user.code);
-    }
-
-    async loadEmpReport(code, name) {
-        const titleEl = document.getElementById('reportTitle');
-        const bodyEl = document.getElementById('reportBody');
-        const modal = document.getElementById('reportModal');
-
-        if (titleEl) titleEl.textContent = `تقرير ${name}`;
-        if (bodyEl) bodyEl.innerHTML = '<center style="padding:20px;"><i class="fas fa-spinner fa-spin"></i></center>';
-        if (modal) modal.classList.add('active');
-
-        await this.fetchAndRenderReport(code);
-    }
-
-    async fetchAndRenderReport(code) {
-        const bodyEl = document.getElementById('reportBody');
-        if (!bodyEl) return;
-
-        try {
-            if (typeof db === 'undefined') throw new Error('Database not available');
-
-            const { data: records } = await db.from('attendance')
-                .select('*')
-                .eq('employee_code', code)
-                .order('created_at', { ascending: false })
-                .limit(100);
-
-            if (records && records.length > 0) {
-                bodyEl.innerHTML = `
-                    <table class="report-table">
-                        <thead>
-                            <tr>
-                                <th>التاريخ</th>
-                                <th>الحالة</th>
-                                <th>الوقت</th>
-                                <th>الوردية</th>
-                                <th>الساعات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${records.map(r => {
-                                const dateStr = new Date(r.created_at).toLocaleDateString('ar-EG', {
-                                    year: 'numeric',
-                                    month: '2-digit',
-                                    day: '2-digit'
-                                });
-                                
-                                const timeStr = new Date(r.created_at).toLocaleTimeString('ar-EG', {
-                                    hour12: true,
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                });
-
-                                return `
-                                    <tr>
-                                        <td style="font-size:12px;">${dateStr}</td>
-                                        <td>
-                                            <span class="att-badge ${r.type === 'حضور' ? 'att-in' : 'att-out'}">
-                                                ${r.type}
-                                            </span>
-                                        </td>
-                                        <td style="font-size:11px;">${timeStr}</td>
-                                        <td style="font-size:11px;">${r.shift || '-'}</td>
-                                        <td style="font-weight:bold; color:${r.hours_worked ? '#38bdf8' : '#64748b'}">
-                                            ${r.hours_worked || '-'}
-                                        </td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                `;
-            } else {
-                bodyEl.innerHTML = '<center style="color:#64748b; padding:30px;">لا توجد سجلات في هذه الفترة</center>';
-            }
-
-        } catch(e) {
-            console.error('Report fetch error:', e);
-            bodyEl.innerHTML = '<center style="color:#ef4444; padding:20px;">فشل تحميل التقرير</center>';
-        }
-    }
-
-    closeReportModal() {
-        const modal = document.getElementById('reportModal');
-        if (modal) modal.classList.remove('active');
-    }
-
-    // ============================================
-    // 🎯 HANDLE ATTENDANCE WITH FACE (يستدعى من face-recognition.js)
-    // ============================================
 
     async handleAttendanceOperation(descriptor) {
         if (!descriptor) {
@@ -828,8 +451,11 @@ class AttendanceManager {
             playSound?.('faceid-success');
             showToast?.(`تم تسجيل ${window.attType} بنجاح ${hoursWorked ? '(' + hoursWorked + ')' : ''}`, 'success');
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 closeCamera?.();
+                this.isProcessing = false;
+                this.lastActionTime = Date.now();
+                await this.loadTodayRecords();
                 this.calculateMonthlyHours();
             }, 800);
 
@@ -844,9 +470,10 @@ class AttendanceManager {
 
         } catch(e) {
             console.error('Attendance recording error:', e);
+            this.isProcessing = false;
             playSound?.('faceid-error');
             showMatchResult?.(false);
-            showToast?.('فشل التسجيل', 'error');
+            showToast?.(e.message || 'فشل التسجيل', 'error');
             setCamStatus?.('حدث خطأ أثناء التسجيل');
             faceRecognition?.restartCamLoop();
         }

@@ -259,13 +259,24 @@ class AuthManager {
             if (result.requiresFaceEnrollment || !result.user.face_enrolled) {
                 window.forceFaceEnrollment = true;
                 window.firstTimeSetupMode = true;
+                this.pendingLoginUser = result.user;
+                this.pendingRememberMe = rememberMe;
 
                 if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-success');
                 }
 
-                this.toast('يجب تسجيل بصمة الوجه أولاً قبل الدخول للنظام', 'warning');
-                await openCamera?.();
+                this.setStatus('تم التحقق من البيانات - مطلوب تسجيل بصمة الوجه');
+                if (typeof showAppDialog === 'function') {
+                    showAppDialog('تم التحقق من بيانات الدخول بنجاح، لكن يلزم تسجيل بصمة الوجه أولاً قبل الدخول للنظام.', 'إعداد إلزامي');
+                }
+                this.toast('تم التحقق من بيانات الدخول. سجّل بصمة الوجه لإكمال الدخول.', 'warning');
+
+                const opened = typeof openCamera === 'function' ? await openCamera() : false;
+                if (!opened) {
+                    this.toast('تعذر فتح الكاميرا لإكمال تسجيل بصمة الوجه', 'error');
+                    this.setStatus('تعذر فتح الكاميرا');
+                }
                 return;
             }
 
@@ -405,7 +416,11 @@ class AuthManager {
         const modal = document.getElementById('forcePwModal');
         if (modal) modal.classList.add('active');
 
-        this.setStatus('النظام جاهز');
+        if (typeof showAppDialog === 'function') {
+            showAppDialog('تم التحقق من بيانات الدخول، ولكن يجب تغيير كلمة المرور الحالية أولاً ثم إكمال تسجيل بصمة الوجه إن لزم.', 'إجراء أمني مطلوب');
+        }
+
+        this.setStatus('مطلوب تغيير كلمة المرور');
     }
 
     // ============================================
