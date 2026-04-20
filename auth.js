@@ -26,6 +26,7 @@ class AuthManager {
     init() {
         // Session restore is handled centrally in app.init() to avoid duplicated UI navigation
         this.setupActivityTracking();
+        this.ensurePasswordModals();
         console.log('✅ Auth Manager ready');
     }
 
@@ -354,8 +355,8 @@ class AuthManager {
                 return {
                     success: true,
                     user,
-                    requiresPasswordChange: !!result.requiresPasswordChange,
-                    requiresFaceEnrollment: !!result.requiresFaceEnrollment || !user.face_enrolled
+                    requiresPasswordChange: !!(result.requiresPasswordChange ?? result.requires_password_change),
+                    requiresFaceEnrollment: !!(result.requiresFaceEnrollment ?? result.requires_face_enrollment) || !user.face_enrolled
                 };
             }
 
@@ -412,15 +413,61 @@ class AuthManager {
     handleFirstTimeLogin(user) {
         this.currentUser = user;
         window.user = user;
+        this.ensurePasswordModals();
 
         const modal = document.getElementById('forcePwModal');
         if (modal) modal.classList.add('active');
 
-        if (typeof showAppDialog === 'function') {
-            showAppDialog('تم التحقق من بيانات الدخول، ولكن يجب تغيير كلمة المرور الحالية أولاً ثم إكمال تسجيل بصمة الوجه إن لزم.', 'إجراء أمني مطلوب');
+        const input = document.getElementById('firstNewPw');
+        if (input) {
+            input.value = '';
+            setTimeout(() => input.focus(), 60);
         }
 
+        this.toast('تم التحقق من بيانات الدخول. يجب تغيير كلمة المرور أولاً.', 'warning');
         this.setStatus('مطلوب تغيير كلمة المرور');
+    }
+
+    ensurePasswordModals() {
+        if (!document.getElementById('forcePwModal')) {
+            const modal = document.createElement('div');
+            modal.id = 'forcePwModal';
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width:520px;">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-shield-halved"></i> إجراء أمني مطلوب</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin-bottom:14px;color:#cbd5e1;line-height:1.8;">تم التحقق من بيانات الدخول، ولكن يجب تغيير كلمة المرور الحالية أولاً، ثم سيتم استكمال تسجيل بصمة الوجه إذا لزم.</p>
+                        <div class="password-wrapper">
+                            <input type="password" id="firstNewPw" placeholder="أدخل كلمة المرور الجديدة">
+                            <button class="toggle-password" onclick="togglePassword('firstNewPw')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div style="display:flex;gap:12px;justify-content:center;margin-top:18px;">
+                            <button class="btn btn-primary" onclick="submitFirstPwChange()">حفظ ومتابعة</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+
+        if (!document.getElementById('changePwModal')) {
+            const modal = document.createElement('div');
+            modal.id = 'changePwModal';
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width:520px;">
+                    <div class="modal-header">
+                        <h3 id="changePwTitle">تغيير كلمة المرور</h3>
+                        <button class="close-modal" onclick="auth.closeChangePwModal()">&times;</button>
+                    </div>
+                    <div class="modal-body" id="changePwBody"></div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
     }
 
     // ============================================
@@ -1015,6 +1062,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.handleLogin = (e) => auth.handleLogin(e);
     window.submitForgotPw = () => auth.submitForgotPw();
     window.submitChangePassword = () => auth.submitChangePassword();
+    window.submitFirstPwChange = () => auth.submitFirstPwChange();
 });
 
 if (typeof module !== 'undefined' && module.exports) {

@@ -575,7 +575,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.attendance = attendance;
     
     // Setup search if on admin page
-    attendance.setupSearch();
+    if (typeof attendance.setupSearch === 'function') {
+        attendance.setupSearch();
+    }
     
     console.log('✅ Attendance Manager initialized');
 });
