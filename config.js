@@ -41,12 +41,12 @@ const AppConfig = {
 
     faceRecognition: {
         models: {
-            baseUrl: 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights',
-            fallbackUrl: 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
+            baseUrl: './models',
+            fallbackUrl: './models'
         },
         detection: {
             inputSize: 416,
-            scoreThreshold: 0.62,
+            scoreThreshold: 0.68,
             minFaceSize: 96,
             maxFaces: 1
         },
@@ -63,25 +63,25 @@ const AppConfig = {
             frameRate: 30
         },
         timeout: {
-            modelLoad: 15000,
+            modelLoad: 20000,
             cameraStart: 10000
         },
         imageStorage: {
-            maxWidth: 480,
-            quality: 0.92
+            maxWidth: 640,
+            quality: 0.94
         },
         antiSpoof: {
             enabled: true,
             requireBlink: true,
             requireTurnLeftRight: true,
             requireNod: true,
-            minStableFrames: 7,
+            minStableFrames: 9,
             earBlinkThreshold: 0.19,
             minBlinks: 1,
             yawMovementPx: 12,
             pitchMovementPx: 10,
-            challengeTimeoutMs: 15000,
-            consecutiveSingleFaceFrames: 7
+            challengeTimeoutMs: 18000,
+            consecutiveSingleFaceFrames: 9
         }
     },
 
@@ -115,7 +115,7 @@ const AppConfig = {
     liveness: {
         enabled: true,
         headMovementThreshold: 0.08,
-        stableFramesRequired: 3,
+        stableFramesRequired: 9,
         stabilityRing: {
             circumference: 126,
             radius: 20

@@ -14,19 +14,23 @@ class FaceRecognitionManager {
         this.videoElement = null;
         this.canvasElement = null;
         this.detectionInterval = null;
+        this.detectInFlight = false;
+        this.lastDetectAt = 0;
+        this.detectEveryMs = 120;
+        this.pendingCaptureTimer = null;
 
         this.lastAutoCaptureAt = 0;
         this.cachedDescriptor = null;
         this.cachedDescriptorAt = 0;
-        this.captureCooldownMs = 1400;
+        this.captureCooldownMs = 1800;
         this.extractTimeoutMs = 9000;
 
         // Stable tracking state
         this.lastTrackedBox = null;
         this.lastTrackedBoxAt = 0;
-        this.facePersistenceMs = 700;
+        this.facePersistenceMs = 420;
         this.missedDetections = 0;
-        this.maxMissedDetections = 5;
+        this.maxMissedDetections = 3;
         this.smoothedBox = null;
         this.lastDetectionRaw = null;
 
@@ -252,54 +256,42 @@ class FaceRecognitionManager {
             return true;
         }
 
-        const MODELS_URL =
-            AppConfig?.faceRecognition?.models?.baseUrl ||
-            AppConfig?.faceRecognition?.models?.fallbackUrl ||
-            'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+        const modelBase = (AppConfig?.faceRecognition?.models?.baseUrl || './models').replace(/\/$/, '');
+        const fallbackBase = (AppConfig?.faceRecognition?.models?.fallbackUrl || modelBase).replace(/\/$/, '');
+        const sources = [...new Set([modelBase, fallbackBase])].filter(Boolean);
+
+        const tryLoad = async (loader) => {
+            let lastError = null;
+            for (const source of sources) {
+                try {
+                    await loader(source);
+                    return true;
+                } catch (err) {
+                    lastError = err;
+                    console.warn('Model source failed:', source, err?.message || err);
+                }
+            }
+            throw lastError || new Error('Model source unavailable');
+        };
 
         try {
-            setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
-            updateSplashProgress?.(25);
-
-            try {
-                await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
-            } catch (e) {
-                await faceapi.nets.tinyFaceDetector.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl);
-            }
+            setStatus('جاري تحميل الذكاء الاصطناعي (1/3)...');
+            updateSplashProgress?.(30);
+            await tryLoad((src) => faceapi.nets.tinyFaceDetector.loadFromUri(src));
             window.lightModels = true;
 
-            setStatus('جاري تحميل الذكاء الاصطناعي (2/4)...');
-            updateSplashProgress?.(50);
+            setStatus('جاري تحميل الذكاء الاصطناعي (2/3)...');
+            updateSplashProgress?.(65);
+            await tryLoad((src) => faceapi.nets.faceLandmark68Net.loadFromUri(src));
 
-            try {
-                await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODELS_URL);
-            } catch (e) {
-                await faceapi.nets.faceLandmark68TinyNet.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl);
-            }
-
-            setStatus('جاري تحميل الذكاء الاصطناعي (3/4)...');
-            updateSplashProgress?.(75);
-
-            try {
-                await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL);
-            } catch (e) {
-                await faceapi.nets.faceLandmark68Net.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl);
-            }
-
-            setStatus('جاري تحميل الذكاء الاصطناعي (4/4)...');
+            setStatus('جاري تحميل الذكاء الاصطناعي (3/3)...');
             updateSplashProgress?.(100);
-
-            try {
-                await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL);
-            } catch (e) {
-                await faceapi.nets.faceRecognitionNet.loadFromUri(AppConfig?.faceRecognition?.models?.fallbackUrl);
-            }
+            await tryLoad((src) => faceapi.nets.faceRecognitionNet.loadFromUri(src));
             window.heavyModels = true;
 
             this.modelsLoaded = true;
             setTimeout(() => updateSplashProgress?.(0), 600);
             setStatus('النظام جاهز');
-
             return true;
         } catch (error) {
             console.error('❌ Model loading error:', error);
@@ -308,6 +300,7 @@ class FaceRecognitionManager {
     }
 
     async loadModelsWithSafetyNet() {
+
         try {
             const timeoutMs = AppConfig?.faceRecognition?.timeout?.modelLoad || 15000;
             const loadPromise = this.loadModels();
@@ -604,17 +597,25 @@ class FaceRecognitionManager {
                 return;
             }
 
-            if (!window.isProcessingCapture) {
-                await this.drawFaceBox();
+            const now = Date.now();
+            if (!window.isProcessingCapture && !this.detectInFlight && (now - this.lastDetectAt) >= this.detectEveryMs) {
+                this.detectInFlight = true;
+                this.lastDetectAt = now;
+                try {
+                    await this.drawFaceBox();
+                } finally {
+                    this.detectInFlight = false;
+                }
             }
 
-            window.detectionLoopTimeout = setTimeout(detect, 160);
+            window.detectionLoopTimeout = setTimeout(detect, 90);
         };
 
         detect();
     }
 
     async drawFaceBox() {
+
         const video = this.videoElement || document.getElementById('video');
         const canvas = this.canvasElement || document.getElementById('canvas');
 
@@ -743,10 +744,12 @@ class FaceRecognitionManager {
         const yOffset = Math.abs(centerY - (canvas.height / 2)) / canvas.height;
 
         return (
-            faceWidthRatio >= 0.18 &&
-            faceHeightRatio >= 0.20 &&
-            xOffset <= 0.22 &&
-            yOffset <= 0.24
+            faceWidthRatio >= 0.16 &&
+            faceHeightRatio >= 0.18 &&
+            faceWidthRatio <= 0.62 &&
+            faceHeightRatio <= 0.72 &&
+            xOffset <= 0.20 &&
+            yOffset <= 0.22
         );
     }
 
@@ -759,7 +762,7 @@ class FaceRecognitionManager {
         );
 
         const verificationMode = !!(window.attMode || window.adminVerifyMode);
-        const stableFramesRequired = enrollmentMode ? 7 : 7;
+        const stableFramesRequired = AppConfig?.faceRecognition?.antiSpoof?.minStableFrames || 9;
         const faceReady = this.isFaceWellPositionedCanvas(trackedBox, canvas);
 
         if (!faceReady) {
@@ -787,7 +790,7 @@ class FaceRecognitionManager {
                     (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
                 ) {
                     this.lastAutoCaptureAt = now;
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 70);
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 220);
                 }
             } else {
                 setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
@@ -828,7 +831,7 @@ class FaceRecognitionManager {
                     (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
                 ) {
                     this.lastAutoCaptureAt = now;
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 70);
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 220);
                 }
             } else {
                 setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
@@ -915,7 +918,7 @@ class FaceRecognitionManager {
         }
 
         const descriptors = [];
-        const attempts = 3;
+        const attempts = 5;
 
         for (let i = 0; i < attempts; i++) {
             try {
@@ -939,7 +942,7 @@ class FaceRecognitionManager {
                     this.cachedDescriptor = arr;
                     this.cachedDescriptorAt = Date.now();
 
-                    if (descriptors.length >= 2) break;
+                    if (descriptors.length >= 4) break;
                 }
             } catch (_e) {}
 
@@ -978,11 +981,16 @@ class FaceRecognitionManager {
 
     resetLiveness() {
         window.livenessActive = true;
-        window.livenessStartYaw = null;
-        window.livenessStartNoseY = null;
-        window.livenessMoved = false;
-        window.livenessCounter = { blink: 0, turn: false, nod: false };
-        window.livenessBlinkClosed = false;
+        window.livenessState = {
+            stage: 'blink',
+            blinkClosed: false,
+            blinkCount: 0,
+            baseYaw: null,
+            baseNoseY: null,
+            turnDone: false,
+            nodDone: false,
+            startedAt: Date.now()
+        };
         window.stabilityCounter = 0;
     }
 
@@ -990,43 +998,66 @@ class FaceRecognitionManager {
         if (!window.livenessActive) return true;
 
         const anti = AppConfig?.faceRecognition?.antiSpoof || {};
+        const state = window.livenessState || {
+            stage: 'blink', blinkClosed: false, blinkCount: 0, baseYaw: null, baseNoseY: null, turnDone: false, nodDone: false, startedAt: Date.now()
+        };
+        window.livenessState = state;
 
-        if (window.livenessStartYaw === null) {
-            window.livenessStartYaw = yaw;
-            const nose = landmarks?.getNose?.()?.[3];
-            window.livenessStartNoseY = nose ? nose.y : null;
-            setCamStatus?.('<i class="fas fa-eye"></i> ارمش ثم حرك رأسك يمين/يسار ثم ارفع أو اخفض رأسك قليلاً');
+        if ((Date.now() - state.startedAt) > (anti.challengeTimeoutMs || 18000)) {
+            this.flashFailure('انتهى وقت التحقق الحيوي، حاول مرة أخرى');
+            this.resetLiveness();
             return false;
         }
 
-        if (landmarks) {
-            const leftEAR = this.getEyeAspectRatio(landmarks.getLeftEye?.() || []);
-            const rightEAR = this.getEyeAspectRatio(landmarks.getRightEye?.() || []);
-            const ear = (leftEAR + rightEAR) / 2;
-
-            if (ear && ear < (anti.earBlinkThreshold || 0.19) && !window.livenessBlinkClosed) {
-                window.livenessBlinkClosed = true;
-            } else if (ear && ear >= (anti.earBlinkThreshold || 0.19) && window.livenessBlinkClosed) {
-                window.livenessCounter.blink += 1;
-                window.livenessBlinkClosed = false;
-            }
-
-            if (Math.abs(yaw - window.livenessStartYaw) > (anti.yawMovementPx || 12)) {
-                window.livenessCounter.turn = true;
-            }
-
-            const nose = landmarks.getNose?.()?.[3];
-            if (nose && window.livenessStartNoseY !== null && Math.abs(nose.y - window.livenessStartNoseY) > (anti.pitchMovementPx || 10)) {
-                window.livenessCounter.nod = true;
-            }
+        if (!landmarks) {
+            setCamStatus?.('<i class="fas fa-spinner fa-spin"></i> تجهيز التحقق الحيوي...');
+            return false;
         }
 
-        const blinkOk = !anti.requireBlink || window.livenessCounter.blink >= (anti.minBlinks || 1);
-        const turnOk = !anti.requireTurnLeftRight || !!window.livenessCounter.turn;
-        const nodOk = !anti.requireNod || !!window.livenessCounter.nod;
+        const nose = landmarks.getNose?.()?.[3] || null;
+        if (state.baseYaw === null) state.baseYaw = yaw;
+        if (state.baseNoseY === null && nose) state.baseNoseY = nose.y;
 
-        if (blinkOk && turnOk && nodOk) {
-            window.livenessMoved = true;
+        const leftEAR = this.getEyeAspectRatio(landmarks.getLeftEye?.() || []);
+        const rightEAR = this.getEyeAspectRatio(landmarks.getRightEye?.() || []);
+        const ear = (leftEAR + rightEAR) / 2;
+        const blinkThreshold = anti.earBlinkThreshold || 0.19;
+
+        if (state.stage === 'blink') {
+            setCamStatus?.('<i class="fas fa-eye"></i> ارمش مرة واحدة');
+            if (ear && ear < blinkThreshold && !state.blinkClosed) {
+                state.blinkClosed = true;
+            } else if (ear && ear >= blinkThreshold && state.blinkClosed) {
+                state.blinkClosed = false;
+                state.blinkCount += 1;
+            }
+            if (state.blinkCount >= (anti.minBlinks || 1)) {
+                state.stage = 'turn';
+                state.baseYaw = yaw;
+            }
+            return false;
+        }
+
+        if (state.stage === 'turn') {
+            setCamStatus?.('<i class="fas fa-arrows-left-right"></i> حرّك رأسك يمين أو يسار قليلًا');
+            if (Math.abs(yaw - state.baseYaw) > (anti.yawMovementPx || 12)) {
+                state.turnDone = true;
+                state.stage = 'nod';
+                if (nose) state.baseNoseY = nose.y;
+            }
+            return false;
+        }
+
+        if (state.stage === 'nod') {
+            setCamStatus?.('<i class="fas fa-arrows-up-down"></i> ارفع أو اخفض رأسك قليلًا');
+            if (nose && state.baseNoseY !== null && Math.abs(nose.y - state.baseNoseY) > (anti.pitchMovementPx || 10)) {
+                state.nodDone = true;
+                state.stage = 'done';
+            }
+            return false;
+        }
+
+        if (state.stage === 'done') {
             window.livenessActive = false;
             setCamStatus?.('<i class="fas fa-check-circle"></i> تم التحقق من الحيوية، ثبت وجهك...');
             return true;
@@ -1036,6 +1067,7 @@ class FaceRecognitionManager {
     }
 
     getEyeAspectRatio(points) {
+
         try {
             if (!points || points.length < 6) return 0;
 
@@ -1128,23 +1160,31 @@ class FaceRecognitionManager {
         const video = this.videoElement || document.getElementById('video');
         if (!video) return Promise.resolve(null);
 
+        const sourceBox = this.lastDetectionRaw?.detection?.box || this.lastDetectionRaw?.box || null;
         const canvas = document.createElement('canvas');
-        let w = video.videoWidth;
-        let h = video.videoHeight;
+        const maxDim = AppConfig?.faceRecognition?.imageStorage?.maxWidth || 640;
+        const quality = AppConfig?.faceRecognition?.imageStorage?.quality || 0.94;
 
-        const maxDim = AppConfig?.faceRecognition?.imageStorage?.maxWidth || 400;
-        const ratio = Math.min(maxDim / w, maxDim / h);
-
-        if (ratio < 1) {
-            w = Math.round(w * ratio);
-            h = Math.round(h * ratio);
+        let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
+        if (sourceBox && video.videoWidth && video.videoHeight) {
+            const padX = sourceBox.width * 0.32;
+            const padY = sourceBox.height * 0.38;
+            sx = Math.max(0, Math.floor(sourceBox.x - padX));
+            sy = Math.max(0, Math.floor(sourceBox.y - padY));
+            sw = Math.min(video.videoWidth - sx, Math.floor(sourceBox.width + padX * 2));
+            sh = Math.min(video.videoHeight - sy, Math.floor(sourceBox.height + padY * 2));
         }
+
+        let w = sw;
+        let h = sh;
+        const ratio = Math.min(maxDim / w, maxDim / h, 1);
+        w = Math.max(1, Math.round(w * ratio));
+        h = Math.max(1, Math.round(h * ratio));
 
         canvas.width = w;
         canvas.height = h;
-        canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+        canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
 
-        const quality = AppConfig?.faceRecognition?.imageStorage?.quality || 0.8;
         return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
     }
 
