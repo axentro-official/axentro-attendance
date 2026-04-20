@@ -1,8 +1,8 @@
 /**
  * ================================================
- * 🎭 AXENTRO FACE RECOGNITION v5.0 - PRO EDITION
- * ✅ Stable Detection, Anti-Spoofing, Auto-Capture
- * 🔥 Built with requestAnimationFrame & MediaPipe-ready
+ * 🎭 AXENTRO FACE RECOGNITION v6.0 - POWERED BY HUMAN
+ * ✅ Stable Detection, Advanced Anti-Spoofing, Fast Auto-Capture
+ * 🔥 Built with @vladmandic/human library for maximum performance
  * ================================================
  */
 
@@ -14,23 +14,24 @@ class FaceRecognitionManager {
         this.overlay = null;
         this.ctx = null;
         this.stream = null;
+        this.human = null; // Human library instance
 
         // State
         this.isActive = false;
-        this.modelsLoaded = false;
-        this.currentMode = null; // 'register', 'verify', 'update', 'attendance'
+        this.isModelsLoaded = false;
+        this.currentMode = null;
         this.modeOptions = {};
 
         // Detection loop
         this.rafId = null;
         this.lastDetectionTime = 0;
-        this.detectionThrottleMs = 100; // ~10 FPS detection
+        this.detectionThrottleMs = 100;
 
         // Face tracking history for stability
         this.faceHistory = [];
         this.maxHistory = 5;
         this.stabilityScore = 0;
-        this.stabilityThreshold = 0.75;
+        this.stabilityThreshold = 0.8;
         this.captureDelayMs = 400;
         this.captureTimer = null;
 
@@ -39,75 +40,147 @@ class FaceRecognitionManager {
         this.cachedDescriptorAt = 0;
         this.extractTimeoutMs = 7000;
 
-        // Liveness (anti-spoofing)
+        // Liveness state (simplified, Human handles the logic)
         this.liveness = {
             active: false,
-            required: {
-                blink: true,
-                turn: true,
-                nod: true
-            },
-            completed: {
-                blink: false,
-                turn: false,
-                nod: false
-            },
-            startYaw: null,
-            startPitch: null,
-            blinkState: 'open', // 'open', 'closed'
-            blinkCount: 0,
-            earThreshold: 0.2
+            completed: false
         };
 
-        // UI state
+        // UI elements
         this.statusElement = null;
         this.stabilityRing = null;
         this.matchResult = null;
 
-        // Cooldown for auto-capture
+        // Cooldown
         this.lastCaptureTime = 0;
         this.captureCooldown = 1500;
-
-        // Processing flag
         this.isProcessing = false;
 
-        console.log('🎭 FaceRecognitionManager v5.0 initialized');
+        console.log('🎭 FaceRecognitionManager v6.0 (Human) initialized');
     }
 
     // ============================================
-    // 🚀 PUBLIC API (compatible with existing calls)
+    // 🚀 INITIALIZATION
     // ============================================
 
     async init() {
+        console.log('🎭 Initializing Human Library...');
         try {
+            // 1. Load the Human library
+            await this.loadHumanLibrary();
+            
+            // 2. Configure Human for optimal face recognition
+            this.configureHuman();
+            
+            // 3. Load models
             await this.loadModels();
+            
+            // 4. Setup UI
             this.setupOverlay();
+            
             console.log('✅ Face Recognition ready');
         } catch (error) {
-            console.error('❌ Init failed:', error);
-            if (typeof ui !== 'undefined' && ui.showWarning) {
-                ui.showWarning('التعرف على الوجه غير متوفر - يمكنك استخدام الكود وكلمة المرور');
-            }
+            console.error('❌ Face Recognition init failed:', error);
+            this.showNonBlockingMessage(
+                'تعذر تحميل نماذج التعرف على الوجه. يمكنك استخدام كلمة المرور فقط.',
+                'warning'
+            );
+            this.isModelsLoaded = false;
         }
     }
+
+    loadHumanLibrary() {
+        return new Promise((resolve, reject) => {
+            // Check if Human is already loaded globally
+            if (typeof Human !== 'undefined') {
+                resolve();
+                return;
+            }
+
+            // If not, load it from CDN
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/dist/human.js';
+            script.onload = resolve;
+            script.onerror = () => reject(new Error('Failed to load Human library from CDN'));
+            document.head.appendChild(script);
+        });
+    }
+
+    configureHuman() {
+        // Base configuration for Human library
+        const humanConfig = {
+            debug: false, // Set to true for verbose logging
+            backend: 'webgl', // 'webgl', 'wasm', or 'cpu'
+            // Use reliable CDN for models
+            modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human@3.3.6/models/',
+            // Enable only what we need for optimal performance
+            face: {
+                enabled: true,
+                detector: { rotation: false, maxDetected: 1 },
+                mesh: { enabled: true },
+                iris: { enabled: false },
+                description: { enabled: true },
+                emotion: { enabled: false },
+                // Advanced anti-spoofing features
+                antispoof: { enabled: true },
+                liveness: { enabled: true }
+            },
+            body: { enabled: false },
+            hand: { enabled: false },
+            object: { enabled: false },
+            gesture: { enabled: false },
+            segmentation: { enabled: false },
+            filter: { enabled: true, equalization: true, flip: false }
+        };
+
+        this.human = new Human(humanConfig);
+    }
+
+    async loadModels() {
+        this.setStatusText('جاري تحميل نماذج الذكاء الاصطناعي...');
+        updateSplashProgress?.(25);
+        try {
+            await this.human.load();
+            this.isModelsLoaded = true;
+            updateSplashProgress?.(100);
+            this.setStatusText('النظام جاهز');
+            setTimeout(() => updateSplashProgress?.(0), 500);
+            console.log('✅ Human models loaded successfully');
+        } catch (error) {
+            console.error('❌ Failed to load Human models:', error);
+            this.isModelsLoaded = false;
+            throw error;
+        }
+    }
+
+    // ============================================
+    // 📹 CAMERA OPERATIONS
+    // ============================================
 
     async openCamera(mode = null, options = {}) {
         if (this.isActive) this.closeCamera();
 
-        // Set mode and options
+        if (!this.isModelsLoaded) {
+            this.setStatusText('جاري تحميل النماذج...');
+            try {
+                await this.loadModels();
+            } catch (e) {
+                this.setStatusText('❌ فشل تحميل نماذج التعرف. تحقق من الاتصال.');
+                this.showNonBlockingMessage('تعذر تحميل نماذج التعرف على الوجه', 'error');
+                return false;
+            }
+        }
+
         this.currentMode = mode || this.detectModeFromGlobals();
         this.modeOptions = options;
 
-        // Ensure overlay is visible
         this.ensureOverlayElements();
         this.overlay.style.display = 'flex';
         this.overlay.classList.add('active');
 
-        // Reset state
         this.resetDetectionState();
         this.isProcessing = false;
 
-        // Request camera
         try {
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: {
@@ -129,17 +202,14 @@ class FaceRecognitionManager {
 
             await this.video.play();
 
-            // Set canvas dimensions
             this.canvas.width = this.video.videoWidth || 640;
             this.canvas.height = this.video.videoHeight || 480;
             this.ctx = this.canvas.getContext('2d');
 
             this.isActive = true;
-            this.setStatus(this.getInitialStatusMessage());
+            this.setStatusText(this.getInitialStatusMessage());
 
-            // Start detection loop
             this.startDetectionLoop();
-
             return true;
         } catch (error) {
             console.error('Camera error:', error);
@@ -153,36 +223,29 @@ class FaceRecognitionManager {
         this.isActive = false;
         this.isProcessing = false;
 
-        // Stop media tracks
         if (this.stream) {
             this.stream.getTracks().forEach(track => track.stop());
             this.stream = null;
         }
 
-        // Clear video source
         if (this.video) this.video.srcObject = null;
 
-        // Cancel animation frame
         if (this.rafId) {
             cancelAnimationFrame(this.rafId);
             this.rafId = null;
         }
 
-        // Clear timers
         if (this.captureTimer) {
             clearTimeout(this.captureTimer);
             this.captureTimer = null;
         }
 
-        // Hide overlay
         if (this.overlay) {
             this.overlay.style.display = 'none';
             this.overlay.classList.remove('active');
         }
 
-        // Reset global flags
         this.clearGlobalFlags();
-
         console.log('📴 Camera closed');
     }
 
@@ -194,66 +257,33 @@ class FaceRecognitionManager {
         return this.isActive;
     }
 
-    areModelsLoaded() {
-        return this.modelsLoaded;
-    }
-
     // ============================================
-    // 🔧 MODELS LOADING
-    // ============================================
-
-    async loadModels() {
-        if (this.modelsLoaded) return true;
-
-        const baseUrl = AppConfig?.faceRecognition?.models?.baseUrl ||
-                       'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
-
-        try {
-            setStatus?.('جاري تحميل نماذج الذكاء الاصطناعي...');
-            updateSplashProgress?.(20);
-
-            // Load lightweight models first
-            await faceapi.nets.ssdMobilenetv1.loadFromUri(baseUrl);
-            updateSplashProgress?.(50);
-
-            await faceapi.nets.faceLandmark68Net.loadFromUri(baseUrl);
-            updateSplashProgress?.(75);
-
-            await faceapi.nets.faceRecognitionNet.loadFromUri(baseUrl);
-            updateSplashProgress?.(100);
-
-            this.modelsLoaded = true;
-            setStatus?.('النظام جاهز');
-            setTimeout(() => updateSplashProgress?.(0), 500);
-
-            return true;
-        } catch (error) {
-            console.error('Model loading failed:', error);
-            this.modelsLoaded = false;
-            throw error;
-        }
-    }
-
-    // ============================================
-    // 🖥️ UI SETUP
+    // 🖥️ UI SETUP (Similar to v5.1 but using Human's drawing)
     // ============================================
 
     setupOverlay() {
-        // Create overlay if not exists
         if (document.getElementById('cameraOverlay')) return;
 
         this.overlay = document.createElement('div');
         this.overlay.id = 'cameraOverlay';
         this.overlay.innerHTML = this.getOverlayHTML();
         document.body.appendChild(this.overlay);
-
-        // Add styles
         this.injectStyles();
 
-        // Cache elements
+        this.cacheDOMElements();
+        this.bindEvents();
+    }
+
+    ensureOverlayElements() {
+        this.overlay = document.getElementById('cameraOverlay');
         this.video = document.getElementById('video');
         this.canvas = document.getElementById('canvas');
         this.statusElement = document.getElementById('camStatus');
+        this.cacheDOMElements();
+        this.ctx = this.canvas?.getContext('2d');
+    }
+
+    cacheDOMElements() {
         this.stabilityRing = {
             container: document.getElementById('stabilityRing'),
             circle: document.getElementById('stabilityCircle'),
@@ -263,31 +293,22 @@ class FaceRecognitionManager {
             container: document.getElementById('matchResult'),
             icon: document.getElementById('matchResultIcon')
         };
-
-        // Bind close button
-        const closeBtn = this.overlay.querySelector('#closeCameraBtn');
-        if (closeBtn) closeBtn.addEventListener('click', () => this.closeCamera());
     }
 
-    ensureOverlayElements() {
-        this.overlay = document.getElementById('cameraOverlay');
-        this.video = document.getElementById('video');
-        this.canvas = document.getElementById('canvas');
-        this.statusElement = document.getElementById('camStatus');
-        if (!this.stabilityRing) {
-            this.stabilityRing = {
-                container: document.getElementById('stabilityRing'),
-                circle: document.getElementById('stabilityCircle'),
-                text: document.getElementById('stabilityText')
-            };
+    bindEvents() {
+        const closeBtn = this.overlay.querySelector('#closeCameraBtn');
+        if (closeBtn) closeBtn.addEventListener('click', () => this.closeCamera());
+
+        const switchBtn = this.overlay.querySelector('#switchCameraBtn');
+        if (switchBtn) {
+            switchBtn.addEventListener('click', async () => {
+                if (AppConfig) {
+                    AppConfig.faceRecognition.camera.facingMode =
+                        AppConfig.faceRecognition.camera.facingMode === 'user' ? 'environment' : 'user';
+                    await this.openCamera(this.currentMode, this.modeOptions);
+                }
+            });
         }
-        if (!this.matchResult) {
-            this.matchResult = {
-                container: document.getElementById('matchResult'),
-                icon: document.getElementById('matchResultIcon')
-            };
-        }
-        this.ctx = this.canvas?.getContext('2d');
     }
 
     getOverlayHTML() {
@@ -312,11 +333,7 @@ class FaceRecognitionManager {
                 <div id="cameraViewport" style="position:relative;aspect-ratio:4/3;background:#020617;border-radius:16px;overflow:hidden;">
                     <video id="video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
                     <canvas id="canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
-
-                    <!-- Face Guide Frame -->
                     <div style="position:absolute;top:15%;left:15%;right:15%;bottom:15%;border:2px dashed rgba(56,189,248,0.6);border-radius:24px;pointer-events:none;"></div>
-
-                    <!-- Stability Ring -->
                     <div id="stabilityRing" style="position:absolute;bottom:16px;left:16px;display:none;align-items:center;gap:8px;background:rgba(15,23,42,0.8);padding:6px 12px;border-radius:40px;backdrop-filter:blur(4px);">
                         <svg width="36" height="36" viewBox="0 0 36 36">
                             <circle cx="18" cy="18" r="15" stroke="rgba(255,255,255,0.2)" stroke-width="3" fill="none"></circle>
@@ -324,13 +341,10 @@ class FaceRecognitionManager {
                         </svg>
                         <span id="stabilityText" style="font-weight:600;min-width:24px;">0</span>
                     </div>
-
-                    <!-- Match Result Indicator -->
                     <div id="matchResult" style="position:absolute;top:16px;right:16px;width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.5);border:2px solid rgba(255,255,255,0.1);opacity:0;transform:scale(0.8);transition:all 0.2s;backdrop-filter:blur(4px);">
                         <span id="matchResultIcon" style="font-size:24px;font-weight:700;color:#fff;"></span>
                     </div>
                 </div>
-
                 <div id="camStatus" style="margin-top:12px;text-align:center;color:#cbd5e1;font-size:0.95rem;">جاهز</div>
             </div>
         `;
@@ -341,14 +355,7 @@ class FaceRecognitionManager {
         const style = document.createElement('style');
         style.id = 'face-recognition-styles';
         style.textContent = `
-            @keyframes pulse-ring {
-                0% { transform: scale(0.95); opacity: 0.7; }
-                50% { transform: scale(1.05); opacity: 1; }
-                100% { transform: scale(0.95); opacity: 0.7; }
-            }
-            .stability-pulse {
-                animation: pulse-ring 1.5s infinite;
-            }
+            .stability-pulse { animation: pulse-ring 1.5s infinite; }
             .match-success {
                 opacity:1 !important;
                 transform:scale(1) !important;
@@ -368,94 +375,79 @@ class FaceRecognitionManager {
     }
 
     // ============================================
-    // 🎯 DETECTION LOOP (Stable, No Flicker)
+    // 🎯 DETECTION LOOP (Using Human)
     // ============================================
 
     startDetectionLoop() {
-        const loop = (timestamp) => {
+        const loop = async (timestamp) => {
             if (!this.isActive) return;
-
-            // Throttle detection to reduce flicker and CPU usage
             if (timestamp - this.lastDetectionTime >= this.detectionThrottleMs) {
                 this.lastDetectionTime = timestamp;
-                this.detectAndProcess().catch(e => console.warn('Detection error:', e));
+                await this.detectAndProcess();
             }
-
-            // Always draw guides (but don't clear canvas unnecessarily)
-            this.drawGuides();
-
             this.rafId = requestAnimationFrame(loop);
         };
         this.rafId = requestAnimationFrame(loop);
     }
 
     async detectAndProcess() {
-        if (!this.modelsLoaded || !this.video?.videoWidth) return;
+        if (!this.isModelsLoaded || !this.video?.videoWidth) return;
 
         try {
-            const options = new faceapi.SsdMobilenetv1Options({
-                minConfidence: 0.5,
-                maxResults: 1
-            });
-
-            const detection = await faceapi
-                .detectSingleFace(this.video, options)
-                .withFaceLandmarks()
-                .withFaceDescriptor();
-
-            // Clear canvas for fresh drawing
+            // Perform detection using Human library
+            const result = await this.human.detect(this.video);
+            
+            // Clear canvas and draw results using Human's built-in drawing tools
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-            if (!detection) {
+            this.human.draw.face(this.canvas, result.face);
+            
+            if (!result.face || result.face.length === 0) {
                 this.handleNoFace();
                 return;
             }
 
-            // Face found
-            this.handleFaceDetected(detection);
-
+            // Human returns an array of faces, we take the first one
+            const face = result.face[0];
+            this.handleFaceDetected(face);
         } catch (error) {
-            console.error('Detection error:', error);
+            console.error('Detection processing error:', error);
         }
     }
 
     handleNoFace() {
         this.resetStability();
         this.cancelCaptureTimer();
-        this.setStatus(this.getInstructionMessage());
+        this.setStatusText(this.getInstructionMessage());
         window.currentFaceDetected = false;
     }
 
-    handleFaceDetected(detection) {
+    handleFaceDetected(face) {
         window.currentFaceDetected = true;
-
-        // Draw face box and landmarks
-        this.drawFaceBox(detection.detection.box);
-        this.drawLandmarks(detection.landmarks);
-
+        
         // Update face history for stability calculation
-        this.updateFaceHistory(detection);
+        this.updateFaceHistory(face);
         this.calculateStability();
-
-        // Update UI
         this.updateStabilityRingUI();
 
-        // Liveness check if needed
-        if (this.shouldCheckLiveness()) {
-            const livenessPassed = this.checkLiveness(detection.landmarks);
-            if (!livenessPassed) {
-                this.cancelCaptureTimer();
-                return;
-            }
+        // Check anti-spoofing and liveness (provided by Human library)
+        const isReal = face.real || 0;
+        const isLive = face.live || 0;
+        const antiSpoofThreshold = 0.5;
+        const livenessThreshold = 0.5;
+
+        if (this.shouldCheckLiveness() && (isReal < antiSpoofThreshold || isLive < livenessThreshold)) {
+            this.setStatusText(`🔍 تأكد من أنك شخص حقيقي... (التحقق: ${Math.round(isReal*100)}%)`);
+            this.cancelCaptureTimer();
+            return;
         }
 
-        // Auto-capture logic
+        // If all checks pass, proceed with stability
         if (this.stabilityScore >= this.stabilityThreshold) {
-            this.setStatus('✅ الوجه ثابت - جاري الالتقاط...');
-            this.scheduleCapture(detection.descriptor);
+            this.setStatusText('✅ الوجه ثابت - جاري الالتقاط...');
+            this.scheduleCapture(face);
         } else {
             this.cancelCaptureTimer();
-            this.setStatus(this.getStabilityMessage());
+            this.setStatusText(this.getStabilityMessage());
         }
     }
 
@@ -463,15 +455,15 @@ class FaceRecognitionManager {
     // 📐 STABILITY CALCULATION
     // ============================================
 
-    updateFaceHistory(detection) {
-        const box = detection.detection.box;
+    updateFaceHistory(face) {
+        const box = face.box;
         const faceData = {
-            x: box.x,
-            y: box.y,
-            width: box.width,
-            height: box.height,
-            centerX: box.x + box.width / 2,
-            centerY: box.y + box.height / 2,
+            x: box[0],
+            y: box[1],
+            width: box[2],
+            height: box[3],
+            centerX: box[0] + box[2] / 2,
+            centerY: box[1] + box[3] / 2,
             timestamp: Date.now()
         };
 
@@ -505,7 +497,6 @@ class FaceRecognitionManager {
         const distanceScore = Math.max(0, 1 - (avgDistance / (avgWidth * 0.3)));
         const sizeScore = Math.max(0, 1 - (widthVariance / (avgWidth * 0.2)));
 
-        // Combined score
         this.stabilityScore = (distanceScore * 0.6 + sizeScore * 0.4);
 
         // Also check if face is well-positioned
@@ -528,126 +519,30 @@ class FaceRecognitionManager {
     }
 
     // ============================================
-    // 🧬 LIVENESS DETECTION (Enhanced)
+    // 🧬 LIVENESS DETECTION (Simplified, Human handles it)
     // ============================================
 
     shouldCheckLiveness() {
-        // Only for verification/attendance modes
-        return (this.currentMode === 'verify' || this.currentMode === 'attendance') &&
-               this.liveness.active &&
-               !this.allLivenessCompleted();
-    }
-
-    allLivenessCompleted() {
-        const req = this.liveness.required;
-        const comp = this.liveness.completed;
-        return (!req.blink || comp.blink) &&
-               (!req.turn || comp.turn) &&
-               (!req.nod || comp.nod);
-    }
-
-    checkLiveness(landmarks) {
-        if (!this.liveness.active) {
-            // Initialize liveness
-            this.liveness.active = true;
-            this.liveness.startYaw = this.getYaw(landmarks);
-            this.liveness.startPitch = this.getPitch(landmarks);
-            this.liveness.completed = { blink: false, turn: false, nod: false };
-            this.setStatus('🔍 للتحقق من الحيوية: ارمش، ثم حرك رأسك يمين/يسار، ثم لأعلى/أسفل');
-            return false;
-        }
-
-        // Blink detection
-        if (this.liveness.required.blink && !this.liveness.completed.blink) {
-            const ear = this.getEyeAspectRatio(landmarks);
-            if (ear < this.liveness.earThreshold) {
-                this.liveness.blinkState = 'closed';
-            } else if (this.liveness.blinkState === 'closed') {
-                this.liveness.blinkCount++;
-                this.liveness.blinkState = 'open';
-                if (this.liveness.blinkCount >= 1) {
-                    this.liveness.completed.blink = true;
-                    this.setStatus('✅ رمشة مكتشفة. الآن حرك رأسك يمين/يسار');
-                }
-            }
-        }
-
-        // Turn (yaw) detection
-        if (this.liveness.required.turn && !this.liveness.completed.turn) {
-            const currentYaw = this.getYaw(landmarks);
-            const yawDiff = Math.abs(currentYaw - this.liveness.startYaw);
-            if (yawDiff > 0.15) { // threshold normalized
-                this.liveness.completed.turn = true;
-                this.setStatus('✅ حركة الرأس الجانبية مكتشفة. الآن حرك رأسك لأعلى/أسفل');
-            }
-        }
-
-        // Nod (pitch) detection
-        if (this.liveness.required.nod && !this.liveness.completed.nod) {
-            const currentPitch = this.getPitch(landmarks);
-            const pitchDiff = Math.abs(currentPitch - this.liveness.startPitch);
-            if (pitchDiff > 0.12) {
-                this.liveness.completed.nod = true;
-                this.setStatus('✅ تم التحقق من الحيوية. ثبّت وجهك للالتقاط...');
-            }
-        }
-
-        // If all completed, deactivate liveness
-        if (this.allLivenessCompleted()) {
-            this.liveness.active = false;
-            return true;
-        }
-
-        return false;
-    }
-
-    getYaw(landmarks) {
-        const nose = landmarks.getNose()[3];
-        const leftEye = landmarks.getLeftEye()[0];
-        const rightEye = landmarks.getRightEye()[3];
-        const eyeCenterX = (leftEye.x + rightEye.x) / 2;
-        const eyeDistance = Math.abs(rightEye.x - leftEye.x);
-        return (nose.x - eyeCenterX) / eyeDistance;
-    }
-
-    getPitch(landmarks) {
-        const nose = landmarks.getNose()[3];
-        const leftEye = landmarks.getLeftEye()[1];
-        const rightEye = landmarks.getRightEye()[2];
-        const eyeCenterY = (leftEye.y + rightEye.y) / 2;
-        const eyeDistance = Math.abs(rightEye.x - leftEye.x);
-        return (nose.y - eyeCenterY) / eyeDistance;
-    }
-
-    getEyeAspectRatio(landmarks) {
-        const leftEye = landmarks.getLeftEye();
-        const rightEye = landmarks.getRightEye();
-        const earLeft = this.calculateEAR(leftEye);
-        const earRight = this.calculateEAR(rightEye);
-        return (earLeft + earRight) / 2.0;
-    }
-
-    calculateEAR(eyePoints) {
-        if (eyePoints.length < 6) return 1.0;
-        const A = Math.hypot(eyePoints[1].x - eyePoints[5].x, eyePoints[1].y - eyePoints[5].y);
-        const B = Math.hypot(eyePoints[2].x - eyePoints[4].x, eyePoints[2].y - eyePoints[4].y);
-        const C = Math.hypot(eyePoints[0].x - eyePoints[3].x, eyePoints[0].y - eyePoints[3].y);
-        return (A + B) / (2.0 * C);
+        // Always check liveness for verification/attendance modes
+        return (this.currentMode === 'verify' || this.currentMode === 'attendance');
     }
 
     // ============================================
     // 📸 CAPTURE LOGIC
     // ============================================
 
-    scheduleCapture(descriptor) {
+    scheduleCapture(face) {
         if (this.captureTimer || this.isProcessing) return;
 
         // Cooldown check
         const now = Date.now();
         if (now - this.lastCaptureTime < this.captureCooldown) return;
 
-        this.cachedDescriptor = Array.from(descriptor);
-        this.cachedDescriptorAt = now;
+        // Cache descriptor from Human's result
+        if (face.embedding) {
+            this.cachedDescriptor = Array.from(face.embedding);
+            this.cachedDescriptorAt = now;
+        }
 
         this.captureTimer = setTimeout(() => {
             this.captureTimer = null;
@@ -669,13 +564,22 @@ class FaceRecognitionManager {
         this.lastCaptureTime = Date.now();
         this.cancelCaptureTimer();
 
-        this.setStatus('📸 جاري استخراج بصمة الوجه...');
+        this.setStatusText('📸 جاري استخراج بصمة الوجه...');
 
         try {
-            // Get stable descriptor (may use cached)
-            const descriptor = await this.extractStableDescriptor();
-            if (!descriptor) throw new Error('تعذر استخراج بصمة الوجه');
+            // Perform one more detection to get the freshest descriptor
+            const result = await this.human.detect(this.video);
+            if (!result.face || result.face.length === 0) {
+                throw new Error('لم يتم اكتشاف وجه.');
+            }
 
+            const face = result.face[0];
+            if (!face.embedding) {
+                throw new Error('تعذر استخراج بصمة الوجه.');
+            }
+
+            const descriptor = Array.from(face.embedding);
+            
             // Capture thumbnail image
             const imageBlob = await this.captureImageBlob();
 
@@ -688,50 +592,8 @@ class FaceRecognitionManager {
             this.flashFailure(error.message || 'فشل في معالجة بصمة الوجه');
         } finally {
             this.isProcessing = false;
-            // Restart detection loop (already running)
             this.resetStability();
         }
-    }
-
-    async extractStableDescriptor() {
-        // Try to get a fresh descriptor multiple times and average
-        const descriptors = [];
-        const attempts = 3;
-
-        for (let i = 0; i < attempts; i++) {
-            try {
-                const detection = await faceapi
-                    .detectSingleFace(this.video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 }))
-                    .withFaceLandmarks()
-                    .withFaceDescriptor();
-
-                if (detection?.descriptor) {
-                    descriptors.push(Array.from(detection.descriptor));
-                }
-            } catch (e) {
-                // ignore
-            }
-            await new Promise(r => setTimeout(r, 100));
-        }
-
-        if (descriptors.length === 0) {
-            // fallback to cached
-            if (this.cachedDescriptor && (Date.now() - this.cachedDescriptorAt < 5000)) {
-                return this.cachedDescriptor;
-            }
-            return null;
-        }
-
-        // Average descriptors
-        const avg = new Array(descriptors[0].length).fill(0);
-        for (const desc of descriptors) {
-            for (let j = 0; j < desc.length; j++) {
-                avg[j] += desc[j] / descriptors.length;
-            }
-        }
-        this.cachedDescriptor = avg;
-        this.cachedDescriptorAt = Date.now();
-        return avg;
     }
 
     async captureImageBlob() {
@@ -751,65 +613,10 @@ class FaceRecognitionManager {
     }
 
     // ============================================
-    // 🎨 DRAWING (No Flicker)
-    // ============================================
-
-    drawGuides() {
-        // Only draw static guides, face box is drawn separately
-        // This method is called every frame but does minimal work
-    }
-
-    drawFaceBox(box) {
-        this.ctx.strokeStyle = '#38bdf8';
-        this.ctx.lineWidth = 3;
-        this.ctx.strokeRect(box.x, box.y, box.width, box.height);
-
-        // Corner brackets
-        const len = 20;
-        this.ctx.strokeStyle = '#10b981';
-        this.ctx.lineWidth = 4;
-        // Top-left
-        this.ctx.beginPath();
-        this.ctx.moveTo(box.x, box.y + len);
-        this.ctx.lineTo(box.x, box.y);
-        this.ctx.lineTo(box.x + len, box.y);
-        this.ctx.stroke();
-        // Top-right
-        this.ctx.beginPath();
-        this.ctx.moveTo(box.x + box.width - len, box.y);
-        this.ctx.lineTo(box.x + box.width, box.y);
-        this.ctx.lineTo(box.x + box.width, box.y + len);
-        this.ctx.stroke();
-        // Bottom-left
-        this.ctx.beginPath();
-        this.ctx.moveTo(box.x, box.y + box.height - len);
-        this.ctx.lineTo(box.x, box.y + box.height);
-        this.ctx.lineTo(box.x + len, box.y + box.height);
-        this.ctx.stroke();
-        // Bottom-right
-        this.ctx.beginPath();
-        this.ctx.moveTo(box.x + box.width - len, box.y + box.height);
-        this.ctx.lineTo(box.x + box.width, box.y + box.height);
-        this.ctx.lineTo(box.x + box.width, box.y + box.height - len);
-        this.ctx.stroke();
-    }
-
-    drawLandmarks(landmarks) {
-        // Optionally draw points for debugging
-        if (!AppConfig?.debug) return;
-        this.ctx.fillStyle = '#fbbf24';
-        landmarks.positions.forEach(p => {
-            this.ctx.beginPath();
-            this.ctx.arc(p.x, p.y, 2, 0, 2 * Math.PI);
-            this.ctx.fill();
-        });
-    }
-
-    // ============================================
     // 📊 UI HELPERS
     // ============================================
 
-    setStatus(text) {
+    setStatusText(text) {
         if (this.statusElement) {
             this.statusElement.innerHTML = text;
         }
@@ -835,13 +642,13 @@ class FaceRecognitionManager {
     flashSuccess(message) {
         this.showMatchResult(true);
         playSound?.('faceid-success');
-        this.setStatus(`<span style="color:#10b981;">✓ ${message}</span>`);
+        this.setStatusText(`<span style="color:#10b981;">✓ ${message}</span>`);
     }
 
     flashFailure(message) {
         this.showMatchResult(false);
         playSound?.('faceid-error');
-        this.setStatus(`<span style="color:#ef4444;">✕ ${message}</span>`);
+        this.setStatusText(`<span style="color:#ef4444;">✕ ${message}</span>`);
     }
 
     showMatchResult(success) {
@@ -872,6 +679,16 @@ class FaceRecognitionManager {
 
     getStabilityMessage() {
         return `📐 ثبّت وجهك (${Math.round(this.stabilityScore * 100)}%)`;
+    }
+
+    showNonBlockingMessage(message, type = 'warning') {
+        if (typeof showToast === 'function') {
+            showToast(message, type);
+        } else if (typeof ui !== 'undefined' && ui.showWarning) {
+            ui.showWarning(message);
+        } else {
+            console.warn(message);
+        }
     }
 
     // ============================================
@@ -916,9 +733,7 @@ class FaceRecognitionManager {
         this.faceHistory = [];
         this.stabilityScore = 0;
         this.cancelCaptureTimer();
-        this.liveness.active = (this.currentMode === 'verify' || this.currentMode === 'attendance');
-        this.liveness.completed = { blink: false, turn: false, nod: false };
-        this.liveness.blinkCount = 0;
+        this.liveness.completed = false;
         window.currentFaceDetected = false;
     }
 }
@@ -942,12 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
 window.openCamera = async () => faceRecognition?.openCamera();
 window.closeCamera = () => faceRecognition?.closeCamera();
 window.manualFaceCapture = async () => faceRecognition?.performCapture();
-window.setCamStatus = (html) => faceRecognition?.setStatus(html);
-window.resetLiveness = () => { if (faceRecognition) faceRecognition.liveness.active = true; };
-window.updateLiveness = (yaw, landmarks) => faceRecognition?.checkLiveness(landmarks);
-window.getHeadYaw = (landmarks) => faceRecognition?.getYaw(landmarks);
-window.updateStabilityRing = (curr, max) => {}; // handled internally
-window.showMatchResult = (success) => faceRecognition?.showMatchResult(success);
+window.setCamStatus = (html) => faceRecognition?.setStatusText(html);
 window.switchFaceCamera = async () => {
     if (AppConfig) {
         AppConfig.faceRecognition.camera.facingMode =
@@ -955,8 +765,13 @@ window.switchFaceCamera = async () => {
         await faceRecognition?.openCamera();
     }
 };
+window.resetLiveness = () => { if (faceRecognition) faceRecognition.liveness.completed = false; };
+window.updateLiveness = () => true; // Human handles this internally
+window.getHeadYaw = () => 0;
+window.updateStabilityRing = () => {};
+window.showMatchResult = (success) => faceRecognition?.showMatchResult(success);
 
-// Utility functions (unchanged)
+// Utility functions
 window.bufferToBase64 = (buffer) => {
     let binary = '';
     const bytes = new Uint8Array(buffer);
