@@ -75,57 +75,6 @@ class SupabaseClient {
         return this.client.rpc(fnName, params);
     }
 
-    async sendEmailService(payload = {}, options = {}) {
-        const endpoint = AppConfig?.emailService?.url;
-        if (!endpoint) return { success: false, skipped: true, error: 'Email service not configured' };
-
-        const requestBody = JSON.stringify(payload);
-        const requestHeaders = { 'Content-Type': 'application/json' };
-        const secret = AppConfig?.emailService?.secret;
-        if (secret) {
-            requestHeaders['X-Axentro-Email-Secret'] = secret;
-        }
-
-        const tries = [
-            { mode: 'cors', credentials: 'omit' },
-            { mode: 'no-cors', credentials: 'omit' }
-        ];
-
-        let lastError = null;
-
-        for (const attempt of tries) {
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    mode: attempt.mode,
-                    credentials: attempt.credentials,
-                    headers: requestHeaders,
-                    body: requestBody
-                });
-
-                if (attempt.mode === 'no-cors') {
-                    return { success: true, opaque: true };
-                }
-
-                let data = null;
-                try {
-                    data = await response.json();
-                } catch (_) {}
-
-                if (!response.ok) {
-                    throw new Error(data?.error || `Email service HTTP ${response.status}`);
-                }
-
-                return data || { success: true };
-            } catch (error) {
-                lastError = error;
-            }
-        }
-
-        console.warn('⚠️ Email service request failed:', lastError?.message || lastError);
-        return { success: false, error: lastError?.message || 'Email service request failed' };
-    }
-
     async executeWithRetry(operation, maxRetries = null) {
         const retries = maxRetries ?? this.maxRetries;
         let lastError;
@@ -269,12 +218,17 @@ class SupabaseClient {
             }
 
             if (employeeData.email && AppConfig?.emailService?.url) {
-                await this.sendEmailService({
-                    action: 'sendNewEmpEmails',
-                    name: employeeData.name?.trim(),
-                    code: payload.employee_code || payload.employeeCode || payload.code,
-                    email: employeeData.email,
-                    password: generatedPassword
+                await fetch(AppConfig.emailService.url, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'sendNewEmpEmails',
+                        name: employeeData.name?.trim(),
+                        code: payload.employee_code || payload.employeeCode || payload.code,
+                        email: employeeData.email,
+                        password: generatedPassword
+                    })
                 });
             }
 
@@ -468,12 +422,17 @@ class SupabaseClient {
                 }
 
                 if (AppConfig?.emailService?.url) {
-                    await this.sendEmailService({
-                        action: 'sendForgotPw',
-                        name: admin.display_name || 'مدير النظام',
-                        code: 'admin',
-                        email: admin.email,
-                        password: newPassword
+                    await fetch(AppConfig.emailService.url, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'sendForgotPw',
+                            name: admin.display_name || 'مدير النظام',
+                            code: 'admin',
+                            email: admin.email,
+                            password: newPassword
+                        })
                     });
                 }
 
@@ -507,12 +466,17 @@ class SupabaseClient {
             }
 
             if (AppConfig?.emailService?.url) {
-                await this.sendEmailService({
-                    action: 'sendForgotPw',
-                    name: employee.name,
-                    code: employee.code,
-                    email: employee.email,
-                    password: newPassword
+                await fetch(AppConfig.emailService.url, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'sendForgotPw',
+                        name: employee.name,
+                        code: employee.code,
+                        email: employee.email,
+                        password: newPassword
+                    })
                 });
             }
 

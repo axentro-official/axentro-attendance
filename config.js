@@ -41,12 +41,12 @@ const AppConfig = {
 
     faceRecognition: {
         models: {
-            baseUrl: 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights/',
-            fallbackUrl: 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights/'
+            baseUrl: 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights',
+            fallbackUrl: 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
         },
         detection: {
             inputSize: 416,
-            scoreThreshold: 0.55,
+            scoreThreshold: 0.62,
             minFaceSize: 96,
             maxFaces: 1
         },
@@ -54,7 +54,7 @@ const AppConfig = {
             threshold: 0.48,
             adminThreshold: 0.45,
             labelDistance: 0.48,
-            minSamples: 3
+            minSamples: 5
         },
         camera: {
             width: 1280,
@@ -67,16 +67,15 @@ const AppConfig = {
             cameraStart: 10000
         },
         imageStorage: {
-            maxWidth: 640,
-            quality: 0.92,
-            faceCropPadding: 0.32
+            maxWidth: 480,
+            quality: 0.92
         },
         antiSpoof: {
             enabled: true,
             requireBlink: true,
             requireTurnLeftRight: true,
             requireNod: true,
-            minStableFrames: 6,
+            minStableFrames: 7,
             earBlinkThreshold: 0.19,
             minBlinks: 1,
             yawMovementPx: 12,
@@ -116,7 +115,7 @@ const AppConfig = {
     liveness: {
         enabled: true,
         headMovementThreshold: 0.08,
-        stableFramesRequired: 6,
+        stableFramesRequired: 3,
         stabilityRing: {
             circumference: 126,
             radius: 20
@@ -173,7 +172,7 @@ const AppConfig = {
 
     app: {
         name: 'Axentro System',
-        version: '5.0.0',
+        version: '5.0.1',
         description: 'نظام حضور وانصراف آمن مع تحقق الوجه والموقع',
         author: 'Axentro Team',
         urls: {
