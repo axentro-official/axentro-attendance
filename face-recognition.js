@@ -1,8 +1,8 @@
 /**
  * ============================================
- * 📷 AXENTRO FACE RECOGNITION v4.5 - STABLE MOBILE CAPTURE
- * ✅ Stable Tracking + Canvas-Based Position Check
- * 🔥 Less flicker, faster mobile capture, success/fail indicators
+ * 📷 AXENTRO FACE RECOGNITION v4.6 - FINAL MOBILE STABLE
+ * ✅ Stable Tracking + Fast First Enrollment
+ * 🔥 Less flicker, lighter preview, stronger verification flow
  * ============================================
  */
 
@@ -18,17 +18,18 @@ class FaceRecognitionManager {
         this.lastAutoCaptureAt = 0;
         this.cachedDescriptor = null;
         this.cachedDescriptorAt = 0;
-        this.captureCooldownMs = 1400;
-        this.extractTimeoutMs = 9000;
+        this.captureCooldownMs = 1600;
+        this.extractTimeoutMs = 8500;
 
         // Stable tracking state
         this.lastTrackedBox = null;
         this.lastTrackedBoxAt = 0;
-        this.facePersistenceMs = 700;
+        this.facePersistenceMs = 850;
         this.missedDetections = 0;
-        this.maxMissedDetections = 5;
+        this.maxMissedDetections = 6;
         this.smoothedBox = null;
         this.lastDetectionRaw = null;
+        this.previewBusy = false;
 
         // Mode flags
         window.regMode = false;
@@ -354,7 +355,7 @@ class FaceRecognitionManager {
                     facingMode,
                     width: { ideal: 640 },
                     height: { ideal: 480 },
-                    frameRate: { ideal: 24, max: 30 }
+                    frameRate: { ideal: 20, max: 24 }
                 },
                 audio: false
             };
@@ -363,7 +364,8 @@ class FaceRecognitionManager {
                 video: {
                     facingMode,
                     width: { ideal: 480 },
-                    height: { ideal: 360 }
+                    height: { ideal: 360 },
+                    frameRate: { ideal: 15, max: 20 }
                 },
                 audio: false
             };
@@ -391,7 +393,7 @@ class FaceRecognitionManager {
                 };
                 video.onloadedmetadata = finish;
                 video.oncanplay = finish;
-                setTimeout(finish, 700);
+                setTimeout(finish, 900);
             });
 
             try {
@@ -415,6 +417,7 @@ class FaceRecognitionManager {
             window.stabilityCounter = 0;
             window.isProcessingCapture = false;
             window.autoCaptureTimeout = null;
+            this.previewBusy = false;
 
             updateStabilityRing?.(0, 2);
 
@@ -487,6 +490,7 @@ class FaceRecognitionManager {
 
         window.stabilityCounter = 0;
         window.livenessActive = false;
+        this.previewBusy = false;
         this.isCameraActive = false;
     }
 
@@ -556,7 +560,7 @@ class FaceRecognitionManager {
             return this.smoothedBox;
         }
 
-        const alpha = 0.32;
+        const alpha = 0.26;
         this.smoothedBox = {
             x: this.smoothedBox.x + ((newBox.x - this.smoothedBox.x) * alpha),
             y: this.smoothedBox.y + ((newBox.y - this.smoothedBox.y) * alpha),
@@ -604,11 +608,16 @@ class FaceRecognitionManager {
                 return;
             }
 
-            if (!window.isProcessingCapture) {
-                await this.drawFaceBox();
+            if (!window.isProcessingCapture && !this.previewBusy) {
+                this.previewBusy = true;
+                try {
+                    await this.drawFaceBox();
+                } finally {
+                    this.previewBusy = false;
+                }
             }
 
-            window.detectionLoopTimeout = setTimeout(detect, 160);
+            window.detectionLoopTimeout = setTimeout(detect, 240);
         };
 
         detect();
@@ -637,8 +646,8 @@ class FaceRecognitionManager {
                     .detectSingleFace(
                         video,
                         new faceapi.TinyFaceDetectorOptions({
-                            inputSize: 256,
-                            scoreThreshold: 0.06
+                            inputSize: 224,
+                            scoreThreshold: 0.05
                         })
                     )
                     .withFaceLandmarks(true);
@@ -646,8 +655,8 @@ class FaceRecognitionManager {
                 detection = await faceapi.detectSingleFace(
                     video,
                     new faceapi.TinyFaceDetectorOptions({
-                        inputSize: 256,
-                        scoreThreshold: 0.06
+                        inputSize: 224,
+                        scoreThreshold: 0.05
                     })
                 );
             }
@@ -730,7 +739,7 @@ class FaceRecognitionManager {
         ctx.stroke();
     }
 
-    isFaceWellPositionedCanvas(box, canvas) {
+    isFaceWellPositionedCanvas(box, canvas, isEnrollment = false) {
         if (!box || !canvas?.width || !canvas?.height) return false;
 
         const faceWidthRatio = box.width / canvas.width;
@@ -742,11 +751,20 @@ class FaceRecognitionManager {
         const xOffset = Math.abs(centerX - (canvas.width / 2)) / canvas.width;
         const yOffset = Math.abs(centerY - (canvas.height / 2)) / canvas.height;
 
+        if (isEnrollment) {
+            return (
+                faceWidthRatio >= 0.15 &&
+                faceHeightRatio >= 0.17 &&
+                xOffset <= 0.28 &&
+                yOffset <= 0.30
+            );
+        }
+
         return (
-            faceWidthRatio >= 0.18 &&
-            faceHeightRatio >= 0.20 &&
-            xOffset <= 0.22 &&
-            yOffset <= 0.24
+            faceWidthRatio >= 0.17 &&
+            faceHeightRatio >= 0.19 &&
+            xOffset <= 0.24 &&
+            yOffset <= 0.26
         );
     }
 
@@ -760,7 +778,7 @@ class FaceRecognitionManager {
 
         const verificationMode = !!(window.attMode || window.adminVerifyMode);
         const stableFramesRequired = enrollmentMode ? 2 : 2;
-        const faceReady = this.isFaceWellPositionedCanvas(trackedBox, canvas);
+        const faceReady = this.isFaceWellPositionedCanvas(trackedBox, canvas, enrollmentMode);
 
         if (!faceReady) {
             window.stabilityCounter = 0;
@@ -787,7 +805,7 @@ class FaceRecognitionManager {
                     (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
                 ) {
                     this.lastAutoCaptureAt = now;
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 70);
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 90);
                 }
             } else {
                 setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
@@ -828,7 +846,7 @@ class FaceRecognitionManager {
                     (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
                 ) {
                     this.lastAutoCaptureAt = now;
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 70);
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 90);
                 }
             } else {
                 setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
@@ -910,12 +928,12 @@ class FaceRecognitionManager {
         const video = this.videoElement || document.getElementById('video');
         if (!video) return null;
 
-        if (this.cachedDescriptor && (Date.now() - this.cachedDescriptorAt < 4000)) {
+        if (this.cachedDescriptor && (Date.now() - this.cachedDescriptorAt < 3500)) {
             return this.cachedDescriptor;
         }
 
         const descriptors = [];
-        const attempts = 3;
+        const attempts = 2;
 
         for (let i = 0; i < attempts; i++) {
             try {
@@ -924,13 +942,13 @@ class FaceRecognitionManager {
                         .detectSingleFace(
                             video,
                             new faceapi.TinyFaceDetectorOptions({
-                                inputSize: 320,
+                                inputSize: 256,
                                 scoreThreshold: 0.05
                             })
                         )
                         .withFaceLandmarks()
                         .withFaceDescriptor(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('descriptor-timeout')), 2400))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('descriptor-timeout')), 2600))
                 ]);
 
                 if (det?.descriptor) {
@@ -943,7 +961,7 @@ class FaceRecognitionManager {
                 }
             } catch (_e) {}
 
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 120));
         }
 
         if (!descriptors.length) return null;
@@ -1311,6 +1329,7 @@ window.setStatus = function (txt) {
 window.updateSplashProgress = function (percent) {
     const bar = document.getElementById('loadProgress');
     if (bar) bar.style.width = `${percent}%`;
+    }
 };
 
 // ============================================
