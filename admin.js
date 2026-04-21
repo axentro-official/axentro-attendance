@@ -142,8 +142,8 @@ class AdminManager {
                 <td style="font-size:12px;color:#94a3b8;">${createdDate}</td>
                 <td>
                     ${!employee.is_admin ? `
-                    <button class="btn btn-sm btn-reg" onclick="adminResetFace('${employee.code}', '${(employee.name || '').replace(/'/g, "&#39;")}')" title="إعادة تسجيل بصمة" style="margin:2px;">
-                        <i class="fas fa-sync-alt"></i>
+                    <button class="btn btn-sm btn-outline" onclick="openEmployeeActionsModal('${employee.code}', '${(employee.name || '').replace(/'/g, "&#39;")}')" title="إعدادات الموظف" style="margin:2px;">
+                        <i class="fas fa-gear"></i>
                     </button>
                     <button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${employee.code}', '${(employee.name || '').replace(/'/g, "&#39;")}')" title="حذف الموظف" style="margin:2px;">
                         <i class="fas fa-trash"></i>
@@ -203,6 +203,15 @@ class AdminManager {
             else modal.classList.add('active');
             modal.style.display = '';
         }
+    }
+
+    openEmployeeActionsModal(code, name) {
+        window.selectedEmployeeAdminAction = { code, name };
+        const nameEl = document.getElementById('employeeActionsName');
+        const codeEl = document.getElementById('employeeActionsCode');
+        if (nameEl) nameEl.textContent = name || 'الموظف';
+        if (codeEl) codeEl.textContent = code || '-';
+        if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('employeeActionsModal');
     }
 
     closeAddEmployeeModal() {
@@ -336,12 +345,36 @@ class AdminManager {
         try {
             if (typeof db === 'undefined') throw new Error('Database not available');
 
-            // Handle employee deletion
             if (targetEmp.type === 'حذف موظف') {
                 await this.deleteEmployeeWithVerification(targetEmp);
-            } else {
-                // Handle manual attendance recording
+            } else if (targetEmp.type === 'حضور' || targetEmp.type === 'انصراف') {
                 await this.recordManualAttendance(targetEmp);
+            } else if (targetEmp.type === 'تغيير كلمة السر') {
+                const newPassword = await ui?.showPrompt?.({
+                    title: 'تغيير كلمة سر الموظف',
+                    message: `أدخل كلمة السر الجديدة للموظف ${targetEmp.name}.`,
+                    placeholder: 'كلمة السر الجديدة',
+                    confirmText: 'حفظ',
+                    cancelText: 'إلغاء',
+                    type: 'warning',
+                    inputType: 'password',
+                    errorMessage: 'كلمة السر الجديدة مطلوبة'
+                });
+                if (!newPassword) { closeCamera?.(); return; }
+                const result = await db.adminChangeEmployeePassword(targetEmp.code, String(newPassword).trim());
+                if (!result?.success) throw new Error(result?.error || 'فشل تغيير كلمة السر');
+                playSound?.('faceid-success');
+                showToast?.(`تم تغيير كلمة سر ${targetEmp.name} بنجاح`, 'success');
+                closeCamera?.();
+            } else if (targetEmp.type === 'تحديث بصمة الوجه') {
+                closeCamera?.();
+                window.faceUpdateTargetUser = { role: 'employee', code: targetEmp.code, name: targetEmp.name };
+                window.updateFaceMode = false;
+                window.attMode = false;
+                window.adminVerifyMode = false;
+                window.firstTimeSetupMode = false;
+                window.adminResetFaceMode = true;
+                await openCamera?.();
             }
 
         } catch(e) {
@@ -751,3 +784,18 @@ window.handleAdminVerificationCapture = async function(descriptor) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = AdminManager;
 }
+
+
+window.openEmployeeActionsModal = (code, name) => adminManager?.openEmployeeActionsModal?.(code, name);
+window.adminOpenEmployeeAction = async function(actionType) {
+    const selected = window.selectedEmployeeAdminAction;
+    if (!selected) return;
+    if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('employeeActionsModal');
+    window.targetEmpForAdmin = { code: selected.code, name: selected.name, type: actionType };
+    window.adminVerifyMode = true;
+    window.attMode = false;
+    window.updateFaceMode = false;
+    window.firstTimeSetupMode = false;
+    window.adminResetFaceMode = false;
+    await openCamera?.();
+};

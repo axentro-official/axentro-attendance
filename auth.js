@@ -417,7 +417,7 @@ class AuthManager {
 
         const modal = document.getElementById('forcePwModal');
         if (modal) {
-            if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('changePwModal');
+            if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('forcePwModal');
             else modal.classList.add('active');
         }
 
@@ -441,16 +441,16 @@ class AuthManager {
                     <div class="modal-header">
                         <h3><i class="fas fa-shield-halved"></i> إجراء أمني مطلوب</h3>
                     </div>
-                    <div class="modal-body">
-                        <p style="margin-bottom:14px;color:#cbd5e1;line-height:1.8;">تم التحقق من بيانات الدخول، ولكن يجب تغيير كلمة المرور الحالية أولاً، ثم سيتم استكمال تسجيل بصمة الوجه إذا لزم.</p>
+                    <div class="modal-body force-pw-body">
+                        <p style="margin-bottom:0;color:#cbd5e1;line-height:1.8;">تم التحقق من بيانات الدخول، ولكن يجب تغيير كلمة المرور الحالية أولاً، ثم سيتم استكمال تسجيل بصمة الوجه إذا لزم.</p>
                         <div class="password-wrapper">
                             <input type="password" id="firstNewPw" placeholder="أدخل كلمة المرور الجديدة">
-                            <button class="toggle-password" onclick="togglePassword('firstNewPw')">
+                            <button type="button" class="toggle-password" data-target="firstNewPw">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
-                        <div style="display:flex;gap:12px;justify-content:center;margin-top:18px;">
-                            <button class="btn btn-primary" onclick="submitFirstPwChange()">حفظ ومتابعة</button>
+                        <div class="btn-row">
+                            <button type="button" class="btn btn-primary" onclick="submitFirstPwChange()">حفظ ومتابعة</button>
                         </div>
                     </div>
                 </div>`;
@@ -557,11 +557,12 @@ class AuthManager {
             }
             const modal = document.getElementById('forcePwModal');
             if (modal) {
-            if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('changePwModal');
-            else modal.classList.remove('active');
-        }
-            if (this.currentUser) this.currentUser.isFirstLogin = false;
-            if (window.user) window.user.isFirstLogin = false;
+                if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('forcePwModal');
+                else modal.classList.remove('active');
+            }
+            if (this.currentUser) { this.currentUser.isFirstLogin = false; this.currentUser.tempPasswordForFirstLogin = ''; }
+            if (window.user) { window.user.isFirstLogin = false; window.user.tempPasswordForFirstLogin = ''; }
+            this.updateStoredSession(window.user || this.currentUser);
             this.toast('تم تحديث كلمة السر', 'success');
             if (!window.user.face_enrolled) {
                 this.pendingLoginUser = window.user;
@@ -736,22 +737,13 @@ class AuthManager {
     // ============================================
 
     showForgotPw() {
-        const modal = document.getElementById('forgotPwModal');
         const codeInput = document.getElementById('forgotCode');
-
-        if (modal) {
-            if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('changePwModal');
-            else modal.classList.add('active');
-        }
+        if (typeof app !== 'undefined' && app?.navigateTo) app.navigateTo('forgotPasswordPage');
         if (codeInput) codeInput.value = '';
     }
 
     closeForgotPw() {
-        const modal = document.getElementById('forgotPwModal');
-        if (modal) {
-            if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('changePwModal');
-            else modal.classList.remove('active');
-        }
+        if (typeof app !== 'undefined' && app?.navigateTo) app.navigateTo('loginPage');
     }
 
     async submitForgotPw() {

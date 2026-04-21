@@ -857,6 +857,39 @@
     </div>
 </div>
 
+<div class="modal" id="employeeActionsModal">
+    <div class="modal-content employee-actions-modal" style="max-width: 620px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-user-gear"></i> إعدادات الموظف</h3>
+            <button class="close-modal" onclick="ui.closeModal('employeeActionsModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="employee-action-userbox">
+                <h4 id="employeeActionsName">—</h4>
+                <p id="employeeActionsCode">—</p>
+            </div>
+            <div class="employee-actions-grid">
+                <button type="button" class="btn btn-outline" id="employeeActionCheckInBtn">
+                    <i class="fas fa-user-check"></i>
+                    تسجيل حضور يدوي
+                </button>
+                <button type="button" class="btn btn-outline" id="employeeActionCheckOutBtn">
+                    <i class="fas fa-user-clock"></i>
+                    تسجيل انصراف يدوي
+                </button>
+                <button type="button" class="btn btn-outline" id="employeeActionPasswordBtn">
+                    <i class="fas fa-key"></i>
+                    تغيير كلمة السر
+                </button>
+                <button type="button" class="btn btn-outline" id="employeeActionFaceBtn">
+                    <i class="fas fa-camera"></i>
+                    تحديث بصمة الوجه
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Add Employee Modal -->
 <div class="modal" id="addEmployeeModal">
     <div class="modal-content" style="max-width: 550px;">

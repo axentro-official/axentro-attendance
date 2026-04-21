@@ -519,6 +519,10 @@ class App {
         const profileImageInput = document.getElementById('profileImageInput');
         const saveWorksiteSettingsBtn = document.getElementById('saveWorksiteSettingsBtn');
         const clearLocalSettingsBtn = document.getElementById('clearLocalSettingsBtn');
+        const employeeActionCheckInBtn = document.getElementById('employeeActionCheckInBtn');
+        const employeeActionCheckOutBtn = document.getElementById('employeeActionCheckOutBtn');
+        const employeeActionPasswordBtn = document.getElementById('employeeActionPasswordBtn');
+        const employeeActionFaceBtn = document.getElementById('employeeActionFaceBtn');
 
         refreshBtn?.addEventListener('click', () => this.refreshData(false, refreshBtn));
         adminRefreshBtn?.addEventListener('click', () => this.refreshData(false, adminRefreshBtn));
@@ -535,6 +539,10 @@ class App {
         profileImageInput?.addEventListener('change', (e) => this.handleProfileImageSelection(e));
         saveWorksiteSettingsBtn?.addEventListener('click', () => this.saveWorksiteSettings());
         clearLocalSettingsBtn?.addEventListener('click', () => this.clearLocalSettings());
+        employeeActionCheckInBtn?.addEventListener('click', () => window.adminOpenEmployeeAction?.('حضور'));
+        employeeActionCheckOutBtn?.addEventListener('click', () => window.adminOpenEmployeeAction?.('انصراف'));
+        employeeActionPasswordBtn?.addEventListener('click', () => window.adminOpenEmployeeAction?.('تغيير كلمة السر'));
+        employeeActionFaceBtn?.addEventListener('click', () => window.adminOpenEmployeeAction?.('تحديث بصمة الوجه'));
 
         // Keyboard shortcuts
         document.addEventListener('DOMContentLoaded', () => {

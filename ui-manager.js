@@ -74,21 +74,17 @@ class UIManager {
         });
 
         // Toggle password visibility
-        document.querySelectorAll('.toggle-password').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const targetId = btn.dataset.target;
-                const input = document.getElementById(targetId);
-                
-                if (input) {
-                    const isPassword = input.type === 'password';
-                    input.type = isPassword ? 'text' : 'password';
-                    
-                    const icon = btn.querySelector('i');
-                    if (icon) {
-                        icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
-                    }
-                }
-            });
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.toggle-password');
+            if (!btn) return;
+            const targetId = btn.dataset.target;
+            const input = targetId ? document.getElementById(targetId) : btn.parentElement?.querySelector('input');
+            if (input) {
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                const icon = btn.querySelector('i');
+                if (icon) icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+            }
         });
     }
 
@@ -413,14 +409,15 @@ class UIManager {
         document.querySelectorAll('.modal.active').forEach(opened => {
             if (opened !== modal) {
                 opened.classList.remove('active');
-                opened.style.display = '';
             }
         });
 
+        document.querySelectorAll('.confirmation-modal, .prompt-modal').forEach(el => el.remove());
         modal.style.display = 'flex';
         modal.classList.add('active');
         document.body.classList.add('modal-open');
         document.body.style.overflow = 'hidden';
+        window.scrollTo({ top: 0, behavior: 'auto' });
 
         if (!modal.dataset.overlayBound) {
             modal.addEventListener('click', (e) => {
@@ -444,7 +441,7 @@ class UIManager {
         if (!modal) return;
 
         modal.classList.remove('active');
-        modal.style.display = '';
+        modal.style.display = 'none';
 
         const hasActiveModal = !!document.querySelector('.modal.active');
         document.body.classList.toggle('modal-open', hasActiveModal);
@@ -459,7 +456,7 @@ class UIManager {
     closeAllModals() {
         document.querySelectorAll('.modal.active').forEach(modal => {
             modal.classList.remove('active');
-            modal.style.display = '';
+            modal.style.display = 'none';
         });
 
         document.body.classList.remove('modal-open');
