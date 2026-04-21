@@ -765,6 +765,9 @@ class App {
         const adminPage = document.getElementById('adminPage');
 
         if (window.user?.role === 'admin' || window.user?.isAdmin) {
+            if (typeof window.adminManager !== 'undefined' && window.adminManager && typeof window.adminManager.init === 'function') {
+                window.adminManager.init();
+            }
             if (adminPage) {
                 adminPage.style.display = 'block';
                 adminPage.classList.add('active');

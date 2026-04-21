@@ -404,14 +404,32 @@ class UIManager {
      */
     openModal(modalId) {
         const modal = document.getElementById(modalId);
-        
+
         if (!modal) {
             console.warn(`⚠️ Modal not found: ${modalId}`);
             return;
         }
 
+        document.querySelectorAll('.modal.active').forEach(opened => {
+            if (opened !== modal) {
+                opened.classList.remove('active');
+                opened.style.display = '';
+            }
+        });
+
+        modal.style.display = 'flex';
         modal.classList.add('active');
-        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        document.body.classList.add('modal-open');
+        document.body.style.overflow = 'hidden';
+
+        if (!modal.dataset.overlayBound) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeModal(modalId);
+                }
+            });
+            modal.dataset.overlayBound = '1';
+        }
 
         console.log(`📂 Modal opened: ${modalId}`);
     }
@@ -422,11 +440,15 @@ class UIManager {
      */
     closeModal(modalId) {
         const modal = document.getElementById(modalId);
-        
+
         if (!modal) return;
 
         modal.classList.remove('active');
-        document.body.style.overflow = ''; // Restore scrolling
+        modal.style.display = '';
+
+        const hasActiveModal = !!document.querySelector('.modal.active');
+        document.body.classList.toggle('modal-open', hasActiveModal);
+        document.body.style.overflow = hasActiveModal ? 'hidden' : '';
 
         console.log(`📕 Modal closed: ${modalId}`);
     }
@@ -437,8 +459,10 @@ class UIManager {
     closeAllModals() {
         document.querySelectorAll('.modal.active').forEach(modal => {
             modal.classList.remove('active');
+            modal.style.display = '';
         });
-        
+
+        document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
     }
 

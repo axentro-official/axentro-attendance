@@ -199,7 +199,8 @@ class AdminManager {
         const form = document.getElementById('addEmployeeModalForm');
         form?.reset?.();
         if (modal) {
-            modal.classList.add('active');
+            if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('addEmployeeModal');
+            else modal.classList.add('active');
             modal.style.display = '';
         }
     }
@@ -207,7 +208,8 @@ class AdminManager {
     closeAddEmployeeModal() {
         const modal = document.getElementById('addEmployeeModal');
         if (modal) {
-            modal.classList.remove('active');
+            if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('addEmployeeModal');
+            else modal.classList.remove('active');
             modal.style.display = '';
         }
     }
@@ -225,7 +227,10 @@ class AdminManager {
         try {
             const result = await db.createEmployee({ name, email });
             if (!result?.success) throw new Error(result?.error || 'فشل إنشاء الحساب');
-            showToast?.(`تم إنشاء الموظف بنجاح. الكود: ${result.employee_code || '-'}`, 'success');
+            const successMessage = email
+                ? `تم إنشاء الموظف بنجاح، وتم إرسال الكود وكلمة المرور المؤقتة إلى البريد: ${email}`
+                : `تم إنشاء الموظف بنجاح. الكود: ${result.employee_code || '-'}`;
+            showToast?.(successMessage, 'success');
             this.closeAddEmployeeModal();
             await this.loadEmployeesList();
         } catch (error) {

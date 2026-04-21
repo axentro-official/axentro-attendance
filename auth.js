@@ -416,7 +416,10 @@ class AuthManager {
         this.ensurePasswordModals();
 
         const modal = document.getElementById('forcePwModal');
-        if (modal) modal.classList.add('active');
+        if (modal) {
+            if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('changePwModal');
+            else modal.classList.add('active');
+        }
 
         const input = document.getElementById('firstNewPw');
         if (input) {
@@ -553,7 +556,10 @@ class AuthManager {
                 throw new Error(result?.error || 'Update failed');
             }
             const modal = document.getElementById('forcePwModal');
-            if (modal) modal.classList.remove('active');
+            if (modal) {
+            if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('changePwModal');
+            else modal.classList.remove('active');
+        }
             if (this.currentUser) this.currentUser.isFirstLogin = false;
             if (window.user) window.user.isFirstLogin = false;
             this.toast('تم تحديث كلمة السر', 'success');
@@ -616,12 +622,18 @@ class AuthManager {
             }
         }
 
-        if (modal) modal.classList.add('active');
+        if (modal) {
+            if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('changePwModal');
+            else modal.classList.add('active');
+        }
     }
 
     closeChangePwModal() {
         const modal = document.getElementById('changePwModal');
-        if (modal) modal.classList.remove('active');
+        if (modal) {
+            if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('changePwModal');
+            else modal.classList.remove('active');
+        }
     }
 
     async submitChangePassword() {
@@ -727,13 +739,19 @@ class AuthManager {
         const modal = document.getElementById('forgotPwModal');
         const codeInput = document.getElementById('forgotCode');
 
-        if (modal) modal.classList.add('active');
+        if (modal) {
+            if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('changePwModal');
+            else modal.classList.add('active');
+        }
         if (codeInput) codeInput.value = '';
     }
 
     closeForgotPw() {
         const modal = document.getElementById('forgotPwModal');
-        if (modal) modal.classList.remove('active');
+        if (modal) {
+            if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('changePwModal');
+            else modal.classList.remove('active');
+        }
     }
 
     async submitForgotPw() {

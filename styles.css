@@ -2135,3 +2135,47 @@ body.auth-mode .global-app-footer{display:none;}
   .profile-settings-preview{align-items:flex-start;}
   .profile-settings-actions,.settings-grid.two-columns,.settings-actions-grid{grid-template-columns:1fr;}
 }
+
+
+/* --- visual refinement patch v2 --- */
+.auth-split-page{display:flex;align-items:stretch;justify-content:center;}
+.login-split-layout{width:min(1180px,100%);grid-template-columns:minmax(220px,.82fr) minmax(320px,1.18fr);gap:14px;align-items:stretch;}
+.login-side-card{padding:22px 18px;position:relative;overflow:hidden;}
+.login-side-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at top center, rgba(59,130,246,.18), transparent 42%);pointer-events:none;}
+.login-side-links{position:relative;z-index:1;max-width:none;width:100%;margin:0 0 20px;}
+.login-side-links a{min-height:58px;border-radius:20px;font-size:1.02rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.05);}
+.login-side-branding{position:relative;z-index:1;justify-content:flex-end;flex:1;padding-top:14px;}
+.login-side-branding .footer-copy{font-size:1rem;line-height:1.6;}
+.login-side-qr-code{width:118px;height:118px;box-shadow:0 12px 28px rgba(0,0,0,.22);}
+.login-card-panel{min-width:0;height:100%;}
+.login-card-panel .auth-header{padding:32px 22px;}
+.login-card-panel .auth-form{padding:24px 22px;}
+.login-card-panel .btn-login{min-height:74px;font-size:1.12rem;}
+.auth-container.login-card-panel{border-radius:28px;}
+.modal{padding:16px;}
+.modal-content{position:relative;z-index:2;}
+@media (max-width:900px){
+  .login-split-layout{grid-template-columns:minmax(170px,.78fr) minmax(0,1.22fr);gap:10px;}
+  .login-side-card{padding:18px 12px;}
+  .login-side-links a{min-height:50px;font-size:.95rem;padding:10px 8px;}
+  .login-side-branding .footer-copy{font-size:.9rem;}
+  .login-side-qr-code{width:92px;height:92px;}
+  .login-card-panel .auth-header{padding:24px 16px;}
+  .login-card-panel .auth-form{padding:18px 14px;}
+}
+@media (max-width:640px){
+  .auth-split-page{padding:10px 8px 18px;}
+  .login-split-layout{grid-template-columns:minmax(128px,.72fr) minmax(0,1.28fr);gap:8px;min-height:calc(100vh - 18px);}
+  .login-side-card{border-radius:22px;}
+  .login-side-links{gap:8px;margin-bottom:14px;}
+  .login-side-links a{min-height:44px;font-size:.88rem;border-radius:16px;}
+  .login-side-branding{gap:5px;padding-top:8px;}
+  .login-side-branding .footer-copy,.footer-sub,.footer-scan{font-size:.78rem;line-height:1.45;}
+  .login-side-qr-title{font-size:1.05rem;}
+  .login-side-qr-code{width:78px;height:78px;}
+  .auth-container.login-card-panel{border-radius:22px;}
+  .login-card-panel .auth-header{padding:22px 12px;}
+  .login-card-panel .auth-form{padding:16px 12px;}
+  .login-card-panel .btn-login{min-height:64px;font-size:1rem;}
+  .remember-label{font-size:.84rem;}
+}
