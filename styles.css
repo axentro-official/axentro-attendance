@@ -2066,3 +2066,32 @@ body{background-color:#06132d !important;}
     line-height: 1.5;
     user-select: none;
 }
+
+
+/* ==== Axentro patch: login split, avatars, settings ==== */
+#app{min-height:100vh;}
+.page{min-height:100vh;}
+.login-split-page{display:block;padding:24px;}
+.login-shell{display:grid;grid-template-columns:1fr 1fr;min-height:calc(100vh - 48px);gap:24px;align-items:stretch;}
+.login-left,.login-right{display:flex;align-items:center;justify-content:center;}
+.login-right .auth-container,.login-left .login-side-card,.login-left .login-side-footer{width:min(100%,560px);}
+.login-left{flex-direction:column;gap:20px;}
+.login-side-card,.login-side-footer{background:linear-gradient(135deg, rgba(6,18,45,.96) 0%, rgba(12,35,86,.98) 100%);border:1px solid rgba(96,165,250,.16);border-radius:24px;box-shadow:0 18px 40px rgba(0,0,0,.28);padding:32px;color:#e2e8f0;}
+.login-side-actions{display:grid;gap:14px;margin-top:18px;}
+.login-side-card .btn{max-width:none;}
+#loginPage .auth-links{display:none;}
+#loginPage .legacy-footer{display:none;}
+#loginPage .auth-container{max-width:560px;margin:0;}
+.global-app-footer{padding-bottom:40px;}
+body.login-active .global-app-footer{display:none;}
+.user-info.with-avatar,.user-info.with-avatar-admin{display:flex;align-items:center;gap:14px;}
+.profile-avatar{width:56px;height:56px;border-radius:50%;overflow:hidden;border:2px solid rgba(59,130,246,.45);display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.65);flex-shrink:0;}
+.profile-avatar img{width:100%;height:100%;object-fit:cover;display:block;}
+.profile-avatar i{font-size:24px;color:#93c5fd;}
+.settings-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.setting-item{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap;}
+.setting-info{flex:1 1 260px;}
+.setting-info h4{margin:0 0 6px;}
+.setting-info p{margin:0;color:var(--text-muted);}
+.admin-settings-block{margin-top:10px;}
+@media (max-width: 900px){.login-shell{grid-template-columns:1fr;}.login-left{order:2}.login-right{order:1}.settings-grid-2{grid-template-columns:1fr;}}

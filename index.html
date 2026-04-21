@@ -78,65 +78,77 @@
     <!-- ================================ -->
     <!-- 🔐 LOGIN PAGE -->
     <!-- ================================ -->
-    <section id="loginPage" class="page active">
-        <div class="auth-container">
-            <div class="auth-header">
-                <div class="logo-main">
-                    <i class="fas fa-fingerprint"></i>
+    <section id="loginPage" class="page active login-split-page">
+        <div class="login-shell">
+            <div class="login-right">
+                <div class="auth-container">
+                    <div class="auth-header">
+                        <div class="logo-main">
+                            <i class="fas fa-fingerprint"></i>
+                        </div>
+                        <h1>Axentro System</h1>
+                        <p>نظام إدارة الحضور والانصراف المتقدم</p>
+                    </div>
+
+                    <form id="loginForm" class="auth-form" novalidate>
+                        <div class="input-group">
+                            <label for="loginCode"><i class="fas fa-id-badge"></i> كود الموظف</label>
+                            <input type="text" id="loginCode" placeholder="أدخل كود الموظف" autocomplete="username" required pattern="[A-Z0-9]{4,10}" maxlength="10">
+                            <span class="error-message" id="loginCodeError"></span>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="loginPassword"><i class="fas fa-lock"></i> كلمة السر</label>
+                            <div class="password-wrapper">
+                                <input type="password" id="loginPassword" placeholder="كلمة السر" autocomplete="current-password" required minlength="4">
+                                <button type="button" class="toggle-password" data-target="loginPassword">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <span class="error-message" id="loginPasswordError"></span>
+                        </div>
+
+                        <div class="form-options">
+                            <div class="remember-control">
+                                <input type="checkbox" id="rememberMe" class="remember-checkbox" checked>
+                                <span class="remember-label">تذكرني (حفظ جلسة الدخول)</span>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block btn-login" id="loginBtn">
+                            <i class="fas fa-arrow-right-to-bracket"></i>
+                            <span>تسجيل الدخول</span>
+                            <span class="btn-loader hidden"></span>
+                        </button>
+
+                        <div class="auth-divider"><span>أو</span></div>
+
+                        <button type="button" class="btn btn-outline btn-block" id="biometricLoginBtn">
+                            <i class="fas fa-fingerprint"></i>
+                            تسجيل الدخول ببصمة الإصبع
+                        </button>
+                    </form>
                 </div>
-                <h1>Axentro System</h1>
-                <p>نظام إدارة الحضور والانصراف المتقدم</p>
             </div>
 
-            <form id="loginForm" class="auth-form" novalidate>
-                <div class="input-group">
-                    <label for="loginCode"><i class="fas fa-id-badge"></i> كود الموظف</label>
-                    <input type="text" id="loginCode" placeholder="أدخل كود الموظف" autocomplete="username" required pattern="[A-Z0-9]{4,10}" maxlength="10">
-                    <span class="error-message" id="loginCodeError"></span>
-                </div>
-
-                <div class="input-group">
-                    <label for="loginPassword"><i class="fas fa-lock"></i> كلمة السر</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="loginPassword" placeholder="كلمة السر" autocomplete="current-password" required minlength="4">
-                        <button type="button" class="toggle-password" data-target="loginPassword">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                    <span class="error-message" id="loginPasswordError"></span>
-                </div>
-
-                <div class="form-options">
-                    <div class="remember-control">
-                        <input type="checkbox" id="rememberMe" class="remember-checkbox" checked>
-                        <span class="remember-label">تذكرني (حفظ جلسة الدخول)</span>
+            <div class="login-left">
+                <div class="login-side-card">
+                    <h2>الوصول السريع</h2>
+                    <p>يمكنك الانتقال مباشرة إلى إنشاء حساب جديد أو استعادة كلمة المرور من هنا.</p>
+                    <div class="login-side-actions">
+                        <a href="#" id="showRegisterLinkSide" class="btn btn-outline btn-block">إنشاء حساب جديد</a>
+                        <a href="#" id="showForgotPasswordLinkSide" class="btn btn-outline btn-block">نسيت كلمة المرور؟</a>
                     </div>
                 </div>
-
-                <button type="submit" class="btn btn-primary btn-block btn-login" id="loginBtn">
-                    <i class="fas fa-arrow-right-to-bracket"></i>
-                    <span>تسجيل الدخول</span>
-                    <span class="btn-loader hidden"></span>
-                </button>
-
-                <div class="auth-divider"><span>أو</span></div>
-
-                <button type="button" class="btn btn-outline btn-block" id="biometricLoginBtn">
-                    <i class="fas fa-fingerprint"></i>
-                    تسجيل الدخول ببصمة الإصبع
-                </button>
-
-                <div class="auth-links">
-                    <a href="#" id="showRegisterLink">إنشاء حساب جديد</a>
-                    <a href="#" id="showForgotPasswordLink">نسيت كلمة المرور؟</a>
+                <div class="login-side-footer">
+                    <p class="footer-copy">© 2024 Axentro – All Rights Reserved</p>
+                    <p class="footer-copy footer-sub">By Axentro Team</p>
+                    <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="qr-link global-qr-link">
+                        <img src="qr-links.png" alt="QR Code" class="qr-code global-qr-code">
+                    </a>
+                    <p class="footer-scan">QR Code</p>
+                    <p class="footer-scan">Scan Me &gt; Click On Me</p>
                 </div>
-            </form>
-
-            <div class="auth-footer legacy-footer">
-                <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="qr-link">
-                    <img src="qr-links.png" alt="QR Code" class="qr-code">
-                </a>
-                <p>Scan Me &gt; Click On Me</p>
             </div>
         </div>
     </section>
@@ -597,7 +609,7 @@
                 <button class="icon-btn" id="adminSettingsBtn" title="الإعدادات">
                     <i class="fas fa-cog"></i>
                 </button>
-                <button class="icon-btn" id="adminLogoutBtn" title="تسجيل الخروج" onclick="window.auth?.logout?.()">
+                <button class="icon-btn" id="adminLogoutBtn" title="تسجيل الخروج" onclick="window.confirmLogout && window.confirmLogout()">
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
             </div>
@@ -633,15 +645,15 @@
             </div>
 
             <div class="admin-actions-row">
-                <button class="btn btn-primary" onclick="openAddEmployeeModal()">
+                <button class="btn btn-primary" onclick="window.openAddEmployeeModal && window.openAddEmployeeModal()">
                     <i class="fas fa-user-plus"></i>
                     إضافة موظف
                 </button>
-                <button class="btn btn-outline" onclick="admin.exportEmployeesList()">
+                <button class="btn btn-outline" onclick="window.admin && window.admin.exportEmployeesList && window.admin.exportEmployeesList()">
                     <i class="fas fa-download"></i>
                     تصدير القائمة
                 </button>
-                <button class="btn btn-outline" onclick="admin.refreshData()">
+                <button class="btn btn-outline" onclick="window.admin && window.admin.refreshData && window.admin.refreshData()">
                     <i class="fas fa-sync-alt"></i>
                     تحديث البيانات
                 </button>
@@ -717,9 +729,11 @@
             </p>
         </div>
     </div>
+</div>
+
 <!-- Settings Modal -->
 <div class="modal" id="settingsModal">
-    <div class="modal-content" style="max-width: 500px;">
+    <div class="modal-content" style="max-width: 620px;">
         <div class="modal-header">
             <h3><i class="fas fa-cog"></i> الإعدادات</h3>
             <button class="close-modal" onclick="ui.closeModal('settingsModal')">&times;</button>
@@ -728,59 +742,77 @@
             <div class="setting-item">
                 <div class="setting-info">
                     <h4><i class="fas fa-volume-up"></i> الإشعارات الصوتية</h4>
-                    <p>تشغيل الأصوات عند تسجيل الحضور</p>
+                    <p>تشغيل الأصوات عند تسجيل الحضور والانصراف</p>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="soundEnabled" checked>
                     <span class="toggle-slider"></span>
                 </label>
-                
-                <div class="setting-item">
-                    <div class="setting-info">
-                        <h4><i class="fas fa-mobile-vibration"></i> الاهتزازات</h4>
+            </div>
+
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h4><i class="fas fa-mobile-vibration"></i> الاهتزازات</h4>
                     <p>اهتزاز عند نجاح العملية</p>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" id="vibrationEnabled" checked>
                     <span class="toggle-slider"></span>
                 </label>
-                
-                <div class="setting-item">
-                    <div class="setting-info">
-                        <h4><i class="fas fa-database"></i> وضع توفير البيانات</h4>
-                        <p>تقليل استهلاك الإنترنت</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="dataSaverMode" checked>
+            </div>
+
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h4><i class="fas fa-database"></i> وضع توفير البيانات</h4>
+                    <p>تقليل استهلاك الإنترنت</p>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="dataSaverMode">
                     <span class="toggle-slider"></span>
                 </label>
-                </div>
             </div>
-            
+
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h4><i class="fas fa-user-pen"></i> تحديث بصمة الوجه وصورة الملف</h4>
+                    <p>سيُطلب إدخال كلمة المرور الحالية قبل إعادة التسجيل.</p>
+                </div>
+                <button class="btn btn-outline" type="button" onclick="window.requestFaceUpdate && window.requestFaceUpdate()">
+                    تحديث البصمة
+                </button>
+            </div>
+
+            <div id="adminLocationSettings" class="admin-settings-block" style="display:none;">
+                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
+                <h4 style="margin-bottom:12px;"><i class="fas fa-location-dot"></i> إعدادات المقر</h4>
+                <div class="settings-grid-2">
+                    <div class="input-group"><label>اسم المقر</label><input type="text" id="officeNameInput" placeholder="المقر الرئيسي"></div>
+                    <div class="input-group"><label>المسافة المسموحة بالمتر</label><input type="number" id="officeRadiusInput" min="10" step="10"></div>
+                    <div class="input-group"><label>Latitude</label><input type="number" id="officeLatitudeInput" step="0.000001"></div>
+                    <div class="input-group"><label>Longitude</label><input type="number" id="officeLongitudeInput" step="0.000001"></div>
+                    <div class="input-group"><label>أقصى دقة GPS بالمتر</label><input type="number" id="officeAccuracyInput" min="5" step="5"></div>
+                </div>
+                <button class="btn btn-primary" type="button" onclick="window.saveLocationSettings && window.saveLocationSettings()">حفظ إعدادات المقر</button>
+            </div>
+
             <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
-            
-            <button class="btn btn-danger btn-block" onclick="
-                if(confirm('هل أنت متأكد من هذا الإجراء؟')) {
-                    localStorage.clear();
-                    ui.showSuccess('تم مسح جميع البيانات', 'success');
-                }
-            " style="margin-top: 20px; max-width: 250px; margin: 0 auto;">
-                <i class="fas fa-trash-alt"></i>
-                مسح جميع البيانات
-            </button>
-            
-            <button class="btn btn-text" onclick="ui.closeModal('settingsModal')" style="margin-top: 15px; max-width: 250px; margin: 0 auto;">
-                إلغاء
-            </button>
+
+            <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                <button class="btn btn-danger" type="button" onclick="window.clearLocalAppData && window.clearLocalAppData()">
+                    <i class="fas fa-trash-alt"></i> مسح البيانات المحلية
+                </button>
+                <button class="btn btn-text" type="button" onclick="ui.closeModal('settingsModal')">إغلاق</button>
+            </div>
         </div>
     </div>
+</div>
 
 <!-- Add Employee Modal -->
 <div class="modal" id="addEmployeeModal" style="display: none;">
     <div class="modal-content" style="max-width: 550px;">
         <div class="modal-header">
             <h3><i class="fas fa-user-plus"></i> إضافة موظف جديد</h3>
-            <button class="close-modal" onclick="this.closest('.modal').style.display='none';">✕</button>
+            <button class="close-modal" onclick="ui.closeModal('addEmployeeModal')">✕</button>
         </div>
         <div class="modal-body">
             <form id="addEmployeeModalForm">
@@ -788,29 +820,30 @@
                     <label><i class="fas fa-user"></i> الاسم الكامل</label>
                     <input type="text" id="newEmpName" placeholder="الاسم الثلاثي" required>
                 </div>
-                
+
                 <div class="input-group">
                     <label><i class="fas fa-envelope"></i> البريد الإلكتروني</label>
                     <input type="email" id="newEmpEmail" placeholder="example@email.com">
                 </div>
-                
+
                 <div class="info-box onboarding-box">
                     <i class="fas fa-envelope-circle-check"></i>
                     <p>سيتم إنشاء كلمة مرور مؤقتة تلقائياً وإرسالها مع كود الموظف إلى بريده الإلكتروني.</p>
                 </div>
-                
+
                 <div style="display:flex; gap:10px; justify-content:center; margin-top:25px;">
                     <button type="submit" class="btn btn-primary" style="flex:1;">
                         <i class="fas fa-plus-circle"></i>
                         إنشاء الحساب
                     </button>
-                    <button type="button" class="btn btn-outline" onclick="document.getElementById('addEmployeeModal').style.display='none';">
+                    <button type="button" class="btn btn-outline" onclick="ui.closeModal('addEmployeeModal')">
                         إلغاء
                     </button>
                 </div>
             </form>
         </div>
     </div>
+</div>
 <!-- End Modals -->
 
 <!-- ============================================ -->

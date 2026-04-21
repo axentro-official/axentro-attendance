@@ -223,7 +223,18 @@ class AuthManager {
             if (!result.success) {
                 this.incrementLoginAttempts(code);
 
-                if (typeof app !== 'undefined' && app?.playSound) {
+                if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-error');
                 }
 
@@ -263,7 +274,18 @@ class AuthManager {
                 this.pendingLoginUser = result.user;
                 this.pendingRememberMe = rememberMe;
 
-                if (typeof app !== 'undefined' && app?.playSound) {
+                if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-success');
                 }
 
@@ -283,7 +305,18 @@ class AuthManager {
 
             await this.onLoginSuccess(result.user, rememberMe);
 
-            if (typeof app !== 'undefined' && app?.playSound) {
+            if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                 app.playSound('login-success');
             }
 
@@ -316,7 +349,18 @@ class AuthManager {
         } catch (error) {
             console.error('❌ Login error:', error);
 
-            if (typeof app !== 'undefined' && app?.playSound) {
+            if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                 app.playSound('login-error');
             }
 
@@ -474,7 +518,18 @@ class AuthManager {
     // 🚪 LOGOUT
     // ============================================
 
-    logout() {
+    async logout(force = false) {
+        if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
         if (typeof app !== 'undefined' && app?.playSound) {
             app.playSound('logout-success');
         }
@@ -497,7 +552,10 @@ class AuthManager {
 
         this.setStatus('النظام جاهز');
 
+        document.body.classList.add('login-active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         console.log('👋 User logged out');
+        return true;
     }
 
     // ============================================
@@ -637,14 +695,36 @@ class AuthManager {
             const result = await db.changeOwnPassword(window.user, oldPw, newPw);
 
             if (result?.success) {
-                if (typeof app !== 'undefined' && app?.playSound) {
+                if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-success');
                 }
 
                 this.toast('تم تغيير كلمة المرور', 'success');
                 this.closeChangePwModal();
             } else {
-                if (typeof app !== 'undefined' && app?.playSound) {
+                if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-error');
                 }
 
@@ -665,14 +745,36 @@ class AuthManager {
             const result = await db.adminChangeEmployeePassword((code || '').trim().toUpperCase(), newPassword);
 
             if (result?.success) {
-                if (typeof app !== 'undefined' && app?.playSound) {
+                if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-success');
                 }
 
                 this.toast('تم التغيير بنجاح', 'success');
                 this.closeChangePwModal();
             } else {
-                if (typeof app !== 'undefined' && app?.playSound) {
+                if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-error');
                 }
 
@@ -717,7 +819,18 @@ class AuthManager {
             const result = await db.requestPasswordReset(identifier);
 
             if (result?.success) {
-                if (typeof app !== 'undefined' && app?.playSound) {
+                if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-success');
                 }
 
@@ -727,7 +840,18 @@ class AuthManager {
                 );
                 this.closeForgotPw();
             } else {
-                if (typeof app !== 'undefined' && app?.playSound) {
+                if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-error');
                 }
 
@@ -736,7 +860,18 @@ class AuthManager {
         } catch (error) {
             console.error('Forgot password error:', error);
 
-            if (typeof app !== 'undefined' && app?.playSound) {
+            if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                 app.playSound('login-error');
             }
 
@@ -901,7 +1036,18 @@ class AuthManager {
                 if (result.success) {
                     await this.onLoginSuccess(result.user, true);
 
-                    if (typeof app !== 'undefined' && app?.playSound) {
+                    if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                         app.playSound('login-success');
                     }
 
@@ -912,7 +1058,18 @@ class AuthManager {
                         document.getElementById('dashboardPage')?.classList.add('active');
                     }
                 } else {
-                    if (typeof app !== 'undefined' && app?.playSound) {
+                    if (!force) {
+            const confirmed = await (window.ui?.showConfirmation ? window.ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'هل تريد تسجيل الخروج الآن؟',
+                type: 'warning',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء'
+            }) : Promise.resolve(confirm('هل تريد تسجيل الخروج الآن؟')));
+            if (!confirmed) return false;
+        }
+
+        if (typeof app !== 'undefined' && app?.playSound) {
                         app.playSound('login-error');
                     }
 
@@ -1068,3 +1225,5 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = AuthManager;
 }
+
+window.confirmLogout = () => window.auth?.logout?.();

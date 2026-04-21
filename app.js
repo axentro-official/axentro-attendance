@@ -129,6 +129,7 @@ class App {
             setTimeout(() => {
                 this.hideSplashScreen();
                 this.hideAllPages();
+                this.bindGlobalUiActions();
                 
                 if (hasSession && this.isAuthenticated() && !window.forceFaceEnrollment && !window.firstTimeSetupMode) {
                     this.navigateTo(window.user?.role === 'admin' || window.user?.isAdmin ? 'adminPage' : 'dashboardPage');
@@ -158,6 +159,60 @@ class App {
     // ============================================
     // 🔧 HELPER METHODS
     // ============================================
+
+    async loadDynamicWorksiteSettings() {
+        try {
+            if (typeof db === 'undefined' || typeof db.getActiveWorksite !== 'function') return;
+            const site = await db.getActiveWorksite();
+            if (!site) return;
+            window.activeWorksite = site;
+            if (site.latitude != null) AppConfig.location.office.latitude = Number(site.latitude);
+            if (site.longitude != null) AppConfig.location.office.longitude = Number(site.longitude);
+            if (site.name) AppConfig.location.office.name = site.name;
+            if (site.allowed_radius_meters != null) AppConfig.location.maxDistanceMeters = Number(site.allowed_radius_meters);
+            if (site.max_accuracy_meters != null) AppConfig.location.maxAccuracyMeters = Number(site.max_accuracy_meters);
+        } catch (e) {
+            console.warn('loadDynamicWorksiteSettings failed:', e);
+        }
+    }
+
+    ensureProfileAvatars() {
+        const setup = (containerId, nameId) => {
+            const container = document.getElementById(containerId);
+            const nameWrap = document.getElementById(nameId)?.parentElement;
+            if (!container || !nameWrap || container.querySelector('.profile-avatar')) return;
+            const avatar = document.createElement('div');
+            avatar.className = 'profile-avatar';
+            avatar.innerHTML = '<i class="fas fa-user"></i>';
+            container.classList.add(containerId.includes('admin') ? 'with-avatar-admin' : 'with-avatar');
+            container.insertBefore(avatar, nameWrap);
+        };
+        setup('adminPage' ? 'userName'.replace('userName','') : '', '');
+    }
+
+    updateHeaderAvatars() {
+        const imageUrl = window.userImage || window.user?.profile_image_url || '';
+        const userInfoNodes = [document.querySelector('#dashboardPage .dashboard-header .user-info'), document.querySelector('#adminPage .dashboard-header .user-info')].filter(Boolean);
+        userInfoNodes.forEach(node => {
+            let avatar = node.querySelector('.profile-avatar');
+            if (!avatar) {
+                avatar = document.createElement('div');
+                avatar.className = 'profile-avatar';
+                node.insertBefore(avatar, node.firstChild);
+            }
+            if (imageUrl) avatar.innerHTML = `<img src="${imageUrl}?t=${Date.now()}" alt="Profile">`;
+            else avatar.innerHTML = '<i class="fas fa-user"></i>';
+        });
+    }
+
+    bindGlobalUiActions() {
+        const openSettings = (e) => { e?.preventDefault?.(); window.openSettingsModal?.(); };
+        document.getElementById('settingsBtn')?.addEventListener('click', openSettings);
+        document.getElementById('adminSettingsBtn')?.addEventListener('click', openSettings);
+        document.getElementById('showRegisterLinkSide')?.addEventListener('click', (e) => { e.preventDefault(); this.showRegisterScreen(); });
+        document.getElementById('showForgotPasswordLinkSide')?.addEventListener('click', (e) => { e.preventDefault(); window.showForgotPasswordScreen?.(); });
+        document.body.classList.toggle('login-active', !!document.getElementById('loginPage')?.classList.contains('active'));
+    }
 
     updateProgress(percent, statusText) {
         const progressBar = document.getElementById('loadProgress');
@@ -628,9 +683,12 @@ class App {
             loginPage.style.display = 'block';
             loginPage.classList.add('active');
         }
+        document.body.classList.add('login-active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     showMainApp() {
+        document.body.classList.remove('login-active');
         if (window.forceFaceEnrollment || window.firstTimeSetupMode) {
             this.showLoginScreen();
             return;
@@ -670,6 +728,8 @@ class App {
         const adminHeaderName = document.getElementById('adminHeaderName');
         const adminHeaderCode = document.getElementById('adminHeaderCode');
         const totalEmployeesStat = document.getElementById('totalEmployeesStat');
+
+        this.updateHeaderAvatars();
 
         if (userName) {
             userName.textContent = `مرحباً، ${displayName}`;
