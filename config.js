@@ -46,7 +46,7 @@ const AppConfig = {
         },
         detection: {
             inputSize: 416,
-            scoreThreshold: 0.68,
+            scoreThreshold: 0.52,
             minFaceSize: 96,
             maxFaces: 1
         },
@@ -54,7 +54,7 @@ const AppConfig = {
             threshold: 0.48,
             adminThreshold: 0.45,
             labelDistance: 0.48,
-            minSamples: 5
+            minSamples: 3
         },
         camera: {
             width: 1280,
@@ -63,25 +63,25 @@ const AppConfig = {
             frameRate: 30
         },
         timeout: {
-            modelLoad: 20000,
+            modelLoad: 12000,
             cameraStart: 10000
         },
         imageStorage: {
-            maxWidth: 640,
-            quality: 0.94
+            maxWidth: 520,
+            quality: 0.9
         },
         antiSpoof: {
             enabled: true,
             requireBlink: true,
             requireTurnLeftRight: true,
             requireNod: true,
-            minStableFrames: 9,
+            minStableFrames: 4,
             earBlinkThreshold: 0.19,
             minBlinks: 1,
             yawMovementPx: 12,
             pitchMovementPx: 10,
-            challengeTimeoutMs: 18000,
-            consecutiveSingleFaceFrames: 9
+            challengeTimeoutMs: 7000,
+            consecutiveSingleFaceFrames: 6
         }
     },
 
@@ -115,7 +115,7 @@ const AppConfig = {
     liveness: {
         enabled: true,
         headMovementThreshold: 0.08,
-        stableFramesRequired: 9,
+        stableFramesRequired: 6,
         stabilityRing: {
             circumference: 126,
             radius: 20
@@ -235,3 +235,8 @@ const SuccessMessages = {
     FACE_ENROLLED: 'تم حفظ بصمة الوجه بنجاح',
     ATTENDANCE_RECORDED: 'تم تسجيل العملية بنجاح'
 };
+
+
+// Compatibility shim for legacy optional dependency checks
+window.Constants = window.Constants || {};
+const Constants = window.Constants;

@@ -5,9 +5,9 @@
  * ============================================
  */
 
-const CACHE_NAME = 'axentro-v5-model-fix';
-const STATIC_CACHE = 'axentro-static-v5-model-fix';
-const DYNAMIC_CACHE = 'axentro-dynamic-v5-model-fix';
+const CACHE_NAME = 'axentro-v5-local-models-2';
+const STATIC_CACHE = 'axentro-static-vfast-5-local-models-2';
+const DYNAMIC_CACHE = 'axentro-dynamic-vfast-5-local-models-2';
 
 // ============================================
 // 📦 FILES TO PRECACHE (App Shell)
@@ -58,18 +58,6 @@ const EXTERNAL_RESOURCES = [
 
 // Face recognition model files (heavy, cache separately)
 const FACE_MODEL_URLS = [
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/tiny_face_detector_model-weights_manifest.json',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/tiny_face_detector_model-shard1',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_landmark_68_tiny_model-weights_manifest.json',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_landmark_68_tiny_model-shard1',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/ssd_mobilenetv1_model-weights_manifest.json',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/ssd_mobilenetv1_model-shard1',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/ssd_mobilenetv1_model-shard2',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_landmark_68_model-weights_manifest.json',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_landmark_68_model-shard1',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_recognition_model-weights_manifest.json',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_recognition_model-shard1',
-    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_recognition_model-shard2'
 ];
 
 // API endpoints that should NOT be cached
@@ -106,7 +94,7 @@ self.addEventListener('install', event => {
             ),
             
             // Pre-cache face models in background
-            caches.open('face-models-v5').then(cache => {
+            caches.open('face-models-v5-local-2').then(cache => {
                 console.log('🤖 Caching face recognition models...');
                 return Promise.allSettled(
                     FACE_MODEL_URLS.map(url => 
@@ -137,7 +125,7 @@ self.addEventListener('activate', event => {
                     cacheNames
                         .filter(name => name !== STATIC_CACHE && 
                                      name !== DYNAMIC_CACHE && 
-                                     name !== 'face-models-v5')
+                                     name !== 'face-models-v5-local-2')
                         .map(name => {
                             console.log('🗑️ Deleting old cache:', name);
                             return caches.delete(name);

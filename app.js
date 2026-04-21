@@ -182,7 +182,7 @@ class App {
             { name: 'AppConfig', obj: typeof AppConfig !== 'undefined' },
             { name: 'ui', obj: typeof ui !== 'undefined', optional: true },
             { name: 'Utils', obj: typeof Utils !== 'undefined', optional: true },
-            { name: 'Constants', obj: typeof Constants !== 'undefined', optional: true },
+            { name: 'Constants', obj: true, optional: true },
             { name: 'db', obj: typeof db !== 'undefined', optional: true },
             { name: 'auth', obj: typeof auth !== 'undefined', optional: true },
             { name: 'faceRecognition', obj: typeof faceRecognition !== 'undefined', optional: true },
@@ -245,21 +245,25 @@ class App {
         }
 
         try {
-            const timeoutMs = AppConfig?.faceRecognition?.timeout?.modelLoad || 15000;
-            
-            const loadPromise = faceRecognition.loadModels ? 
-                faceRecognition.loadModels() : 
-                this.loadModelsDirectly();
-            
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('تجاوز وقت تحميل النماذج')), timeoutMs)
-            );
+            await (faceRecognition.init ? faceRecognition.init() : Promise.resolve(true));
+            window.faceRecognitionAvailable = true;
+            window.modelsLoaded = !!(faceRecognition.areModelsLoaded && faceRecognition.areModelsLoaded());
 
-            const result = await Promise.race([loadPromise, timeoutPromise]);
-            return result;
+            setTimeout(() => {
+                try {
+                    if (faceRecognition?.loadModelsWithSafetyNet && !faceRecognition.areModelsLoaded?.()) {
+                        faceRecognition.loadModelsWithSafetyNet().catch((e) => {
+                            console.warn('⚠️ Background model prefetch skipped:', e?.message || e);
+                        });
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Background model prefetch error:', e?.message || e);
+                }
+            }, 1200);
 
+            return true;
         } catch (error) {
-            console.error('❌ Face recognition models failed to load:', error.message);
+            console.error('❌ Face recognition init failed:', error.message || error);
             window.modelsLoaded = false;
             return false;
         }
@@ -268,19 +272,16 @@ class App {
     async loadModelsDirectly() {
         // Direct model loading (من الكود القديم)
         try {
-            const MODELS_URL = AppConfig?.faceRecognition?.models?.baseUrl || AppConfig?.faceRecognition?.models?.fallbackUrl || 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights/';
+            const MODELS_URL = AppConfig?.faceRecognition?.models?.baseUrl || AppConfig?.faceRecognition?.models?.fallbackUrl || (AppConfig?.faceRecognition?.models?.baseUrl || './models');
             
-            setStatus('جاري تحميل الذكاء الاصطناعي (1/4)...');
+            setStatus('جاري تحميل الذكاء الاصطناعي (1/3)...');
             await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
             window.lightModels = true;
 
-            setStatus('جاري تحميل الذكاء الاصطناعي (2/4)...');
-            await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODELS_URL);
-
-            setStatus('جاري تحميل الذكاء الاصطناعي (3/4)...');
+            setStatus('جاري تحميل الذكاء الاصطناعي (2/3)...');
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL);
 
-            setStatus('جاري تحميل الذكاء الاصطناعي (4/4)...');
+            setStatus('جاري تحميل الذكاء الاصطناعي (3/3)...');
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL);
             window.heavyModels = true;
 
