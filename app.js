@@ -1,4 +1,3 @@
-window.Constants = window.Constants || {};
 /**
  * ============================================
  * 🎯 AXENTRO APPLICATION v4.2 - MAIN CONTROLLER
@@ -183,6 +182,7 @@ class App {
             { name: 'AppConfig', obj: typeof AppConfig !== 'undefined' },
             { name: 'ui', obj: typeof ui !== 'undefined', optional: true },
             { name: 'Utils', obj: typeof Utils !== 'undefined', optional: true },
+            { name: 'Constants', obj: true, optional: true },
             { name: 'db', obj: typeof db !== 'undefined', optional: true },
             { name: 'auth', obj: typeof auth !== 'undefined', optional: true },
             { name: 'faceRecognition', obj: typeof faceRecognition !== 'undefined', optional: true },

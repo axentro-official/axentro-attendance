@@ -24,7 +24,9 @@ class FaceRecognitionManager {
         this.lastAutoCaptureAt = 0;
         this.cachedDescriptor = null;
         this.cachedDescriptorAt = 0;
-        this.captureCooldownMs = 1200;
+        this.captureCooldownMs = 900;
+        this.cameraOpenedAt = 0;
+        this.enrollmentAutoTimer = null;
         this.extractTimeoutMs = 7000;
 
         // Stable tracking state
@@ -129,15 +131,7 @@ class FaceRecognitionManager {
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;">
                     <strong id="cameraTitle">التحقق ببصمة الوجه</strong>
                     <div style="display:flex;gap:8px;">
-                        <button type="button" id="manualCaptureBtn" onclick="manualFaceCapture()" style="
-                            display:none;
-                            background:#2563eb;
-                            color:#fff;
-                            border:none;
-                            border-radius:10px;
-                            padding:8px 12px;
-                            cursor:pointer
-                        ">التقاط الآن</button>
+                        <button id="manualCaptureBtn" type="button" onclick="manualFaceCapture()" style="display:none;background:#2563eb;color:#fff;border:none;border-radius:10px;padding:8px 12px;cursor:pointer">التقاط الآن</button>
                         <button type="button" onclick="closeCamera()" style="
                             background:#ef4444;
                             color:#fff;
@@ -356,7 +350,27 @@ class FaceRecognitionManager {
 
     async openCamera() {
         try {
+            const requestedModes = {
+                regMode: !!window.regMode,
+                attMode: !!window.attMode,
+                updateFaceMode: !!window.updateFaceMode,
+                adminVerifyMode: !!window.adminVerifyMode,
+                firstTimeSetupMode: !!window.firstTimeSetupMode,
+                adminResetFaceMode: !!window.adminResetFaceMode,
+                attType: window.attType || '',
+                targetEmpForAdmin: window.targetEmpForAdmin || null
+            };
+
             this.stopCamera();
+
+            window.regMode = requestedModes.regMode;
+            window.attMode = requestedModes.attMode;
+            window.updateFaceMode = requestedModes.updateFaceMode;
+            window.adminVerifyMode = requestedModes.adminVerifyMode;
+            window.firstTimeSetupMode = requestedModes.firstTimeSetupMode;
+            window.adminResetFaceMode = requestedModes.adminResetFaceMode;
+            window.attType = requestedModes.attType;
+            window.targetEmpForAdmin = requestedModes.targetEmpForAdmin;
 
             if (!navigator.mediaDevices?.getUserMedia) {
                 throw new Error('الكاميرا غير مدعومة في هذا المتصفح');
@@ -368,13 +382,14 @@ class FaceRecognitionManager {
                 overlay.classList.add('active');
             }
 
-            const enrollmentMode = !!(window.regMode || window.updateFaceMode || window.firstTimeSetupMode || window.adminResetFaceMode);
-            const titleEl = document.getElementById('cameraTitle');
-            if (titleEl) titleEl.textContent = enrollmentMode ? 'تسجيل بصمة الوجه' : 'التحقق ببصمة الوجه';
-            const manualBtn = document.getElementById('manualCaptureBtn');
-            if (manualBtn) {
-                manualBtn.style.display = enrollmentMode ? 'inline-flex' : 'none';
-                manualBtn.disabled = false;
+            const enrollmentMode = !!(window.regMode || window.firstTimeSetupMode || window.updateFaceMode || window.adminResetFaceMode);
+            const cameraTitle = document.getElementById('cameraTitle');
+            const manualCaptureBtn = document.getElementById('manualCaptureBtn');
+            if (cameraTitle) {
+                cameraTitle.textContent = enrollmentMode ? 'تسجيل بصمة الوجه' : 'التحقق ببصمة الوجه';
+            }
+            if (manualCaptureBtn) {
+                manualCaptureBtn.style.display = enrollmentMode ? 'inline-block' : 'none';
             }
 
             setCamStatus?.('<i class="fas fa-video"></i> جاري تشغيل الكاميرا...');
@@ -448,7 +463,7 @@ class FaceRecognitionManager {
             window.isProcessingCapture = false;
             window.autoCaptureTimeout = null;
 
-            updateStabilityRing?.(0, AppConfig?.faceRecognition?.enrollment?.stableFrames || 2);
+            updateStabilityRing?.(0, 2);
 
             if (window.attMode || window.adminVerifyMode || window.adminResetFaceMode) {
                 resetLiveness?.();
@@ -456,11 +471,12 @@ class FaceRecognitionManager {
 
             setCamStatus?.('<i class="fas fa-cog fa-spin"></i> تجهيز الكاميرا...');
             this.isCameraActive = true;
+            this.cameraOpenedAt = Date.now();
 
             const ready = this.modelsLoaded ? true : await this.loadModelsWithSafetyNet();
             if (!ready) throw new Error('تعذر تحميل نماذج التعرف على الوجه');
 
-            setCamStatus?.('<i class="fas fa-spinner fa-spin"></i> ضع الوجه داخل الإطار وسيتم الالتقاط تلقائياً...');
+            setCamStatus?.(enrollmentMode ? '<i class="fas fa-user-plus"></i> ضع الوجه داخل الإطار وسيتم حفظ البصمة تلقائياً...' : '<i class="fas fa-spinner fa-spin"></i> ضع الوجه داخل الإطار وسيتم الالتقاط تلقائياً...');
             this.startDetectionLoop();
             return true;
         } catch (e) {
@@ -488,8 +504,6 @@ class FaceRecognitionManager {
 
         const scanLine = document.getElementById('scanLine');
         if (scanLine) scanLine.classList.remove('active');
-        const manualBtn = document.getElementById('manualCaptureBtn');
-        if (manualBtn) manualBtn.style.display = 'none';
 
         const stabilityRing = document.getElementById('stabilityRing');
         if (stabilityRing) {
@@ -513,6 +527,10 @@ class FaceRecognitionManager {
         if (window.autoCaptureTimeout) {
             clearTimeout(window.autoCaptureTimeout);
             window.autoCaptureTimeout = null;
+        }
+        if (this.enrollmentAutoTimer) {
+            clearTimeout(this.enrollmentAutoTimer);
+            this.enrollmentAutoTimer = null;
         }
         if (window.detectionLoopTimeout) {
             clearTimeout(window.detectionLoopTimeout);
@@ -725,8 +743,8 @@ class FaceRecognitionManager {
 
             this.clearTrackedFace();
             window.stabilityCounter = 0;
-            updateStabilityRing?.(0, AppConfig?.faceRecognition?.enrollment?.stableFrames || 2);
-            setCamStatus?.('<i class="fas fa-spinner fa-spin"></i> وجّه الكاميرا إلى وجهك الأمامي داخل الإطار...');
+            updateStabilityRing?.(0, 2);
+            setCamStatus?.((window.regMode || window.firstTimeSetupMode || window.updateFaceMode || window.adminResetFaceMode) ? '<i class="fas fa-user-plus"></i> قرّب الوجه قليلًا داخل الإطار لحفظ البصمة...' : '<i class="fas fa-spinner fa-spin"></i> وجّه الكاميرا إلى وجهك الأمامي داخل الإطار...');
         } catch (e) {
             console.error('Face detection error:', e);
         }
@@ -787,9 +805,9 @@ class FaceRecognitionManager {
         return (
             faceWidthRatio >= 0.07 &&
             faceHeightRatio >= 0.09 &&
-            faceWidthRatio <= 0.80 &&
+            faceWidthRatio <= 0.78 &&
             faceHeightRatio <= 0.88 &&
-            xOffset <= 0.40 &&
+            xOffset <= 0.38 &&
             yOffset <= 0.40
         );
     }
@@ -803,8 +821,9 @@ class FaceRecognitionManager {
         );
 
         const verificationMode = !!(window.attMode || window.adminVerifyMode);
-        const stableFramesRequired = enrollmentMode ? (AppConfig?.faceRecognition?.enrollment?.stableFrames || 2) : (AppConfig?.faceRecognition?.antiSpoof?.minStableFrames || 4);
-        const faceReady = this.isFaceWellPositionedCanvas(trackedBox, canvas);
+        const configuredStableFrames = AppConfig?.faceRecognition?.antiSpoof?.minStableFrames || 4;
+        const stableFramesRequired = enrollmentMode ? Math.min(3, configuredStableFrames) : configuredStableFrames;
+        const faceReady = this.isFaceWellPositionedCanvas(trackedBox, canvas) || (!!trackedBox && (trackedBox.width / (canvas?.width || 1)) >= 0.07);
 
         if (!faceReady) {
             window.stabilityCounter = 0;
@@ -823,7 +842,7 @@ class FaceRecognitionManager {
             updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
 
             if (window.stabilityCounter >= stableFramesRequired) {
-                setCamStatus?.('<i class="fas fa-camera"></i> تم اكتشاف الوجه - جاري الالتقاط التلقائي...');
+                setCamStatus?.('<i class="fas fa-camera"></i> تم اكتشاف الوجه - جاري حفظ بصمة الوجه...');
                 const now = Date.now();
 
                 if (
@@ -831,10 +850,11 @@ class FaceRecognitionManager {
                     (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
                 ) {
                     this.lastAutoCaptureAt = now;
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), enrollmentMode ? 90 : 180);
+                    if (window.autoCaptureTimeout) clearTimeout(window.autoCaptureTimeout);
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 120);
                 }
             } else {
-                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك لحظة وسيتم حفظ البصمة تلقائياً...');
             }
 
             return;
@@ -872,7 +892,7 @@ class FaceRecognitionManager {
                     (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
                 ) {
                     this.lastAutoCaptureAt = now;
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), enrollmentMode ? 90 : 180);
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 180);
                 }
             } else {
                 setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
@@ -897,12 +917,8 @@ class FaceRecognitionManager {
 
         const scanLine = document.getElementById('scanLine');
         if (scanLine) scanLine.classList.remove('active');
-        const manualBtn = document.getElementById('manualCaptureBtn');
-        if (manualBtn) manualBtn.style.display = 'none';
 
         setCamStatus?.('<i class="fas fa-brain"></i> جاري استخراج بصمة الوجه...');
-        const manualBtn = document.getElementById('manualCaptureBtn');
-        if (manualBtn) manualBtn.disabled = true;
 
         let newDescriptor = null;
 
@@ -914,14 +930,17 @@ class FaceRecognitionManager {
         } catch (_e) {}
 
         if (!newDescriptor) {
-            this.flashFailure('تعذر استخراج بصمة الوجه، ثبّت وجهك وجرّب ثانية.');
+            newDescriptor = await this.extractQuickDescriptor();
+        }
+
+        if (!newDescriptor) {
+            this.flashFailure('تعذر استخراج بصمة الوجه، حسّن الإضاءة وثبّت الوجه ثم جرّب مرة أخرى.');
             window.isProcessingCapture = false;
             window.stabilityCounter = 0;
-            updateStabilityRing?.(0, AppConfig?.faceRecognition?.enrollment?.stableFrames || 2);
+            updateStabilityRing?.(0, 2);
 
             if (scanLine) scanLine.classList.add('active');
             this.startDetectionLoop();
-            if (manualBtn) manualBtn.disabled = false;
             return;
         }
 
@@ -948,7 +967,6 @@ class FaceRecognitionManager {
             throw error;
         } finally {
             window.isProcessingCapture = false;
-            if (manualBtn) manualBtn.disabled = false;
         }
     }
 
@@ -960,59 +978,77 @@ class FaceRecognitionManager {
         const video = this.videoElement || document.getElementById('video');
         if (!video) return null;
 
-        if (this.cachedDescriptor && (Date.now() - this.cachedDescriptorAt < 1200)) {
+        if (this.cachedDescriptor && (Date.now() - this.cachedDescriptorAt < 2500)) {
             return this.cachedDescriptor;
         }
 
-        const tryOnce = async (inputSize = 416, threshold = 0.12) => {
+        const descriptors = [];
+        const attempts = 6;
+
+        for (let i = 0; i < attempts; i++) {
             try {
                 const det = await Promise.race([
                     faceapi
                         .detectSingleFace(
                             video,
                             new faceapi.TinyFaceDetectorOptions({
-                                inputSize,
-                                scoreThreshold: threshold
+                                inputSize: 416,
+                                scoreThreshold: 0.22
                             })
                         )
                         .withFaceLandmarks()
                         .withFaceDescriptor(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('descriptor-timeout')), 2600))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('descriptor-timeout')), 3200))
                 ]);
-                return det?.descriptor ? Array.from(det.descriptor) : null;
-            } catch (_e) {
-                return null;
-            }
-        };
 
-        const attempts = [
-            [416, 0.12],
-            [416, 0.10],
-            [320, 0.10],
-            [320, 0.08],
-            [224, 0.08],
-            [224, 0.05]
-        ];
+                if (det?.descriptor) {
+                    const arr = Array.from(det.descriptor);
+                    descriptors.push(arr);
+                    this.cachedDescriptor = arr;
+                    this.cachedDescriptorAt = Date.now();
 
-        const descriptors = [];
-        for (const [inputSize, threshold] of attempts) {
-            const descriptor = await tryOnce(inputSize, threshold);
-            if (descriptor) {
-                descriptors.push(descriptor);
-                if (descriptors.length >= 2) break;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 80));
+                    if (descriptors.length >= 4) break;
+                }
+            } catch (_e) {}
+
+            await new Promise((resolve) => setTimeout(resolve, 60));
         }
 
         if (!descriptors.length) return null;
+        if (descriptors.length === 1) return descriptors[0];
 
-        const result = descriptors.length === 1
-            ? descriptors[0]
-            : descriptors[0].map((_, i) => descriptors.reduce((sum, d) => sum + d[i], 0) / descriptors.length);
+        const avg = new Array(descriptors[0].length).fill(0);
+        for (const d of descriptors) {
+            for (let i = 0; i < d.length; i++) {
+                avg[i] += d[i] / descriptors.length;
+            }
+        }
 
-        this.cachedDescriptor = result;
+        this.cachedDescriptor = avg;
         this.cachedDescriptorAt = Date.now();
-        return result;
+        return avg;
+    }
+
+    async extractQuickDescriptor() {
+        const video = this.videoElement || document.getElementById('video');
+        if (!video) return null;
+
+        try {
+            const det = await faceapi
+                .detectSingleFace(
+                    video,
+                    new faceapi.TinyFaceDetectorOptions({
+                        inputSize: 416,
+                        scoreThreshold: 0.25
+                    })
+                )
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            return det?.descriptor ? Array.from(det.descriptor) : null;
+        } catch (_e) {
+            return null;
+        }
     }
 
     // ============================================
@@ -1263,7 +1299,7 @@ class FaceRecognitionManager {
     restartCamLoop() {
         window.isProcessingCapture = false;
         window.stabilityCounter = 0;
-        updateStabilityRing?.(0, AppConfig?.faceRecognition?.enrollment?.stableFrames || 2);
+        updateStabilityRing?.(0, 2);
 
         const scanLine = document.getElementById('scanLine');
         if (scanLine) scanLine.classList.add('active');
