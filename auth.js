@@ -474,7 +474,19 @@ class AuthManager {
     // 🚪 LOGOUT
     // ============================================
 
-    logout() {
+    async logout() {
+        const confirmed = typeof ui !== 'undefined' && ui?.showConfirmation
+            ? await ui.showConfirmation({
+                title: 'تأكيد تسجيل الخروج',
+                message: 'سيتم إنهاء الجلسة الحالية والعودة إلى صفحة تسجيل الدخول. هل تريد المتابعة؟',
+                confirmText: 'تسجيل الخروج',
+                cancelText: 'إلغاء',
+                type: 'warning'
+            })
+            : confirm('سيتم تسجيل الخروج من النظام. هل تريد المتابعة؟');
+
+        if (!confirmed) return;
+
         if (typeof app !== 'undefined' && app?.playSound) {
             app.playSound('logout-success');
         }
@@ -483,19 +495,42 @@ class AuthManager {
             app.stopAutoRefresh();
         }
 
+        if (typeof ui !== 'undefined' && ui?.closeAllModals) {
+            ui.closeAllModals();
+        }
+
         this.clearSession();
 
         window.sessionDescriptor = null;
         window.userImage = '';
         window.forceFaceEnrollment = false;
         window.firstTimeSetupMode = false;
+        window.updateFaceMode = false;
+        window.attMode = false;
+        window.adminVerifyMode = false;
+        window.adminResetFaceMode = false;
+        window.user = null;
 
-        document.getElementById('dashboardPage')?.classList.remove('active');
-        document.getElementById('registerPage')?.classList.remove('active');
-        document.getElementById('forgotPasswordPage')?.classList.remove('active');
-        document.getElementById('loginPage')?.classList.add('active');
+        if (typeof app !== 'undefined' && app?.navigateTo) {
+            app.navigateTo('loginPage');
+        } else {
+            document.getElementById('dashboardPage')?.classList.remove('active');
+            document.getElementById('adminPage')?.classList.remove('active');
+            document.getElementById('registerPage')?.classList.remove('active');
+            document.getElementById('forgotPasswordPage')?.classList.remove('active');
+            const loginPage = document.getElementById('loginPage');
+            if (loginPage) {
+                loginPage.style.display = 'block';
+                loginPage.classList.add('active');
+            }
+        }
+
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
 
         this.setStatus('النظام جاهز');
+        this.toast('تم تسجيل الخروج بنجاح', 'success');
 
         console.log('👋 User logged out');
     }

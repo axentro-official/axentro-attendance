@@ -507,6 +507,29 @@ class App {
         document.addEventListener('click', () => this.unlockAudio(), { once: true });
         document.addEventListener('touchstart', () => this.unlockAudio(), { once: true });
 
+        const refreshBtn = document.getElementById('refreshBtn');
+        const adminRefreshBtn = document.getElementById('adminRefreshBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const adminSettingsBtn = document.getElementById('adminSettingsBtn');
+        const notificationsBtn = document.getElementById('notificationsBtn');
+        const openOwnPasswordSettingsBtn = document.getElementById('openOwnPasswordSettingsBtn');
+        const openFaceUpdateBtn = document.getElementById('openFaceUpdateBtn');
+        const saveWorksiteSettingsBtn = document.getElementById('saveWorksiteSettingsBtn');
+        const clearLocalSettingsBtn = document.getElementById('clearLocalSettingsBtn');
+
+        refreshBtn?.addEventListener('click', () => this.refreshData(false, refreshBtn));
+        adminRefreshBtn?.addEventListener('click', () => this.refreshData(false, adminRefreshBtn));
+        settingsBtn?.addEventListener('click', () => this.openSettingsModal());
+        adminSettingsBtn?.addEventListener('click', () => this.openSettingsModal());
+        notificationsBtn?.addEventListener('click', () => ui?.openModal?.('notificationsModal'));
+        openOwnPasswordSettingsBtn?.addEventListener('click', () => {
+            ui?.closeModal?.('settingsModal');
+            auth?.openChangePwModal?.('own');
+        });
+        openFaceUpdateBtn?.addEventListener('click', () => this.promptFaceUpdate());
+        saveWorksiteSettingsBtn?.addEventListener('click', () => this.saveWorksiteSettings());
+        clearLocalSettingsBtn?.addEventListener('click', () => this.clearLocalSettings());
+
         // Keyboard shortcuts
         document.addEventListener('DOMContentLoaded', () => {
             // Fingerprint button visibility
@@ -560,27 +583,38 @@ class App {
         if (window.audioUnlocked) return;
         
         try {
-            const audio = document.getElementById('login-success');
-            if (audio) {
-                audio.play().then(() => {
-                    audio.pause();
-                    audio.currentTime = 0;
-                    window.audioUnlocked = true;
-                }).catch(() => {});
-            }
-        } catch(e) {}
+            const audios = Array.from(document.querySelectorAll('audio'));
+            const warmups = audios.map(audio => {
+                audio.muted = true;
+                audio.currentTime = 0;
+                return audio.play()
+                    .then(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        audio.muted = false;
+                    })
+                    .catch(() => {
+                        audio.muted = false;
+                    });
+            });
+
+            Promise.allSettled(warmups).finally(() => {
+                window.audioUnlocked = true;
+            });
+        } catch(e) {
+            window.audioUnlocked = true;
+        }
     }
 
     playSound(id) {
+        if (window.soundEnabled === false) return;
         if (!window.audioUnlocked) {
             this.unlockAudio();
-            return;
         }
         
         try {
             const audio = document.getElementById(id);
             if (!audio) return;
-            
             audio.currentTime = 0;
             audio.play().catch(() => {});
         } catch(e) {}
@@ -679,6 +713,20 @@ class App {
             userCodeDisplay.textContent = `CODE: ${displayCode}`;
         }
 
+        const profileImage = window.userImage || user.profile_image_url || '';
+        const userAvatar = document.getElementById('userAvatar');
+        const adminAvatar = document.getElementById('adminUserAvatar');
+        [userAvatar, adminAvatar].forEach((avatar) => {
+            if (!avatar) return;
+            if (profileImage) {
+                avatar.src = `${profileImage}${profileImage.includes('?') ? '&' : '?'}t=${Date.now()}`;
+                avatar.style.display = 'block';
+            } else {
+                avatar.removeAttribute('src');
+                avatar.style.display = 'none';
+            }
+        });
+
         if (adminPanelBtn) {
             adminPanelBtn.style.display = isAdmin ? 'inline-flex' : 'none';
             adminPanelBtn.onclick = (e) => {
@@ -744,24 +792,147 @@ class App {
         }
     }
 
-    async refreshData(silent = false) {
-        const refreshBtn = document.getElementById('refreshBtn');
-        
-        if (refreshBtn) {
-            const icon = refreshBtn.querySelector('i');
+    async refreshData(silent = false, triggerBtn = null) {
+        const activeBtn = triggerBtn || document.getElementById('refreshBtn') || document.getElementById('adminRefreshBtn');
+
+        if (activeBtn) {
+            const icon = activeBtn.querySelector('i');
             if (icon) {
                 icon.style.animation = 'spin 0.5s linear';
                 setTimeout(() => icon.style.animation = '', 600);
             }
         }
         
-        if (window.user?.isAdmin) {
-            if (typeof loadEmployees === 'function') await loadEmployees();
-        } else if (window.user) {
-            if (typeof fetchUserDataInBackground === 'function') fetchUserDataInBackground();
+        try {
+            if (window.user?.isAdmin || window.user?.role === 'admin') {
+                if (typeof loadEmployees === 'function') await loadEmployees();
+                if (window.attendance?.loadWorksitePolicy) await window.attendance.loadWorksitePolicy(true);
+            } else if (window.user) {
+                if (typeof fetchUserDataInBackground === 'function') await fetchUserDataInBackground();
+                if (window.attendance?.loadWorksitePolicy) await window.attendance.loadWorksitePolicy(true);
+            }
+            if (!silent) showToast('تم تحديث البيانات بنجاح', 'success');
+        } catch (error) {
+            console.error('Refresh data error:', error);
+            if (!silent) showToast('تعذر تحديث البيانات', 'error');
         }
-        
-        if (!silent) showToast('تم التحديث', 'success');
+    }
+
+
+    openSettingsModal() {
+        const soundToggle = document.getElementById('soundEnabled');
+        const vibrationToggle = document.getElementById('vibrationEnabled');
+        const dataSaverToggle = document.getElementById('dataSaverMode');
+        const isAdmin = window.user?.role === 'admin' || window.user?.isAdmin;
+        const worksiteSection = document.getElementById('worksiteSettingsSection');
+
+        if (soundToggle) soundToggle.checked = window.soundEnabled !== false;
+        if (vibrationToggle) vibrationToggle.checked = window.vibrationEnabled !== false;
+        if (dataSaverToggle) dataSaverToggle.checked = localStorage.getItem('axentro_data_saver') === 'true';
+
+        if (soundToggle && !soundToggle.dataset.bound) {
+            soundToggle.addEventListener('change', () => {
+                window.soundEnabled = soundToggle.checked;
+                localStorage.setItem('axentro_sound_enabled', String(soundToggle.checked));
+                if (soundToggle.checked) this.playSound('login-success');
+            });
+            soundToggle.dataset.bound = '1';
+        }
+        if (vibrationToggle && !vibrationToggle.dataset.bound) {
+            vibrationToggle.addEventListener('change', () => {
+                window.vibrationEnabled = vibrationToggle.checked;
+                localStorage.setItem('axentro_vibration_enabled', String(vibrationToggle.checked));
+            });
+            vibrationToggle.dataset.bound = '1';
+        }
+        if (dataSaverToggle && !dataSaverToggle.dataset.bound) {
+            dataSaverToggle.addEventListener('change', () => {
+                localStorage.setItem('axentro_data_saver', String(dataSaverToggle.checked));
+            });
+            dataSaverToggle.dataset.bound = '1';
+        }
+
+        if (worksiteSection) {
+            worksiteSection.style.display = isAdmin ? '' : 'none';
+        }
+
+        if (isAdmin && window.attendance?.loadWorksitePolicy) {
+            Promise.resolve(window.attendance.loadWorksitePolicy(true)).then((site) => this.populateWorksiteFields(site));
+        }
+
+        ui?.openModal?.('settingsModal');
+    }
+
+    populateWorksiteFields(site) {
+        if (!site) return;
+        const mappings = {
+            worksiteLatitude: site.latitude,
+            worksiteLongitude: site.longitude,
+            worksiteAllowedRadius: site.allowed_radius_meters,
+            worksiteMaxAccuracy: site.max_accuracy_meters
+        };
+        Object.entries(mappings).forEach(([id, value]) => {
+            const input = document.getElementById(id);
+            if (input) input.value = value ?? '';
+        });
+    }
+
+    async promptFaceUpdate() {
+        const password = prompt('أدخل كلمة المرور الحالية لتحديث بصمة الوجه');
+        if (password === null) return;
+        const identifier = window.user?.role === 'admin' ? (window.user?.username || 'admin') : window.user?.code;
+        if (!identifier || !password.trim()) {
+            showToast('كلمة المرور الحالية مطلوبة', 'error');
+            return;
+        }
+        const verify = await db.signIn(identifier, password.trim());
+        if (!verify?.success) {
+            showToast(verify?.error || 'كلمة المرور الحالية غير صحيحة', 'error');
+            return;
+        }
+        window.faceUpdateTargetUser = { ...window.user };
+        window.updateFaceMode = true;
+        window.attMode = false;
+        window.adminVerifyMode = false;
+        window.firstTimeSetupMode = false;
+        window.adminResetFaceMode = false;
+        ui?.closeModal?.('settingsModal');
+        await openCamera?.();
+    }
+
+    async saveWorksiteSettings() {
+        if (!(window.user?.role === 'admin' || window.user?.isAdmin)) {
+            showToast('هذا الإجراء متاح للأدمن فقط', 'error');
+            return;
+        }
+        const payload = {
+            latitude: parseFloat(document.getElementById('worksiteLatitude')?.value || ''),
+            longitude: parseFloat(document.getElementById('worksiteLongitude')?.value || ''),
+            allowed_radius_meters: parseInt(document.getElementById('worksiteAllowedRadius')?.value || '', 10),
+            max_accuracy_meters: parseInt(document.getElementById('worksiteMaxAccuracy')?.value || '', 10)
+        };
+        if (Object.values(payload).some(v => Number.isNaN(v))) {
+            showToast('يرجى إدخال قيم صحيحة لإعدادات المقر', 'error');
+            return;
+        }
+        const result = await db.getWorksiteSettings();
+        const save = await db.updateWorksiteSettings(result?.id, payload);
+        if (!save?.success) {
+            showToast(save?.error || 'فشل حفظ إعدادات المقر', 'error');
+            return;
+        }
+        if (window.attendance?.loadWorksitePolicy) await window.attendance.loadWorksitePolicy(true);
+        showToast('تم حفظ إعدادات المقر بنجاح', 'success');
+    }
+
+    clearLocalSettings() {
+        localStorage.removeItem('axentro_sound_enabled');
+        localStorage.removeItem('axentro_vibration_enabled');
+        localStorage.removeItem('axentro_data_saver');
+        window.soundEnabled = true;
+        window.vibrationEnabled = true;
+        showToast('تمت إعادة ضبط الإعدادات المحلية', 'success');
+        this.openSettingsModal();
     }
 
     // ============================================

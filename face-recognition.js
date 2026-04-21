@@ -1222,8 +1222,8 @@ class FaceRecognitionManager {
 
         const sourceBox = this.lastDetectionRaw?.detection?.box || this.lastDetectionRaw?.box || null;
         const canvas = document.createElement('canvas');
-        const maxDim = AppConfig?.faceRecognition?.imageStorage?.maxWidth || 640;
-        const quality = AppConfig?.faceRecognition?.imageStorage?.quality || 0.94;
+        const maxDim = AppConfig?.faceRecognition?.imageStorage?.maxWidth || 900;
+        const quality = AppConfig?.faceRecognition?.imageStorage?.quality || 0.96;
 
         let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
         if (sourceBox && video.videoWidth && video.videoHeight) {
@@ -1243,7 +1243,12 @@ class FaceRecognitionManager {
 
         canvas.width = w;
         canvas.height = h;
-        canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+        }
 
         return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
     }

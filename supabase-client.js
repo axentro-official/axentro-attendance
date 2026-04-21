@@ -388,6 +388,37 @@ class SupabaseClient {
         return this.changeOwnPassword({ role: 'employee', code }, currentPassword, newPassword);
     }
 
+    async getWorksiteSettings() {
+        try {
+            const table = AppConfig?.supabase?.tables?.worksites || 'worksites';
+            const { data, error } = await this.from(table)
+                .select('*')
+                .order('id', { ascending: true })
+                .limit(1);
+            if (error) throw error;
+            return Array.isArray(data) ? (data[0] || null) : null;
+        } catch (error) {
+            console.error('❌ Get worksite settings error:', error);
+            return null;
+        }
+    }
+
+    async updateWorksiteSettings(worksiteId, updates) {
+        try {
+            const table = AppConfig?.supabase?.tables?.worksites || 'worksites';
+            let query = this.from(table).update(updates);
+            if (worksiteId !== undefined && worksiteId !== null) {
+                query = query.eq('id', worksiteId);
+            }
+            const { data, error } = await query.select('*').limit(1);
+            if (error) throw error;
+            return { success: true, data: Array.isArray(data) ? data[0] : data };
+        } catch (error) {
+            console.error('❌ Update worksite settings error:', error);
+            return { success: false, error: error.message || 'فشل تحديث إعدادات المقر' };
+        }
+    }
+
     async requestPasswordReset(identifier) {
         try {
             const normalized = String(identifier || '').trim();

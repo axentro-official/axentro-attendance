@@ -78,65 +78,73 @@
     <!-- ================================ -->
     <!-- 🔐 LOGIN PAGE -->
     <!-- ================================ -->
-    <section id="loginPage" class="page active">
-        <div class="auth-container">
-            <div class="auth-header">
-                <div class="logo-main">
-                    <i class="fas fa-fingerprint"></i>
-                </div>
-                <h1>Axentro System</h1>
-                <p>نظام إدارة الحضور والانصراف المتقدم</p>
-            </div>
-
-            <form id="loginForm" class="auth-form" novalidate>
-                <div class="input-group">
-                    <label for="loginCode"><i class="fas fa-id-badge"></i> كود الموظف</label>
-                    <input type="text" id="loginCode" placeholder="أدخل كود الموظف" autocomplete="username" required pattern="[A-Z0-9]{4,10}" maxlength="10">
-                    <span class="error-message" id="loginCodeError"></span>
-                </div>
-
-                <div class="input-group">
-                    <label for="loginPassword"><i class="fas fa-lock"></i> كلمة السر</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="loginPassword" placeholder="كلمة السر" autocomplete="current-password" required minlength="4">
-                        <button type="button" class="toggle-password" data-target="loginPassword">
-                            <i class="fas fa-eye"></i>
-                        </button>
+    <section id="loginPage" class="page active auth-split-page">
+        <div class="login-split-layout">
+            <aside class="login-side-panel">
+                <div class="login-side-card">
+                    <div class="login-side-links">
+                        <a href="#" id="showRegisterLink">إنشاء حساب جديد</a>
+                        <a href="#" id="showForgotPasswordLink">نسيت كلمة المرور؟</a>
                     </div>
-                    <span class="error-message" id="loginPasswordError"></span>
-                </div>
-
-                <div class="form-options">
-                    <div class="remember-control">
-                        <input type="checkbox" id="rememberMe" class="remember-checkbox" checked>
-                        <span class="remember-label">تذكرني (حفظ جلسة الدخول)</span>
+                    <div class="login-side-branding">
+                        <p class="footer-copy">© 2024 Axentro – All Rights Reserved</p>
+                        <p class="footer-copy footer-sub">By Axentro Team</p>
+                        <p class="login-side-qr-title">QR Code</p>
+                        <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="qr-link login-side-qr-link">
+                            <img src="qr-links.png" alt="QR Code" class="qr-code login-side-qr-code">
+                        </a>
+                        <p class="footer-scan">Scan Me &gt; Click On Me</p>
                     </div>
                 </div>
+            </aside>
 
-                <button type="submit" class="btn btn-primary btn-block btn-login" id="loginBtn">
-                    <i class="fas fa-arrow-right-to-bracket"></i>
-                    <span>تسجيل الدخول</span>
-                    <span class="btn-loader hidden"></span>
-                </button>
-
-                <div class="auth-divider"><span>أو</span></div>
-
-                <button type="button" class="btn btn-outline btn-block" id="biometricLoginBtn">
-                    <i class="fas fa-fingerprint"></i>
-                    تسجيل الدخول ببصمة الإصبع
-                </button>
-
-                <div class="auth-links">
-                    <a href="#" id="showRegisterLink">إنشاء حساب جديد</a>
-                    <a href="#" id="showForgotPasswordLink">نسيت كلمة المرور؟</a>
+            <div class="auth-container login-card-panel">
+                <div class="auth-header">
+                    <div class="logo-main">
+                        <i class="fas fa-fingerprint"></i>
+                    </div>
+                    <h1>Axentro System</h1>
+                    <p>نظام إدارة الحضور والانصراف المتقدم</p>
                 </div>
-            </form>
 
-            <div class="auth-footer legacy-footer">
-                <a href="https://axentro-official.github.io/axentro-website/links.html" target="_blank" rel="noopener noreferrer" class="qr-link">
-                    <img src="qr-links.png" alt="QR Code" class="qr-code">
-                </a>
-                <p>Scan Me &gt; Click On Me</p>
+                <form id="loginForm" class="auth-form" novalidate>
+                    <div class="input-group">
+                        <label for="loginCode"><i class="fas fa-id-badge"></i> كود الموظف</label>
+                        <input type="text" id="loginCode" placeholder="أدخل كود الموظف" autocomplete="username" required pattern="[A-Z0-9]{4,10}" maxlength="10">
+                        <span class="error-message" id="loginCodeError"></span>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="loginPassword"><i class="fas fa-lock"></i> كلمة السر</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="loginPassword" placeholder="كلمة السر" autocomplete="current-password" required minlength="4">
+                            <button type="button" class="toggle-password" data-target="loginPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <span class="error-message" id="loginPasswordError"></span>
+                    </div>
+
+                    <div class="form-options">
+                        <div class="remember-control">
+                            <input type="checkbox" id="rememberMe" class="remember-checkbox" checked>
+                            <span class="remember-label">تذكرني (حفظ جلسة الدخول)</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block btn-login" id="loginBtn">
+                        <i class="fas fa-arrow-right-to-bracket"></i>
+                        <span>تسجيل الدخول</span>
+                        <span class="btn-loader hidden"></span>
+                    </button>
+
+                    <div class="auth-divider"><span>أو</span></div>
+
+                    <button type="button" class="btn btn-outline btn-block" id="biometricLoginBtn">
+                        <i class="fas fa-fingerprint"></i>
+                        تسجيل الدخول ببصمة الإصبع
+                    </button>
+                </form>
             </div>
         </div>
     </section>
@@ -219,8 +227,11 @@
         <!-- Header -->
         <header class="dashboard-header">
             <div class="user-info">
+                <img id="userAvatar" class="emp-profile-img profile-avatar" alt="Profile" style="display:none;">
+                <div class="user-meta">
                 <h3 id="userName">مرحباً، موظف</h3>
                 <span id="userCodeDisplay">CODE: ----</span>
+                </div>
             </div>
             
             <div class="header-actions">
@@ -231,6 +242,10 @@
                 
                 <button class="icon-btn admin-only" id="adminPanelBtn" title="لوحة التحكم">
                     <i class="fas fa-user-shield"></i>
+                </button>
+                
+                <button class="icon-btn" id="refreshBtn" title="تحديث البيانات">
+                    <i class="fas fa-sync-alt"></i>
                 </button>
                 
                 <button class="icon-btn" id="settingsBtn" title="الإعدادات">
@@ -590,10 +605,16 @@
     <section id="adminPage" class="page admin-themed-page">
         <header class="dashboard-header admin-dashboard-header">
             <div class="user-info">
+                <img id="adminUserAvatar" class="emp-profile-img profile-avatar" alt="Profile" style="display:none;">
+                <div class="user-meta">
                 <h3 id="adminHeaderName">مرحباً، مدير النظام</h3>
                 <span id="adminHeaderCode">ADMIN: admin</span>
+                </div>
             </div>
             <div class="header-actions">
+                <button class="icon-btn" id="adminRefreshBtn" title="تحديث البيانات">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
                 <button class="icon-btn" id="adminSettingsBtn" title="الإعدادات">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -717,70 +738,108 @@
             </p>
         </div>
     </div>
+</div>
 <!-- Settings Modal -->
 <div class="modal" id="settingsModal">
-    <div class="modal-content" style="max-width: 500px;">
+    <div class="modal-content settings-modal-content" style="max-width: 620px;">
         <div class="modal-header">
             <h3><i class="fas fa-cog"></i> الإعدادات</h3>
             <button class="close-modal" onclick="ui.closeModal('settingsModal')">&times;</button>
         </div>
-        <div class="modal-body">
-            <div class="setting-item">
-                <div class="setting-info">
-                    <h4><i class="fas fa-volume-up"></i> الإشعارات الصوتية</h4>
-                    <p>تشغيل الأصوات عند تسجيل الحضور</p>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="soundEnabled" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-                
-                <div class="setting-item">
-                    <div class="setting-info">
-                        <h4><i class="fas fa-mobile-vibration"></i> الاهتزازات</h4>
-                    <p>اهتزاز عند نجاح العملية</p>
-                </div>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="vibrationEnabled" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-                
-                <div class="setting-item">
-                    <div class="setting-info">
-                        <h4><i class="fas fa-database"></i> وضع توفير البيانات</h4>
-                        <p>تقليل استهلاك الإنترنت</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="dataSaverMode" checked>
-                    <span class="toggle-slider"></span>
-                </label>
+        <div class="modal-body settings-modal-body">
+            <div class="settings-group">
+                <h4><i class="fas fa-user-shield"></i> إعدادات الحساب</h4>
+                <div class="settings-actions-grid">
+                    <button type="button" class="btn btn-outline" id="openOwnPasswordSettingsBtn">
+                        <i class="fas fa-key"></i>
+                        تغيير كلمة المرور
+                    </button>
+                    <button type="button" class="btn btn-outline" id="openFaceUpdateBtn">
+                        <i class="fas fa-camera"></i>
+                        تحديث بصمة الوجه
+                    </button>
                 </div>
             </div>
-            
-            <hr style="border: none; border-top: 1px solid var(--border-color); margin: 20px 0;">
-            
-            <button class="btn btn-danger btn-block" onclick="
-                if(confirm('هل أنت متأكد من هذا الإجراء؟')) {
-                    localStorage.clear();
-                    ui.showSuccess('تم مسح جميع البيانات', 'success');
-                }
-            " style="margin-top: 20px; max-width: 250px; margin: 0 auto;">
-                <i class="fas fa-trash-alt"></i>
-                مسح جميع البيانات
-            </button>
-            
-            <button class="btn btn-text" onclick="ui.closeModal('settingsModal')" style="margin-top: 15px; max-width: 250px; margin: 0 auto;">
-                إلغاء
-            </button>
+
+            <div class="settings-group">
+                <h4><i class="fas fa-sliders"></i> تفضيلات النظام</h4>
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <h5><i class="fas fa-volume-up"></i> الإشعارات الصوتية</h5>
+                        <p>تشغيل جميع الأصوات داخل النظام</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="soundEnabled" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <h5><i class="fas fa-mobile-vibration"></i> الاهتزازات</h5>
+                        <p>اهتزاز عند نجاح العملية على الأجهزة المدعومة</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="vibrationEnabled" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <h5><i class="fas fa-database"></i> وضع توفير البيانات</h5>
+                        <p>تقليل استهلاك الإنترنت عند الحاجة</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="dataSaverMode">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="settings-group admin-only" id="worksiteSettingsSection" style="display:none;">
+                <h4><i class="fas fa-location-dot"></i> إعدادات المقر</h4>
+                <div class="settings-grid two-columns">
+                    <div class="input-group">
+                        <label for="worksiteLatitude"><i class="fas fa-location-arrow"></i> Latitude</label>
+                        <input type="number" step="any" id="worksiteLatitude" placeholder="30.000000">
+                    </div>
+                    <div class="input-group">
+                        <label for="worksiteLongitude"><i class="fas fa-location-arrow"></i> Longitude</label>
+                        <input type="number" step="any" id="worksiteLongitude" placeholder="31.000000">
+                    </div>
+                    <div class="input-group">
+                        <label for="worksiteAllowedRadius"><i class="fas fa-circle-dot"></i> allowed_radius_meters</label>
+                        <input type="number" step="1" id="worksiteAllowedRadius" placeholder="500">
+                    </div>
+                    <div class="input-group">
+                        <label for="worksiteMaxAccuracy"><i class="fas fa-crosshairs"></i> max_accuracy_meters</label>
+                        <input type="number" step="1" id="worksiteMaxAccuracy" placeholder="50">
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-block" id="saveWorksiteSettingsBtn">
+                    <i class="fas fa-save"></i>
+                    حفظ إعدادات المقر
+                </button>
+            </div>
+
+            <div class="settings-actions-grid settings-footer-actions">
+                <button class="btn btn-danger" type="button" id="clearLocalSettingsBtn">
+                    <i class="fas fa-trash-alt"></i>
+                    مسح البيانات المحلية فقط
+                </button>
+                <button class="btn btn-text" type="button" onclick="ui.closeModal('settingsModal')">
+                    إغلاق
+                </button>
+            </div>
         </div>
     </div>
+</div>
 
 <!-- Add Employee Modal -->
-<div class="modal" id="addEmployeeModal" style="display: none;">
+<div class="modal" id="addEmployeeModal">
     <div class="modal-content" style="max-width: 550px;">
         <div class="modal-header">
             <h3><i class="fas fa-user-plus"></i> إضافة موظف جديد</h3>
-            <button class="close-modal" onclick="this.closest('.modal').style.display='none';">✕</button>
+            <button class="close-modal" onclick="this.closest('.modal').classList.remove('active');">✕</button>
         </div>
         <div class="modal-body">
             <form id="addEmployeeModalForm">
@@ -804,13 +863,14 @@
                         <i class="fas fa-plus-circle"></i>
                         إنشاء الحساب
                     </button>
-                    <button type="button" class="btn btn-outline" onclick="document.getElementById('addEmployeeModal').style.display='none';">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('addEmployeeModal').classList.remove('active');">
                         إلغاء
                     </button>
                 </div>
             </form>
         </div>
     </div>
+</div>
 <!-- End Modals -->
 
 <!-- ============================================ -->
@@ -1476,19 +1536,19 @@
 </style>
 
 
-<audio id="login-success" preload="auto">
+<audio id="login-success" preload="auto" playsinline webkit-playsinline>
     <source src="login-success.mp3" type="audio/mpeg">
 </audio>
-<audio id="login-error" preload="auto">
+<audio id="login-error" preload="auto" playsinline webkit-playsinline>
     <source src="login-error.mp3" type="audio/mpeg">
 </audio>
-<audio id="logout-success" preload="auto">
+<audio id="logout-success" preload="auto" playsinline webkit-playsinline>
     <source src="logout-success.mp3" type="audio/mpeg">
 </audio>
-<audio id="faceid-success" preload="auto">
+<audio id="faceid-success" preload="auto" playsinline webkit-playsinline>
     <source src="faceid-success.mp3" type="audio/mpeg">
 </audio>
-<audio id="faceid-error" preload="auto">
+<audio id="faceid-error" preload="auto" playsinline webkit-playsinline>
     <source src="faceid-error.mp3" type="audio/mpeg">
 </audio>
 

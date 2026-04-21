@@ -21,7 +21,25 @@ class AdminManager {
 
     init() {
         this.checkAdminAccess();
+        this.bindAdminUi();
         console.log('✅ Admin Manager ready');
+    }
+
+    bindAdminUi() {
+        const form = document.getElementById('addEmployeeModalForm');
+        const searchInput = document.getElementById('adminSearchInput');
+
+        if (form && !form.dataset.bound) {
+            form.addEventListener('submit', (e) => this.handleAddEmployeeForm(e));
+            form.dataset.bound = '1';
+        }
+
+        if (searchInput && !searchInput.dataset.bound) {
+            searchInput.addEventListener('input', () => {
+                this.populateEmployeesTable(this.searchEmployees(searchInput.value));
+            });
+            searchInput.dataset.bound = '1';
+        }
     }
 
     checkAdminAccess() {
@@ -63,27 +81,23 @@ class AdminManager {
                 throw new Error('Database not available');
             }
 
-            const { data: employees } = await db.from('employees')
-                .select('*')
-                .eq('is_deleted', false)
-                .order('created_at', { ascending: true });
+            const employees = await db.getAllEmployees();
+            this.employeesList = Array.isArray(employees) ? employees : [];
 
-            if (employees) {
-                this.employeesList = employees;
-                
-                // Update count
-                const countEl = document.getElementById('totalEmployeesStat');
-                if (countEl) countEl.textContent = employees.length;
+            const count = this.employeesList.length;
+            const countEl = document.getElementById('totalEmployeesStat');
+            const adminTotalEmp = document.getElementById('adminTotalEmp');
+            if (countEl) countEl.textContent = count;
+            if (adminTotalEmp) adminTotalEmp.textContent = count;
 
-                // Render table/list
-                this.populateEmployeesTable(employees);
+            this.populateEmployeesTable(this.employeesList);
+            await this.updateDashboardStats();
 
-                console.log(`📋 Loaded ${employees.length} employees`);
-            }
-
+            console.log(`📋 Loaded ${count} employees`);
         } catch (error) {
             console.error('❌ Load employees error:', error);
             this.employeesList = [];
+            this.populateEmployeesTable([]);
         }
     }
 
@@ -106,61 +120,120 @@ class AdminManager {
 
         employees.forEach((employee, index) => {
             const row = document.createElement('tr');
+            const createdDate = employee.created_at ? new Date(employee.created_at).toLocaleDateString('ar-EG', {
+                year: 'numeric', month: '2-digit', day: '2-digit'
+            }) : '-';
 
-            // Format dates
-            const createdDate = employee.created_at ? 
-                new Date(employee.created_at).toLocaleDateString('ar-EG', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                }) : '-';
-
-            const lastLogin = employee.last_login ? 
-                new Date(employee.last_login).toLocaleDateString('ar-EG', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }) : 'لم يسجل دخول';
-
-            // Status badge
-            let statusClass, statusText;
+            let statusClass = 'badge-success', statusText = 'نشط';
             if (employee.is_deleted) {
                 statusClass = 'badge-danger';
                 statusText = 'محذوف';
             } else if (employee.is_admin) {
                 statusClass = 'badge-primary';
                 statusText = 'أدمن';
-            } else {
-                statusClass = 'badge-success';
-                statusText = 'نشط';
             }
 
             row.innerHTML = `
                 <td style="font-weight:bold;">${index + 1}</td>
-                <td style="color:#3b82f6;font-weight:bold;font-family:monospace;">${employee.code}</td>
-                <td><strong>${employee.name}</strong></td>
+                <td style="color:#3b82f6;font-weight:bold;font-family:monospace;">${employee.code || '-'}</td>
+                <td><strong>${employee.name || '-'}</strong></td>
                 <td>${employee.email || '-'}</td>
-                <td><span class="${statusClass}" style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;display:inline-block;">
-                        ${statusText}
-                    </span></td>
+                <td><span class="${statusClass}" style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;display:inline-block;">${statusText}</span></td>
                 <td style="font-size:12px;color:#94a3b8;">${createdDate}</td>
-                <td style="font-size:12px;color:#94a3b8;">${lastLogin}</td>
                 <td>
                     ${!employee.is_admin ? `
-                    <button class="btn btn-sm btn-reg" onclick="adminResetFace('${employee.code}', '${employee.name}')" title="إعادة تسجيل بصمة" style="margin:2px;">
+                    <button class="btn btn-sm btn-reg" onclick="adminResetFace('${employee.code}', '${(employee.name || '').replace(/'/g, "&#39;")}')" title="إعادة تسجيل بصمة" style="margin:2px;">
                         <i class="fas fa-sync-alt"></i>
                     </button>
-                    <button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${employee.code}', '${employee.name}')" title="حذف الموظف" style="margin:2px;">
+                    <button class="btn btn-sm btn-danger" onclick="adminDeleteEmp('${employee.code}', '${(employee.name || '').replace(/'/g, "&#39;")}')" title="حذف الموظف" style="margin:2px;">
                         <i class="fas fa-trash"></i>
                     </button>
                     ` : '<span style="color:#64748b;font-size:11px;">—</span>'}
                 </td>
             `;
-
             tbody.appendChild(row);
         });
+    }
+
+    async updateDashboardStats() {
+        const stats = await this.getDashboardStats();
+        if (!stats) return;
+        const mappings = {
+            adminTotalEmp: stats.totalEmployees,
+            adminTodayCheckIns: stats.todayCheckIns,
+            adminTodayCheckOuts: stats.todayCheckOuts,
+            adminNewThisMonth: stats.registeredThisMonth
+        };
+        Object.entries(mappings).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value ?? 0;
+        });
+    }
+
+    async refreshData() {
+        await this.loadEmployeesList();
+        showToast?.('تم تحديث بيانات لوحة التحكم', 'success');
+    }
+
+    exportEmployeesList() {
+        try {
+            const data = this.employeesList.map((emp, index) => ({
+                index: index + 1,
+                code: emp.code || '',
+                name: emp.name || '',
+                email: emp.email || '',
+                status: emp.is_admin ? 'أدمن' : (emp.is_deleted ? 'محذوف' : 'نشط'),
+                created_at: emp.created_at || ''
+            }));
+            if (!data.length) throw new Error('لا توجد بيانات للتصدير');
+            Utils.exportToCSV(data, `employees-list-${new Date().toISOString().slice(0,10)}.csv`);
+            showToast?.('تم تصدير قائمة الموظفين', 'success');
+        } catch (error) {
+            console.error('Export employee list error:', error);
+            showToast?.(error.message || 'فشل تصدير القائمة', 'error');
+        }
+    }
+
+    openAddEmployeeModal() {
+        const modal = document.getElementById('addEmployeeModal');
+        const form = document.getElementById('addEmployeeModalForm');
+        form?.reset?.();
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.display = '';
+        }
+    }
+
+    closeAddEmployeeModal() {
+        const modal = document.getElementById('addEmployeeModal');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = '';
+        }
+    }
+
+    async handleAddEmployeeForm(event) {
+        event.preventDefault();
+        const name = document.getElementById('newEmpName')?.value?.trim();
+        const email = document.getElementById('newEmpEmail')?.value?.trim() || null;
+        if (!name) {
+            showToast?.('الاسم الكامل مطلوب', 'error');
+            return;
+        }
+        const submitBtn = event.submitter || event.target.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+            const result = await db.createEmployee({ name, email });
+            if (!result?.success) throw new Error(result?.error || 'فشل إنشاء الحساب');
+            showToast?.(`تم إنشاء الموظف بنجاح. الكود: ${result.employee_code || '-'}`, 'success');
+            this.closeAddEmployeeModal();
+            await this.loadEmployeesList();
+        } catch (error) {
+            console.error('Add employee error:', error);
+            showToast?.(error.message || 'فشل إنشاء الموظف', 'error');
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
     }
 
     updateEmployeesCount(count) {
@@ -531,9 +604,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Make globally available
     window.adminManager = adminManager;
+    window.admin = adminManager;
+    window.openAddEmployeeModal = () => adminManager.openAddEmployeeModal();
     
     // Auto-init if user is admin
-    if (window.user?.isAdmin) {
+    if (window.user?.isAdmin || window.user?.role === 'admin') {
         adminManager.init();
     }
     
@@ -620,27 +695,35 @@ window.handleFirstTimeSetupCapture = async function(descriptor) {
 
 window.handleFaceUpdateCapture = async function(descriptor) {
     try {
-        if (!descriptor || !window.user) throw new Error('Missing data');
+        const targetUser = window.faceUpdateTargetUser || window.user;
+        if (!descriptor || !targetUser) throw new Error('Missing data');
         setCamStatus?.('<i class="fas fa-upload"></i> جاري تحديث البصمة...');
         let imageUrl = null;
         if (typeof faceRecognition !== 'undefined') {
             const imgBlob = await faceRecognition.createStorageImageBlob();
             if (imgBlob) {
-                const faceKey = `${window.user.role || 'employee'}_${window.user.username || window.user.code}_face.jpg`;
+                const faceKey = `${targetUser.role || 'employee'}_${targetUser.username || targetUser.code}_face.jpg`;
                 await db.storage.from('faces').upload(faceKey, imgBlob, { upsert: true });
                 const { data: imgData } = db.storage.from('faces').getPublicUrl(faceKey);
                 imageUrl = imgData?.publicUrl || null;
             }
         }
-        const result = await db.saveFaceEnrollment(window.user, descriptor, imageUrl);
+        const result = await db.saveFaceEnrollment(targetUser, descriptor, imageUrl);
         if (!result?.success) throw new Error(result?.error || 'فشل تحديث البصمة');
         playSound?.('faceid-success');
-        window.sessionDescriptor = descriptor;
-        window.user.face_enrolled = true;
-        window.user.face_descriptor = descriptor;
-        if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
+        if (window.user && targetUser.code === window.user.code && targetUser.role === window.user.role) {
+            window.sessionDescriptor = descriptor;
+            window.user.face_enrolled = true;
+            window.user.face_descriptor = descriptor;
+            if (imageUrl) {
+                window.userImage = imageUrl;
+                window.user.profile_image_url = imageUrl;
+            }
+            if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
+        }
         showMatchResult?.(true);
         showToast?.('تم تحديث البصمة بنجاح', 'success');
+        window.faceUpdateTargetUser = null;
         setTimeout(() => closeCamera?.(), 800);
         showApp?.();
     } catch (e) {

@@ -28,7 +28,31 @@ class AttendanceManager {
     // ============================================
 
     init() {
+        this.loadWorksitePolicy();
         console.log('✅ Attendance Manager ready');
+    }
+
+    async loadWorksitePolicy(force = false) {
+        if (!force && this.worksitePolicy) return this.worksitePolicy;
+        try {
+            const site = await db?.getWorksiteSettings?.();
+            this.worksitePolicy = site || null;
+            return this.worksitePolicy;
+        } catch (error) {
+            console.warn('⚠️ Worksite policy load failed:', error?.message || error);
+            return this.worksitePolicy || null;
+        }
+    }
+
+    getAttendancePolicy() {
+        const site = this.worksitePolicy || {};
+        return {
+            latitude: Number(site.latitude ?? AppConfig?.location?.office?.latitude ?? 30.1407941),
+            longitude: Number(site.longitude ?? AppConfig?.location?.office?.longitude ?? 31.3800838),
+            allowedRadiusMeters: Number(site.allowed_radius_meters ?? AppConfig?.location?.maxDistanceMeters ?? 500),
+            maxAccuracyMeters: Number(site.max_accuracy_meters ?? AppConfig?.location?.maxAccuracyMeters ?? 50),
+            name: site.name || AppConfig?.location?.office?.name || 'المقر الرئيسي'
+        };
     }
 
     // ============================================
@@ -85,12 +109,13 @@ class AttendanceManager {
     updateLocationStatus(success, accuracy = null) {
         const statusEl = document.getElementById('locationStatus') || document.getElementById('locBar');
         if (!statusEl) return;
+        const policy = this.getAttendancePolicy();
 
         if (success && accuracy) {
             statusEl.innerHTML = `
                 <i class="fas fa-map-marker-alt" style="color:#10b981;"></i> 
                 <a href="${window.currentLoc}" target="_blank" style="color:#38bdf8; text-decoration:none;">
-                    الموقع محدد (دقة: ${Math.round(accuracy)}م)
+                    ${policy.name} - دقة: ${Math.round(accuracy)}م
                 </a>
             `;
         } else {
@@ -594,8 +619,8 @@ window.handleAttendance = function(type) {
 };
 
 window.loadEmployees = async function() {
-    if (typeof attendance !== 'undefined') {
-        await attendance.loadEmployees();
+    if (typeof adminManager !== 'undefined' && adminManager?.loadEmployeesList) {
+        await adminManager.loadEmployeesList();
     }
 };
 
@@ -661,15 +686,42 @@ window.adminDirectAtt = function(type, code, name) {
 };
 
 window.adminDeleteEmp = function(code, name) {
-    if (typeof attendance !== 'undefined') {
-        attendance.adminDeleteEmp(code, name);
+    if (typeof ui !== 'undefined' && ui?.showConfirmation) {
+        ui.showConfirmation({
+            title: 'حذف موظف',
+            message: `سيتم حذف الموظف ${name} من الحسابات النشطة. هل تريد المتابعة؟`,
+            confirmText: 'حذف',
+            cancelText: 'إلغاء',
+            type: 'danger'
+        }).then((confirmed) => {
+            if (!confirmed) return;
+            window.targetEmpForAdmin = { code, name, type: 'حذف موظف' };
+            window.adminVerifyMode = true;
+            openCamera?.();
+        });
+        return;
     }
+    window.targetEmpForAdmin = { code, name, type: 'حذف موظف' };
+    window.adminVerifyMode = true;
+    openCamera?.();
 };
 
-window.adminResetFace = function(code, name) {
-    if (typeof attendance !== 'undefined') {
-        attendance.adminResetFace(code, name);
+window.adminResetFace = async function(code, name) {
+    const password = prompt(`أدخل كلمة المرور الحالية لحسابك لتحديث بصمة ${name}`);
+    if (password === null) return;
+    const identifier = window.user?.role === 'admin' ? (window.user?.username || 'admin') : window.user?.code;
+    const verify = await db?.signIn?.(identifier, String(password || '').trim());
+    if (!verify?.success) {
+        showToast?.(verify?.error || 'كلمة المرور الحالية غير صحيحة', 'error');
+        return;
     }
+    window.faceUpdateTargetUser = { role: 'employee', code, name };
+    window.updateFaceMode = false;
+    window.attMode = false;
+    window.adminVerifyMode = false;
+    window.firstTimeSetupMode = false;
+    window.adminResetFaceMode = true;
+    await openCamera?.();
 };
 
 // Export for modules

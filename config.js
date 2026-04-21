@@ -67,8 +67,8 @@ const AppConfig = {
             cameraStart: 10000
         },
         imageStorage: {
-            maxWidth: 520,
-            quality: 0.9
+            maxWidth: 900,
+            quality: 0.96
         },
         antiSpoof: {
             enabled: true,
