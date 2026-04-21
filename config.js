@@ -46,7 +46,7 @@ const AppConfig = {
         },
         detection: {
             inputSize: 416,
-            scoreThreshold: 0.52,
+            scoreThreshold: 0.18,
             minFaceSize: 96,
             maxFaces: 1
         },
@@ -54,7 +54,7 @@ const AppConfig = {
             threshold: 0.48,
             adminThreshold: 0.45,
             labelDistance: 0.48,
-            minSamples: 3
+            minSamples: 1
         },
         camera: {
             width: 1280,
@@ -63,19 +63,22 @@ const AppConfig = {
             frameRate: 30
         },
         timeout: {
-            modelLoad: 12000,
+            modelLoad: 30000,
             cameraStart: 10000
         },
         imageStorage: {
             maxWidth: 520,
-            quality: 0.9
+            quality: 0.86
+        },
+        enrollment: {
+            stableFrames: 2
         },
         antiSpoof: {
             enabled: true,
             requireBlink: true,
             requireTurnLeftRight: true,
             requireNod: true,
-            minStableFrames: 4,
+            minStableFrames: 3,
             earBlinkThreshold: 0.19,
             minBlinks: 1,
             yawMovementPx: 12,
