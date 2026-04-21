@@ -165,47 +165,7 @@ class AdminManager {
 
     updateEmployeesCount(count) {
         const countEl = document.getElementById('totalEmployeesStat');
-        const adminCountEl = document.getElementById('adminTotalEmp');
         if (countEl) countEl.textContent = count;
-        if (adminCountEl) adminCountEl.textContent = count;
-    }
-
-    async refreshData() {
-        await this.loadEmployeesList();
-        if (typeof db !== 'undefined') {
-            const today = new Date().toISOString().split('T')[0];
-            const { data: attendanceRows } = await db.from('attendance').select('type, created_at').gte('created_at', today);
-            const rows = attendanceRows || [];
-            const checkIns = rows.filter(r => r.type === 'حضور').length;
-            const checkOuts = rows.filter(r => r.type === 'انصراف').length;
-            const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-            const { count: monthlyNew } = await db.from('employees').select('*', { count: 'exact', head: true }).gte('created_at', monthStart).eq('is_deleted', false);
-            const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = String(val ?? 0); };
-            set('adminTodayCheckIns', checkIns);
-            set('adminTodayCheckOuts', checkOuts);
-            set('adminNewThisMonth', monthlyNew || 0);
-        }
-        if (typeof attendance !== 'undefined' && typeof attendance.setupSearch === 'function') attendance.setupSearch();
-        return true;
-    }
-
-    exportEmployeesList() {
-        try {
-            const rows = this.employeesList || window.employeesList || [];
-            const headers = ['code','name','email','face_enrolled','is_first_login','created_at'];
-            const csv = [headers.join(',')].concat(rows.map(r => headers.map(h => JSON.stringify(r[h] ?? '')).join(','))).join('\n');
-            const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `employees-${new Date().toISOString().slice(0,10)}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            showToast?.('تم تصدير قائمة الموظفين', 'success');
-        } catch (e) {
-            console.error('❌ Export employees error:', e);
-            showToast?.('فشل تصدير قائمة الموظفين', 'error');
-        }
     }
 
     // ============================================
@@ -571,7 +531,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Make globally available
     window.adminManager = adminManager;
-    window.admin = adminManager;
     
     // Auto-init if user is admin
     if (window.user?.isAdmin) {
@@ -704,44 +663,3 @@ window.handleAdminVerificationCapture = async function(descriptor) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = AdminManager;
 }
-
-
-window.openAddEmployeeModal = function() {
-    const modal = document.getElementById('addEmployeeModal');
-    if (modal) {
-        if (window.ui?.openModal) {
-            ui.openModal('addEmployeeModal');
-        } else {
-            modal.classList.add('active');
-            modal.style.display = 'flex';
-        }
-    }
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-    const addForm = document.getElementById('addEmployeeModalForm');
-    if (addForm && !addForm.dataset.bound) {
-        addForm.dataset.bound = 'true';
-        addForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                const name = document.getElementById('newEmpName')?.value?.trim();
-                const email = document.getElementById('newEmpEmail')?.value?.trim();
-                if (!name) {
-                    showToast?.('اسم الموظف مطلوب', 'error');
-                    return;
-                }
-                if (typeof db === 'undefined') throw new Error('Database not available');
-                const result = await db.createEmployee({ name, email });
-                if (!result?.success) throw new Error(result?.error || 'فشل إنشاء الموظف');
-                showToast?.(`تم إنشاء الموظف بنجاح. الكود: ${result.employee_code || '-'}`, 'success');
-                ui?.closeModal?.('addEmployeeModal');
-                addForm.reset();
-                await window.admin?.refreshData?.();
-            } catch (err) {
-                console.error('❌ Add employee modal error:', err);
-                showToast?.(err.message || 'فشل إنشاء الموظف', 'error');
-            }
-        });
-    }
-});

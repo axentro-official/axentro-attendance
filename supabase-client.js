@@ -173,45 +173,6 @@ class SupabaseClient {
         }
     }
 
-    async getActiveWorksite() {
-        try {
-            const { data, error } = await this.from(AppConfig.supabase.tables.worksites)
-                .select('*')
-                .eq('is_active', true)
-                .limit(1)
-                .single();
-            if (error && error.code !== 'PGRST116') throw error;
-            return data || null;
-        } catch (error) {
-            console.error('❌ Get active worksite error:', error);
-            return null;
-        }
-    }
-
-    async updateActiveWorksite(payload) {
-        try {
-            const current = await this.getActiveWorksite();
-            if (current?.id) {
-                const { data, error } = await this.from(AppConfig.supabase.tables.worksites)
-                    .update(payload)
-                    .eq('id', current.id)
-                    .select()
-                    .single();
-                if (error) throw error;
-                return { success: true, data };
-            }
-            const { data, error } = await this.from(AppConfig.supabase.tables.worksites)
-                .insert(payload)
-                .select()
-                .single();
-            if (error) throw error;
-            return { success: true, data };
-        } catch (error) {
-            console.error('❌ Update active worksite error:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
     async saveFaceEnrollment(user, descriptor, imageUrl = null) {
         try {
             const role = user?.role || (user?.isAdmin ? 'admin' : 'employee');
