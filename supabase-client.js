@@ -403,6 +403,71 @@ class SupabaseClient {
         }
     }
 
+    getAvatarStorageKey(user) {
+        const role = user?.role || (user?.isAdmin ? 'admin' : 'employee');
+        const identifier = role === 'admin' ? (user?.username || 'admin') : (user?.code || 'unknown');
+        const safeIdentifier = String(identifier).trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
+        return `avatars/${role}_${safeIdentifier}_avatar.jpg`;
+    }
+
+    async uploadProfileImage(user, imageBlob) {
+        try {
+            if (!this.storage) throw new Error('Storage service not available');
+            const bucket = AppConfig?.supabase?.storage?.bucketName || 'faces';
+            const fileKey = this.getAvatarStorageKey(user);
+            const { error } = await this.storage.from(bucket).upload(fileKey, imageBlob, {
+                upsert: true,
+                contentType: 'image/jpeg',
+                cacheControl: '3600'
+            });
+            if (error) throw error;
+            const { data } = this.storage.from(bucket).getPublicUrl(fileKey);
+            return { success: true, imageUrl: data?.publicUrl || null, fileKey };
+        } catch (error) {
+            console.error('❌ Upload profile image error:', error);
+            return { success: false, error: error.message || 'فشل رفع الصورة الشخصية' };
+        }
+    }
+
+    async updateUserProfileImage(user, imageUrl = null) {
+        try {
+            const role = user?.role || (user?.isAdmin ? 'admin' : 'employee');
+            if (role === 'admin') {
+                const { data, error } = await this.from(AppConfig.supabase.tables.admins)
+                    .update({ profile_image_url: imageUrl })
+                    .eq('username', String(user?.username || 'admin').trim().toLowerCase())
+                    .select('*')
+                    .single();
+                if (error) throw error;
+                return { success: true, data };
+            }
+            const { data, error } = await this.from(AppConfig.supabase.tables.employees)
+                .update({ profile_image_url: imageUrl })
+                .eq('code', String(user?.code || '').trim().toUpperCase())
+                .select('code,name,email,is_first_login,face_descriptor,profile_image_url,is_deleted,created_at')
+                .single();
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('❌ Update profile image error:', error);
+            return { success: false, error: error.message || 'فشل تحديث الصورة الشخصية' };
+        }
+    }
+
+    async removeProfileImage(user) {
+        try {
+            const bucket = AppConfig?.supabase?.storage?.bucketName || 'faces';
+            const fileKey = this.getAvatarStorageKey(user);
+            if (this.storage) {
+                try { await this.storage.from(bucket).remove([fileKey]); } catch (_) {}
+            }
+            return await this.updateUserProfileImage(user, null);
+        } catch (error) {
+            console.error('❌ Remove profile image error:', error);
+            return { success: false, error: error.message || 'فشل إزالة الصورة الشخصية' };
+        }
+    }
+
     async updateWorksiteSettings(worksiteId, updates) {
         try {
             const table = AppConfig?.supabase?.tables?.worksites || 'worksites';

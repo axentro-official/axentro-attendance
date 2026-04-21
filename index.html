@@ -759,6 +759,29 @@
                         تحديث بصمة الوجه
                     </button>
                 </div>
+                <div class="profile-settings-card">
+                    <div class="profile-settings-preview">
+                        <img id="settingsProfileAvatar" class="settings-profile-avatar" alt="الصورة الشخصية" style="display:none;">
+                        <div class="settings-profile-fallback" id="settingsProfileFallback">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="profile-settings-text">
+                            <h5>الصورة الشخصية (Avatar)</h5>
+                            <p>تظهر تلقائياً من صورة بصمة الوجه عند التسجيل، ويمكنك تغييرها بأي صورة من هاتفك دون التأثير على بصمة الوجه المخزنة في النظام.</p>
+                        </div>
+                    </div>
+                    <div class="settings-actions-grid profile-settings-actions">
+                        <button type="button" class="btn btn-outline" id="uploadProfileImageBtn">
+                            <i class="fas fa-image"></i>
+                            اختيار / تغيير الصورة
+                        </button>
+                        <button type="button" class="btn btn-text" id="removeProfileImageBtn">
+                            <i class="fas fa-trash"></i>
+                            إزالة الصورة الحالية
+                        </button>
+                    </div>
+                    <input type="file" id="profileImageInput" accept="image/*" hidden>
+                </div>
             </div>
 
             <div class="settings-group">

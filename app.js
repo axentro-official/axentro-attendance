@@ -514,6 +514,9 @@ class App {
         const notificationsBtn = document.getElementById('notificationsBtn');
         const openOwnPasswordSettingsBtn = document.getElementById('openOwnPasswordSettingsBtn');
         const openFaceUpdateBtn = document.getElementById('openFaceUpdateBtn');
+        const uploadProfileImageBtn = document.getElementById('uploadProfileImageBtn');
+        const removeProfileImageBtn = document.getElementById('removeProfileImageBtn');
+        const profileImageInput = document.getElementById('profileImageInput');
         const saveWorksiteSettingsBtn = document.getElementById('saveWorksiteSettingsBtn');
         const clearLocalSettingsBtn = document.getElementById('clearLocalSettingsBtn');
 
@@ -527,6 +530,9 @@ class App {
             auth?.openChangePwModal?.('own');
         });
         openFaceUpdateBtn?.addEventListener('click', () => this.promptFaceUpdate());
+        uploadProfileImageBtn?.addEventListener('click', () => profileImageInput?.click());
+        removeProfileImageBtn?.addEventListener('click', () => this.removeProfileImage());
+        profileImageInput?.addEventListener('change', (e) => this.handleProfileImageSelection(e));
         saveWorksiteSettingsBtn?.addEventListener('click', () => this.saveWorksiteSettings());
         clearLocalSettingsBtn?.addEventListener('click', () => this.clearLocalSettings());
 
@@ -624,6 +630,87 @@ class App {
     // 🎨 UI HELPERS
     // ============================================
 
+    updateLayoutMode(mode = 'auth') {
+        const body = document.body;
+        if (!body) return;
+        body.classList.toggle('auth-mode', mode === 'auth');
+        body.classList.toggle('app-mode', mode === 'app');
+    }
+
+    getUserAvatarStorageKey(user = window.user) {
+        const role = user?.role || (user?.isAdmin ? 'admin' : 'employee');
+        const identifier = role === 'admin' ? (user?.username || 'admin') : (user?.code || 'unknown');
+        return `axentro_avatar_${role}_${String(identifier).trim().toLowerCase()}`;
+    }
+
+    getResolvedProfileImage(user = window.user) {
+        const fallback = (() => {
+            try { return localStorage.getItem(this.getUserAvatarStorageKey(user)) || ''; } catch (_) { return ''; }
+        })();
+        return window.userImage || user?.profile_image_url || fallback || '';
+    }
+
+    syncProfileAvatarUI(profileImage = '', user = window.user) {
+        const userAvatar = document.getElementById('userAvatar');
+        const adminAvatar = document.getElementById('adminUserAvatar');
+        const settingsAvatar = document.getElementById('settingsProfileAvatar');
+        const settingsFallback = document.getElementById('settingsProfileFallback');
+        [userAvatar, adminAvatar, settingsAvatar].forEach((avatar) => {
+            if (!avatar) return;
+            if (profileImage) {
+                avatar.src = `${profileImage}${profileImage.includes('?') ? '&' : '?'}t=${Date.now()}`;
+                avatar.style.display = 'block';
+            } else {
+                avatar.removeAttribute('src');
+                avatar.style.display = 'none';
+            }
+        });
+        if (settingsFallback) settingsFallback.style.display = profileImage ? 'none' : 'flex';
+        if (userAvatar && !profileImage) userAvatar.style.display = 'none';
+        if (adminAvatar && !profileImage) adminAvatar.style.display = 'none';
+    }
+
+    async optimizeProfileImage(file) {
+        if (!file) throw new Error('لم يتم اختيار ملف');
+        const allowed = AppConfig?.supabase?.storage?.allowedTypes || ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowed.includes(file.type)) throw new Error('نوع الصورة غير مدعوم');
+
+        return await new Promise((resolve, reject) => {
+            const objectUrl = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    const minSide = Math.min(img.naturalWidth || img.width, img.naturalHeight || img.height);
+                    const sx = Math.max(0, ((img.naturalWidth || img.width) - minSide) / 2);
+                    const sy = Math.max(0, ((img.naturalHeight || img.height) - minSide) / 2);
+                    const targetSize = 720;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = targetSize;
+                    canvas.height = targetSize;
+                    const ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, targetSize, targetSize);
+                    canvas.toBlob((blob) => {
+                        URL.revokeObjectURL(objectUrl);
+                        if (!blob) {
+                            reject(new Error('تعذر تجهيز الصورة')); return;
+                        }
+                        resolve(blob);
+                    }, 'image/jpeg', 0.9);
+                } catch (error) {
+                    URL.revokeObjectURL(objectUrl);
+                    reject(error);
+                }
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error('فشل قراءة الصورة المختارة'));
+            };
+            img.src = objectUrl;
+        });
+    }
+
     hideAllPages() {
         const pages = ['loginPage', 'registerPage', 'forgotPasswordPage', 'dashboardPage', 'adminPage'];
         pages.forEach((id) => {
@@ -656,6 +743,7 @@ class App {
     }
 
     showLoginScreen() {
+        this.updateLayoutMode('auth');
         this.hideAllPages();
         const loginPage = document.getElementById('loginPage');
         if (loginPage) {
@@ -669,6 +757,7 @@ class App {
             this.showLoginScreen();
             return;
         }
+        this.updateLayoutMode('app');
         this.applyUserContextToDashboard();
         this.hideAllPages();
 
@@ -713,19 +802,9 @@ class App {
             userCodeDisplay.textContent = `CODE: ${displayCode}`;
         }
 
-        const profileImage = window.userImage || user.profile_image_url || '';
-        const userAvatar = document.getElementById('userAvatar');
-        const adminAvatar = document.getElementById('adminUserAvatar');
-        [userAvatar, adminAvatar].forEach((avatar) => {
-            if (!avatar) return;
-            if (profileImage) {
-                avatar.src = `${profileImage}${profileImage.includes('?') ? '&' : '?'}t=${Date.now()}`;
-                avatar.style.display = 'block';
-            } else {
-                avatar.removeAttribute('src');
-                avatar.style.display = 'none';
-            }
-        });
+        const profileImage = this.getResolvedProfileImage(user);
+        window.userImage = profileImage || '';
+        this.syncProfileAvatarUI(profileImage, user);
 
         if (adminPanelBtn) {
             adminPanelBtn.style.display = isAdmin ? 'inline-flex' : 'none';
@@ -763,6 +842,7 @@ class App {
     }
 
     showRegisterScreen() {
+        this.updateLayoutMode('auth');
         this.hideAllPages();
         const registerPage = document.getElementById('registerPage');
         if (registerPage) {
@@ -860,6 +940,7 @@ class App {
             Promise.resolve(window.attendance.loadWorksitePolicy(true)).then((site) => this.populateWorksiteFields(site));
         }
 
+        this.syncProfileAvatarUI(this.getResolvedProfileImage(window.user), window.user);
         ui?.openModal?.('settingsModal');
     }
 
@@ -878,14 +959,25 @@ class App {
     }
 
     async promptFaceUpdate() {
-        const password = prompt('أدخل كلمة المرور الحالية لتحديث بصمة الوجه');
+        const password = typeof ui !== 'undefined' && ui?.showPrompt
+            ? await ui.showPrompt({
+                title: 'تأكيد تحديث بصمة الوجه',
+                message: 'لحماية الحساب، أدخل كلمة المرور الحالية ثم تابع فتح الكاميرا لتحديث بصمة الوجه.',
+                placeholder: 'كلمة المرور الحالية',
+                confirmText: 'متابعة',
+                cancelText: 'إلغاء',
+                type: 'warning',
+                inputType: 'password',
+                errorMessage: 'كلمة المرور الحالية مطلوبة'
+            })
+            : prompt('أدخل كلمة المرور الحالية لتحديث بصمة الوجه');
         if (password === null) return;
         const identifier = window.user?.role === 'admin' ? (window.user?.username || 'admin') : window.user?.code;
-        if (!identifier || !password.trim()) {
+        if (!identifier || !String(password).trim()) {
             showToast('كلمة المرور الحالية مطلوبة', 'error');
             return;
         }
-        const verify = await db.signIn(identifier, password.trim());
+        const verify = await db.signIn(identifier, String(password).trim());
         if (!verify?.success) {
             showToast(verify?.error || 'كلمة المرور الحالية غير صحيحة', 'error');
             return;
@@ -898,6 +990,61 @@ class App {
         window.adminResetFaceMode = false;
         ui?.closeModal?.('settingsModal');
         await openCamera?.();
+    }
+
+    async handleProfileImageSelection(event) {
+        const input = event?.target;
+        const file = input?.files?.[0];
+        if (!file || !window.user) return;
+        try {
+            const optimizedBlob = await this.optimizeProfileImage(file);
+            const upload = await db?.uploadProfileImage?.(window.user, optimizedBlob);
+            if (!upload?.success || !upload?.imageUrl) {
+                throw new Error(upload?.error || 'فشل رفع الصورة الشخصية');
+            }
+            const update = await db?.updateUserProfileImage?.(window.user, upload.imageUrl);
+            if (!update?.success) {
+                console.warn('Profile image db sync warning:', update?.error);
+            }
+            window.user.profile_image_url = upload.imageUrl;
+            window.userImage = upload.imageUrl;
+            try { localStorage.setItem(this.getUserAvatarStorageKey(window.user), upload.imageUrl); } catch (_) {}
+            if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
+            this.syncProfileAvatarUI(upload.imageUrl, window.user);
+            this.applyUserContextToDashboard();
+            showToast('تم تحديث الصورة الشخصية بنجاح', 'success');
+        } catch (error) {
+            console.error('Profile image selection error:', error);
+            showToast(error.message || 'تعذر تحديث الصورة الشخصية', 'error');
+        } finally {
+            if (input) input.value = '';
+        }
+    }
+
+    async removeProfileImage() {
+        if (!window.user) return;
+        const confirmed = typeof ui !== 'undefined' && ui?.showConfirmation
+            ? await ui.showConfirmation({
+                title: 'إزالة الصورة الشخصية',
+                message: 'سيتم حذف الأفاتار الحالي فقط، ولن تتأثر بصمة الوجه المسجلة. هل تريد المتابعة؟',
+                confirmText: 'إزالة الصورة',
+                cancelText: 'إلغاء',
+                type: 'warning'
+            })
+            : confirm('سيتم حذف الصورة الشخصية فقط. هل تريد المتابعة؟');
+        if (!confirmed) return;
+        const result = await db?.removeProfileImage?.(window.user);
+        if (!result?.success) {
+            showToast(result?.error || 'تعذر إزالة الصورة الشخصية', 'error');
+            return;
+        }
+        window.user.profile_image_url = '';
+        window.userImage = '';
+        try { localStorage.removeItem(this.getUserAvatarStorageKey(window.user)); } catch (_) {}
+        if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
+        this.syncProfileAvatarUI('', window.user);
+        this.applyUserContextToDashboard();
+        showToast('تمت إزالة الصورة الشخصية', 'success');
     }
 
     async saveWorksiteSettings() {
@@ -1088,10 +1235,12 @@ if (typeof window !== 'undefined') {
         const registerPage = document.getElementById('registerPage');
         const forgotPasswordPage = document.getElementById('forgotPasswordPage');
         const dashboardPage = document.getElementById('dashboardPage');
+        const adminPage = document.getElementById('adminPage');
         const appRoot = document.getElementById('app');
         if (appRoot) appRoot.classList.remove('hidden');
-        [loginPage, registerPage, dashboardPage].forEach(el => el?.classList.remove('active'));
-        forgotPasswordPage?.classList.add('active');
+        window.app?.updateLayoutMode?.('auth');
+        [loginPage, registerPage, dashboardPage, adminPage].forEach(el => { if (el) { el.classList.remove('active'); el.style.display = 'none'; } });
+        if (forgotPasswordPage) { forgotPasswordPage.style.display = 'block'; forgotPasswordPage.classList.add('active'); }
     };
     window.showApp = () => window.app?.showMainApp?.();
 }

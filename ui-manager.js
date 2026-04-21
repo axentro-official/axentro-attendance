@@ -310,6 +310,90 @@ class UIManager {
         return icons[type] || icons.info;
     }
 
+    async showPrompt(options = {}) {
+        const {
+            title = 'إدخال مطلوب',
+            message = 'يرجى إدخال القيمة المطلوبة.',
+            placeholder = '',
+            confirmText = 'متابعة',
+            cancelText = 'إلغاء',
+            type = 'info',
+            inputType = 'text',
+            required = true,
+            value = '',
+            errorMessage = 'هذا الحقل مطلوب'
+        } = options;
+
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay confirmation-modal prompt-modal';
+
+            overlay.innerHTML = `
+                <div class="modal-content confirmation-content">
+                    <div class="confirmation-header">
+                        <h3>${this.getConfirmationIcon(type)} ${Utils.sanitizeHTML(title)}</h3>
+                    </div>
+                    <div class="confirmation-body">
+                        <p class="prompt-message">${Utils.sanitizeHTML(message)}</p>
+                        <div class="prompt-input-wrap">
+                            <input type="${inputType === 'password' ? 'password' : 'text'}" class="prompt-input" id="uiPromptInput" placeholder="${Utils.sanitizeHTML(placeholder)}" value="${Utils.sanitizeHTML(String(value || ''))}" autocomplete="${inputType === 'password' ? 'current-password' : 'off'}">
+                            ${inputType === 'password' ? '<button type="button" class="prompt-password-toggle" id="togglePromptPassword"><i class="fas fa-eye"></i></button>' : ''}
+                        </div>
+                        <div class="prompt-error" id="uiPromptError">${Utils.sanitizeHTML(errorMessage)}</div>
+                    </div>
+                    <div class="confirmation-actions">
+                        <button class="btn btn-outline" id="promptCancelBtn">${Utils.sanitizeHTML(cancelText)}</button>
+                        <button class="btn btn-${type === 'danger' ? 'danger' : 'primary'}" id="promptOkBtn">${Utils.sanitizeHTML(confirmText)}</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+            requestAnimationFrame(() => overlay.classList.add('show'));
+
+            const input = overlay.querySelector('#uiPromptInput');
+            const errorEl = overlay.querySelector('#uiPromptError');
+            const cleanup = (result) => {
+                overlay.classList.remove('show');
+                setTimeout(() => {
+                    if (overlay.parentElement) overlay.parentElement.removeChild(overlay);
+                }, 300);
+                resolve(result);
+            };
+
+            const submit = () => {
+                const currentValue = String(input?.value || '').trim();
+                if (required && !currentValue) {
+                    errorEl?.classList.add('show');
+                    input?.focus();
+                    return;
+                }
+                cleanup(currentValue || null);
+            };
+
+            overlay.querySelector('#promptCancelBtn')?.addEventListener('click', () => cleanup(null));
+            overlay.querySelector('#promptOkBtn')?.addEventListener('click', submit);
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) cleanup(null);
+            });
+            input?.addEventListener('input', () => errorEl?.classList.remove('show'));
+            input?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submit();
+                }
+            });
+            overlay.querySelector('#togglePromptPassword')?.addEventListener('click', () => {
+                if (!input) return;
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                const icon = overlay.querySelector('#togglePromptPassword i');
+                if (icon) icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+            });
+            setTimeout(() => input?.focus(), 50);
+        });
+    }
+
     // ============================================
     // 🪟 MODAL MANAGEMENT
     // ============================================

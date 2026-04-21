@@ -707,7 +707,18 @@ window.adminDeleteEmp = function(code, name) {
 };
 
 window.adminResetFace = async function(code, name) {
-    const password = prompt(`أدخل كلمة المرور الحالية لحسابك لتحديث بصمة ${name}`);
+    const password = typeof ui !== 'undefined' && ui?.showPrompt
+        ? await ui.showPrompt({
+            title: 'تأكيد تحديث بصمة الوجه',
+            message: `أدخل كلمة المرور الحالية لحسابك قبل فتح الكاميرا لتحديث بصمة الوجه الخاصة بـ ${name}.`,
+            placeholder: 'كلمة المرور الحالية',
+            confirmText: 'متابعة',
+            cancelText: 'إلغاء',
+            type: 'warning',
+            inputType: 'password',
+            errorMessage: 'كلمة المرور الحالية مطلوبة'
+        })
+        : prompt(`أدخل كلمة المرور الحالية لحسابك لتحديث بصمة ${name}`);
     if (password === null) return;
     const identifier = window.user?.role === 'admin' ? (window.user?.username || 'admin') : window.user?.code;
     const verify = await db?.signIn?.(identifier, String(password || '').trim());

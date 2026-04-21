@@ -784,6 +784,9 @@ class AuthManager {
     // ============================================
 
     showRegisterScreen() {
+        if (typeof app !== 'undefined' && app?.updateLayoutMode) {
+            app.updateLayoutMode('auth');
+        }
         if (typeof app !== 'undefined' && app?.hideAllPages) {
             app.hideAllPages();
         }
@@ -800,6 +803,9 @@ class AuthManager {
     }
 
     showLoginScreen() {
+        if (typeof app !== 'undefined' && app?.updateLayoutMode) {
+            app.updateLayoutMode('auth');
+        }
         if (typeof app !== 'undefined' && app?.hideAllPages) {
             app.hideAllPages();
         }
