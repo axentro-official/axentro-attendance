@@ -211,18 +211,23 @@ class SupabaseClient {
 
     async createEmployee(employeeData) {
         try {
-            const generatedPassword = employeeData.password || 'Ax@' + Math.random().toString(36).slice(-8) + '1!';
+            const generatedPassword = employeeData.password || ('Ax@' + Math.random().toString(36).slice(-8) + '1!');
             const sessionToken = this.getSessionToken();
-            const params = {
+            const baseParams = {
                 p_name: employeeData.name?.trim(),
                 p_email: employeeData.email || null,
                 p_plain_password: generatedPassword,
                 p_face_descriptor: employeeData.faceDescriptor || null,
                 p_profile_image_url: employeeData.profileImageUrl || null
             };
-            if (sessionToken) params.p_session_token = sessionToken;
 
-            const { data, error } = await this.rpc(AppConfig.supabase.rpc.createEmployee, params);
+            let response;
+            if (sessionToken) {
+                response = await this.rpc(AppConfig.supabase.rpc.createEmployee, { p_session_token: sessionToken, ...baseParams });
+            } else {
+                response = await this.rpc(AppConfig.supabase.rpc.createEmployee, baseParams);
+            }
+            const { data, error } = response;
             if (error) throw error;
             const payload = this.normalizePayload(data);
             if (!payload?.success) return payload || { success: false, error: 'Unknown error' };

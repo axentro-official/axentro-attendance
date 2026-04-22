@@ -956,8 +956,13 @@ class App {
         }
 
         if (isAdmin && window.attendance?.loadWorksitePolicy) {
-            Promise.resolve(window.attendance.loadWorksitePolicy(true)).then((site) => this.populateWorksiteFields(site));
+            Promise.resolve(window.attendance.loadWorksitePolicy(true)).then((site) => { this.populateWorksiteFields(site); setTimeout(() => document.getElementById('worksiteSettingsSection')?.scrollIntoView({behavior:'smooth', block:'start'}), 120); });
         }
+
+        const extractBtn = document.getElementById('extractWorksiteMapBtn');
+        if (extractBtn && !extractBtn.dataset.bound) { extractBtn.addEventListener('click', () => this.extractWorksiteFromMapUrl()); extractBtn.dataset.bound = '1'; }
+        const currentLocBtn = document.getElementById('useCurrentWorksiteLocationBtn');
+        if (currentLocBtn && !currentLocBtn.dataset.bound) { currentLocBtn.addEventListener('click', () => this.useCurrentLocationForWorksite()); currentLocBtn.dataset.bound = '1'; }
 
         this.syncProfileAvatarUI(this.getResolvedProfileImage(window.user), window.user);
         ui?.openModal?.('settingsModal');
@@ -979,7 +984,7 @@ class App {
         });
         const summary = document.getElementById('worksiteSummaryCard');
         if (summary) {
-            summary.innerHTML = `<strong>${site.name || 'المقر الرئيسي'}</strong><br>Latitude: ${site.latitude ?? '-'} | Longitude: ${site.longitude ?? '-'}<br>المسافة المسموح بها: ${site.allowed_radius_meters ?? '-'} متر - أقصى دقة: ${site.max_accuracy_meters ?? '-'} متر`;
+            summary.innerHTML = `<strong>${site.name || 'المقر الرئيسي'}</strong><br>${site.map_url ? `رابط الخريطة: <a href="${site.map_url}" target="_blank" style="color:#93c5fd">فتح الموقع</a><br>` : ''}Latitude: ${site.latitude ?? '-'} | Longitude: ${site.longitude ?? '-'}<br>المسافة المسموح بها: ${site.allowed_radius_meters ?? '-'} متر - أقصى دقة: ${site.max_accuracy_meters ?? '-'} متر`;
         }
     }
 

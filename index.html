@@ -817,6 +817,18 @@
                 <h4><i class="fas fa-location-dot"></i> إعدادات المقر</h4>
                 <div class="settings-grid two-columns">
                     <div class="input-group">
+                        <label for="worksiteName"><i class="fas fa-building"></i> اسم المقر</label>
+                        <input type="text" id="worksiteName" placeholder="المقر الرئيسي">
+                    </div>
+                    <div class="input-group" style="grid-column:1 / -1;">
+                        <label for="worksiteMapUrl"><i class="fas fa-link"></i> رابط Google Maps</label>
+                        <input type="url" id="worksiteMapUrl" placeholder="الصق رابط الموقع من Google Maps">
+                    </div>
+                    <div class="settings-actions-grid" style="grid-column:1 / -1; margin-bottom:8px;">
+                        <button type="button" class="btn btn-secondary" id="extractWorksiteMapBtn"><i class="fas fa-wand-magic-sparkles"></i> استخراج الإحداثيات من الرابط</button>
+                        <button type="button" class="btn btn-secondary" id="useCurrentWorksiteLocationBtn"><i class="fas fa-location-crosshairs"></i> استخدام موقعي الحالي</button>
+                    </div>
+                    <div class="input-group">
                         <label for="worksiteLatitude"><i class="fas fa-location-arrow"></i> Latitude</label>
                         <input type="number" step="any" id="worksiteLatitude" placeholder="30.000000">
                     </div>
@@ -825,14 +837,15 @@
                         <input type="number" step="any" id="worksiteLongitude" placeholder="31.000000">
                     </div>
                     <div class="input-group">
-                        <label for="worksiteAllowedRadius"><i class="fas fa-circle-dot"></i> allowed_radius_meters</label>
+                        <label for="worksiteAllowedRadius"><i class="fas fa-circle-dot"></i> المسافة المسموحة بالمتر</label>
                         <input type="number" step="1" id="worksiteAllowedRadius" placeholder="500">
                     </div>
                     <div class="input-group">
-                        <label for="worksiteMaxAccuracy"><i class="fas fa-crosshairs"></i> max_accuracy_meters</label>
+                        <label for="worksiteMaxAccuracy"><i class="fas fa-crosshairs"></i> أقصى دقة GPS بالمتر</label>
                         <input type="number" step="1" id="worksiteMaxAccuracy" placeholder="50">
                     </div>
                 </div>
+                <div id="worksiteSummaryCard" class="hint-card" style="margin:12px 0 16px;padding:12px 14px;border-radius:14px;background:rgba(59,130,246,0.08);color:#dbeafe;line-height:1.7;">لم يتم تحميل بيانات المقر بعد.</div>
                 <button type="button" class="btn btn-primary btn-block" id="saveWorksiteSettingsBtn">
                     <i class="fas fa-save"></i>
                     حفظ إعدادات المقر

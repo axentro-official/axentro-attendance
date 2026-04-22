@@ -5,9 +5,9 @@
  * ============================================
  */
 
-const CACHE_NAME = 'axentro-v5-local-models-2';
-const STATIC_CACHE = 'axentro-static-vfast-5-local-models-2';
-const DYNAMIC_CACHE = 'axentro-dynamic-vfast-5-local-models-2';
+const CACHE_NAME = 'axentro-v6-local-models-3';
+const STATIC_CACHE = 'axentro-static-v6-local-models-3';
+const DYNAMIC_CACHE = 'axentro-dynamic-v6-local-models-3';
 
 // ============================================
 // 📦 FILES TO PRECACHE (App Shell)
@@ -94,7 +94,7 @@ self.addEventListener('install', event => {
             ),
             
             // Pre-cache face models in background
-            caches.open('face-models-v5-local-2').then(cache => {
+            caches.open('face-models-v6-local-3').then(cache => {
                 console.log('🤖 Caching face recognition models...');
                 return Promise.allSettled(
                     FACE_MODEL_URLS.map(url => 
@@ -125,7 +125,7 @@ self.addEventListener('activate', event => {
                     cacheNames
                         .filter(name => name !== STATIC_CACHE && 
                                      name !== DYNAMIC_CACHE && 
-                                     name !== 'face-models-v5-local-2')
+                                     name !== 'face-models-v6-local-3')
                         .map(name => {
                             console.log('🗑️ Deleting old cache:', name);
                             return caches.delete(name);
@@ -202,7 +202,7 @@ self.addEventListener('fetch', event => {
                     
                     // Not in cache - fetch from network
                     return fetch(event.request).then(networkResponse => {
-                        if (networkResponse.ok) {
+                        if (networkResponse.ok && networkResponse.status === 200) {
                             cache.put(event.request, networkResponse.clone());
                         }
                         return networkResponse;
@@ -224,7 +224,7 @@ self.addEventListener('fetch', event => {
             fetch(event.request)
                 .then(networkResponse => {
                     // Cache successful responses
-                    if (networkResponse.ok) {
+                    if (networkResponse.ok && networkResponse.status === 200) {
                         const responseClone = networkResponse.clone();
                         caches.open(DYNAMIC_CACHE).then(cache => {
                             cache.put(event.request, responseClone);
@@ -259,7 +259,7 @@ self.addEventListener('fetch', event => {
             return cache.match(event.request).then(cachedResponse => {
                 const fetchedPromise = fetch(event.request)
                     .then(networkResponse => {
-                        if (networkResponse.ok) {
+                        if (networkResponse.ok && networkResponse.status === 200) {
                             cache.put(event.request, networkResponse.clone());
                         }
                         return networkResponse;

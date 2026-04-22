@@ -450,6 +450,7 @@ password: ''
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
+                        <div id="firstNewPwError" style="display:none;margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(239,68,68,.12);color:#fecaca;line-height:1.7;"></div>
                         <div class="btn-row">
                             <button type="button" class="btn btn-primary" onclick="submitFirstPwChange()">حفظ ومتابعة</button>
                         </div>
@@ -546,9 +547,13 @@ password: ''
     async submitFirstPwChange() {
         const newPwInput = document.getElementById('firstNewPw');
         const newPw = newPwInput?.value?.trim();
-        if (!newPw || !Validator?.validatePassword?.(newPw)?.isValid) {
+        const firstPwError = document.getElementById('firstNewPwError');
+        const validation = Validator?.validatePassword?.(newPw);
+        if (!newPw || !validation?.isValid) {
+            if (firstPwError) { firstPwError.style.display = 'block'; firstPwError.textContent = 'كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز'; }
             return this.toast('كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز', 'error');
         }
+        if (firstPwError) { firstPwError.style.display = 'none'; firstPwError.textContent = ''; }
         this.setStatus('جاري التغيير...');
         try {
             if (!window.user) throw new Error('User not available');
@@ -766,20 +771,19 @@ password: ''
             }
 
             if (!resetToken || !newPassword) {
-                const result = await db.requestPasswordReset(identifier, true);
+                const result = await db.requestPasswordReset(identifier, false);
                 if (!result?.success) {
                     this.toast(result?.error || 'تعذر إنشاء رمز التعيين', 'error');
                     return;
                 }
 
                 const email = result.email || '';
-                const resetCode = result.reset_token || '';
-                if (!email || !resetCode) {
-                    this.toast('تعذر تجهيز بريد إعادة التعيين لهذا الحساب', 'error');
+                if (!email) {
+                    this.toast('لا يوجد بريد إلكتروني مسجل لهذا الحساب', 'error');
                     return;
                 }
 
-                if (AppConfig?.emailService?.url) {
+                if (AppConfig?.emailService?.url && result.reset_token) {
                     await fetch(AppConfig.emailService.url, {
                         method: 'POST',
                         mode: 'no-cors',
@@ -789,7 +793,7 @@ password: ''
                             name: result.name || 'مستخدم النظام',
                             code: result.identifier || identifier,
                             email,
-                            resetCode,
+                            resetCode: result.reset_token,
                             accountType: result.role || 'user'
                         })
                     }).catch(() => {});

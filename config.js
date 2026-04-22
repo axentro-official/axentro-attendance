@@ -127,7 +127,7 @@ const AppConfig = {
     liveness: {
         enabled: true,
         headMovementThreshold: 0.08,
-        stableFramesRequired: 6,
+        stableFramesRequired: 4,
         stabilityRing: {
             circumference: 126,
             radius: 20
