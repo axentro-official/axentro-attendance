@@ -38,6 +38,7 @@ const AppConfig = {
             getTodayAttendance: 'get_today_attendance_secure',
             getAttendanceByRange: 'get_attendance_by_range_secure',
             updateProfileImage: 'update_profile_image_secure',
+            updateAvatarImage: 'update_avatar_image_secure',
             deleteEmployee: 'delete_employee_secure',
             updateEmployee: 'update_employee_secure',
             logSensitiveAction: 'log_sensitive_action'

@@ -546,8 +546,8 @@ password: ''
     async submitFirstPwChange() {
         const newPwInput = document.getElementById('firstNewPw');
         const newPw = newPwInput?.value?.trim();
-        if (!newPw || newPw.length < 4) {
-            return this.toast('كلمة السر ضعيفة (4 أحرف على الأقل)', 'error');
+        if (!newPw || !Validator?.validatePassword?.(newPw)?.isValid) {
+            return this.toast('كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز', 'error');
         }
         this.setStatus('جاري التغيير...');
         try {
@@ -771,10 +771,32 @@ password: ''
                     this.toast(result?.error || 'تعذر إنشاء رمز التعيين', 'error');
                     return;
                 }
-                const tokenInput = document.getElementById('forgotResetToken');
-                if (tokenInput) tokenInput.value = result.reset_token || '';
-                if (helper) helper.innerHTML = `تم إنشاء رمز إعادة التعيين: <strong>${result.reset_token || '---'}</strong> - صالح لمدة ${result.expires_in_minutes || 15} دقيقة.`;
-                this.toast('تم إنشاء رمز إعادة التعيين. أدخل كلمة المرور الجديدة ثم أعد الضغط على الزر.', 'success');
+
+                const email = result.email || '';
+                const resetCode = result.reset_token || '';
+                if (!email || !resetCode) {
+                    this.toast('تعذر تجهيز بريد إعادة التعيين لهذا الحساب', 'error');
+                    return;
+                }
+
+                if (AppConfig?.emailService?.url) {
+                    await fetch(AppConfig.emailService.url, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'sendResetCode',
+                            name: result.name || 'مستخدم النظام',
+                            code: result.identifier || identifier,
+                            email,
+                            resetCode,
+                            accountType: result.role || 'user'
+                        })
+                    }).catch(() => {});
+                }
+
+                if (helper) helper.textContent = `تم إرسال رمز إعادة التعيين إلى البريد الإلكتروني المسجل للحساب. صالح لمدة ${result.expires_in_minutes || 15} دقيقة.`;
+                this.toast('تم إرسال رمز إعادة التعيين إلى البريد الإلكتروني المسجل.', 'success');
                 return;
             }
 

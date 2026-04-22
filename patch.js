@@ -94,7 +94,7 @@
     const user = window.user || {};
     const isAdmin = user.role === 'admin' || user.isAdmin;
     const fallback = ((user.name || user.display_name || user.username || user.code || 'U').trim()[0] || 'U').toUpperCase();
-    const image = user.profile_image_url || window.userImage || '';
+    const image = user.avatar_image_url || window.userAvatarImage || user.profile_image_url || window.userImage || '';
 
     const userInfoBlocks = [
       qs('#dashboardPage .dashboard-header .user-info'),
@@ -230,7 +230,7 @@
     const user = window.user || {};
     const name = user.name || user.display_name || user.username || user.code || 'مستخدم';
     const code = user.code || user.username || '';
-    const image = user.profile_image_url || window.userImage || '';
+    const image = user.avatar_image_url || window.userAvatarImage || user.profile_image_url || window.userImage || '';
     const fallback = (String(name).trim()[0] || 'U').toUpperCase();
     holder.innerHTML = `
       ${buildAvatarMarkup(image, fallback)}

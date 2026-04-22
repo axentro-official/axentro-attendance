@@ -449,28 +449,8 @@ class AttendanceManager {
         // Get shift selection
         const selShift = document.querySelector('input[name="shift"]:checked');
         
-        // Calculate hours worked for check-out
+        // Backend now calculates hours worked securely
         let hoursWorked = null;
-
-        if (window.attType === 'انصراف') {
-            const today = new Date().toISOString().split('T')[0];
-            
-            if (typeof db !== 'undefined') {
-                const { data: lastCheckIn } = await db.from('attendance')
-                    .select('created_at')
-                    .eq('employee_code', window.user.code)
-                    .eq('type', 'حضور')
-                    .gte('created_at', today)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
-
-                if (lastCheckIn) {
-                    const diff = (new Date() - new Date(lastCheckIn.created_at)) / (1000 * 60 * 60);
-                    hoursWorked = diff.toFixed(2);
-                }
-            }
-        }
 
         // Format datetime
         const now = new Date();

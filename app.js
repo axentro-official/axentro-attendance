@@ -655,7 +655,7 @@ class App {
         const fallback = (() => {
             try { return localStorage.getItem(this.getUserAvatarStorageKey(user)) || ''; } catch (_) { return ''; }
         })();
-        const serverImage = window.userImage || user?.profile_image_url || '';
+        const serverImage = window.userAvatarImage || user?.avatar_image_url || window.userImage || user?.profile_image_url || '';
         if (serverImage) {
             try { localStorage.setItem(this.getUserAvatarStorageKey(user), serverImage); } catch (_) {}
             return serverImage;
@@ -1070,8 +1070,8 @@ class App {
             if (!update?.success) {
                 console.warn('Profile image db sync warning:', update?.error);
             }
-            window.user.profile_image_url = upload.imageUrl;
-            window.userImage = upload.imageUrl;
+            window.user.avatar_image_url = upload.imageUrl;
+            window.userAvatarImage = upload.imageUrl;
             try { localStorage.setItem(this.getUserAvatarStorageKey(window.user), upload.imageUrl); } catch (_) {}
             if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
             this.syncProfileAvatarUI(upload.imageUrl, window.user);
@@ -1102,8 +1102,8 @@ class App {
             showToast(result?.error || 'تعذر إزالة الصورة الشخصية', 'error');
             return;
         }
-        window.user.profile_image_url = '';
-        window.userImage = '';
+        window.user.avatar_image_url = '';
+        window.userAvatarImage = '';
         try { localStorage.removeItem(this.getUserAvatarStorageKey(window.user)); } catch (_) {}
         if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
         this.syncProfileAvatarUI('', window.user);

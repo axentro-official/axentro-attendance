@@ -263,13 +263,8 @@ class AdminManager {
         try {
             if (typeof db === 'undefined') throw new Error('Database not available');
 
-            const { data: employee, error } = await db.from('employees')
-                .select('*')
-                .eq('code', code)
-                .single();
-
-            if (error || !employee) throw new Error('الموظف غير موجود');
-
+            const employee = this.employeesList.find(emp => String(emp.code || '').toUpperCase() === String(code || '').toUpperCase());
+            if (!employee) throw new Error('الموظف غير موجود');
             this.selectedEmployee = employee;
             
             // Show details modal or panel
@@ -489,10 +484,7 @@ class AdminManager {
             // Send email notification
             if (AppConfig?.emailService?.url) {
                 try {
-                    const { data: emp } = await db.from('employees')
-                        .select('name, email')
-                        .eq('code', code)
-                        .single();
+                    const emp = this.employeesList.find(item => String(item.code || '').toUpperCase() === String(code || '').toUpperCase());
 
                     if (emp) {
                         fetch(AppConfig.emailService.url, {
@@ -523,27 +515,25 @@ class AdminManager {
         try {
             if (typeof db === 'undefined') return null;
 
-            const today = new Date().toISOString().split('T')[0];
-            const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+            const employees = Array.isArray(this.employeesList) && this.employeesList.length
+                ? this.employeesList
+                : await db.getAllEmployees();
+            const todayAtt = await db.getTodayAttendance();
 
-            // Today's stats
-            const { data: todayAtt, count: todayCount } = await db.from('attendance')
-                .select('type', { count: 'exact' })
-                .gte('created_at', today);
-
-            const todayCheckIns = todayAtt?.filter(a => a.type === 'حضور').length || 0;
-            const todayCheckOuts = todayAtt?.filter(a => a.type === 'انصراف').length || 0;
-
-            // This month stats
-            const { data: monthData } = await db.from('employees')
-                .select('code', { count: 'exact' })
-                .eq('is_deleted', false);
+            const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+            const todayCheckIns = (todayAtt || []).filter(a => a.type === 'حضور').length || 0;
+            const todayCheckOuts = (todayAtt || []).filter(a => a.type === 'انصراف').length || 0;
+            const activeEmployees = (employees || []).filter(emp => !emp.is_deleted);
+            const registeredThisMonth = activeEmployees.filter(emp => {
+                if (!emp.created_at) return false;
+                return new Date(emp.created_at) >= monthStart;
+            }).length;
 
             return {
-                totalEmployees: monthData?.length || 0,
+                totalEmployees: activeEmployees.length || 0,
                 todayCheckIns,
                 todayCheckOuts,
-                registeredThisMonth: monthData?.length || 0
+                registeredThisMonth
             };
 
         } catch(e) {
@@ -758,10 +748,11 @@ window.handleFaceUpdateCapture = async function(descriptor) {
             if (imageUrl) {
                 window.userImage = imageUrl;
                 window.user.profile_image_url = imageUrl;
+                if (!window.user.avatar_image_url) window.user.avatar_image_url = imageUrl;
                 try {
                     const role = window.user?.role || (window.user?.isAdmin ? 'admin' : 'employee');
                     const identifier = role === 'admin' ? (window.user?.username || 'admin') : (window.user?.code || 'unknown');
-                    localStorage.setItem(`axentro_avatar_${role}_${String(identifier).trim().toLowerCase()}`, imageUrl);
+                    if (!window.user?.avatar_image_url) localStorage.setItem(`axentro_avatar_${role}_${String(identifier).trim().toLowerCase()}`, imageUrl);
                 } catch (_) {}
                 if (window.app?.syncProfileAvatarUI) window.app.syncProfileAvatarUI(imageUrl, window.user);
             }

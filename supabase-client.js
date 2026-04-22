@@ -212,14 +212,17 @@ class SupabaseClient {
     async createEmployee(employeeData) {
         try {
             const generatedPassword = employeeData.password || 'Ax@' + Math.random().toString(36).slice(-8) + '1!';
-            const { data, error } = await this.rpc(AppConfig.supabase.rpc.createEmployee, {
-                ...this.getSessionHeaders(),
+            const sessionToken = this.getSessionToken();
+            const params = {
                 p_name: employeeData.name?.trim(),
                 p_email: employeeData.email || null,
                 p_plain_password: generatedPassword,
                 p_face_descriptor: employeeData.faceDescriptor || null,
                 p_profile_image_url: employeeData.profileImageUrl || null
-            });
+            };
+            if (sessionToken) params.p_session_token = sessionToken;
+
+            const { data, error } = await this.rpc(AppConfig.supabase.rpc.createEmployee, params);
             if (error) throw error;
             const payload = this.normalizePayload(data);
             if (!payload?.success) return payload || { success: false, error: 'Unknown error' };
@@ -236,7 +239,7 @@ class SupabaseClient {
                         email: employeeData.email,
                         password: generatedPassword
                     })
-                });
+                }).catch(() => {});
             }
 
             return { success: true, employee_code: payload.employee_code || payload.employeeCode || payload.code, generatedPassword };
@@ -294,6 +297,35 @@ class SupabaseClient {
         } catch (error) {
             console.error('❌ Record attendance secure error:', error);
             return { success: false, error: error.message || 'فشل تسجيل الحضور' };
+        }
+    }
+
+
+    async getTodayAttendance() {
+        try {
+            const { data, error } = await this.rpc(AppConfig.supabase.rpc.getTodayAttendance, this.getSessionHeaders());
+            if (error) throw error;
+            const payload = this.normalizePayload(data);
+            return payload?.attendance || payload?.records || [];
+        } catch (error) {
+            console.error('❌ Get today attendance error:', error);
+            return [];
+        }
+    }
+
+    async getAttendanceByRange(dateFrom = null, dateTo = null) {
+        try {
+            const { data, error } = await this.rpc(AppConfig.supabase.rpc.getAttendanceByRange, {
+                ...this.getSessionHeaders(),
+                p_date_from: dateFrom || null,
+                p_date_to: dateTo || null
+            });
+            if (error) throw error;
+            const payload = this.normalizePayload(data);
+            return payload?.attendance || payload?.records || [];
+        } catch (error) {
+            console.error('❌ Get attendance by range error:', error);
+            return [];
         }
     }
 
@@ -367,7 +399,7 @@ class SupabaseClient {
             const { data, error } = await this.rpc(AppConfig.supabase.rpc.getWorksiteSettings, this.getSessionHeaders());
             if (error) throw error;
             const payload = this.normalizePayload(data);
-            return payload?.worksite || payload || null;
+            return payload?.worksite || payload?.data || payload || null;
         } catch (error) {
             console.error('❌ Get worksite settings error:', error);
             return null;
@@ -402,9 +434,10 @@ class SupabaseClient {
 
     async updateUserProfileImage(user, imageUrl = null) {
         try {
-            const { data, error } = await this.rpc(AppConfig.supabase.rpc.updateProfileImage, {
+            const rpcName = AppConfig?.supabase?.rpc?.updateAvatarImage || 'update_avatar_image_secure';
+            const { data, error } = await this.rpc(rpcName, {
                 ...this.getSessionHeaders(user),
-                p_profile_image_url: imageUrl
+                p_avatar_image_url: imageUrl
             });
             if (error) throw error;
             const payload = this.normalizePayload(data);
