@@ -393,7 +393,7 @@ class FaceRecognitionManager {
                 cameraTitle.textContent = enrollmentMode ? 'تسجيل بصمة الوجه' : 'التحقق ببصمة الوجه';
             }
             if (manualCaptureBtn) {
-                manualCaptureBtn.style.display = enrollmentMode ? 'inline-block' : 'none';
+                manualCaptureBtn.style.display = 'inline-block';
             }
 
             setCamStatus?.('<i class="fas fa-video"></i> جاري تشغيل الكاميرا...');
@@ -480,7 +480,7 @@ class FaceRecognitionManager {
             const ready = this.modelsLoaded ? true : await this.loadModelsWithSafetyNet();
             if (!ready) throw new Error('تعذر تحميل نماذج التعرف على الوجه');
 
-            setCamStatus?.(enrollmentMode ? '<i class="fas fa-user-plus"></i> ضع الوجه داخل الإطار وسيتم حفظ البصمة تلقائياً...' : '<i class="fas fa-spinner fa-spin"></i> ضع الوجه داخل الإطار وسيتم الالتقاط تلقائياً...');
+            setCamStatus?.('<i class="fas fa-camera"></i> ضع الوجه داخل الإطار ثم اضغط "التقاط الآن"');
             this.startDetectionLoop();
             return true;
         } catch (e) {
@@ -846,19 +846,9 @@ class FaceRecognitionManager {
             updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
 
             if (window.stabilityCounter >= stableFramesRequired) {
-                setCamStatus?.('<i class="fas fa-camera"></i> تم اكتشاف الوجه - جاري حفظ بصمة الوجه...');
-                const now = Date.now();
-
-                if (
-                    !window.isProcessingCapture &&
-                    (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
-                ) {
-                    this.lastAutoCaptureAt = now;
-                    if (window.autoCaptureTimeout) clearTimeout(window.autoCaptureTimeout);
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 120);
-                }
+                setCamStatus?.('<i class="fas fa-camera"></i> تم اكتشاف الوجه - اضغط "التقاط الآن"');
             } else {
-                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك لحظة وسيتم حفظ البصمة تلقائياً...');
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك لحظة ثم اضغط "التقاط الآن"');
             }
 
             return;
@@ -888,18 +878,9 @@ class FaceRecognitionManager {
             updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
 
             if (window.stabilityCounter >= stableFramesRequired) {
-                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> تم التحقق - جاري الالتقاط...');
-                const now = Date.now();
-
-                if (
-                    !window.isProcessingCapture &&
-                    (!this.lastAutoCaptureAt || (now - this.lastAutoCaptureAt) > this.captureCooldownMs)
-                ) {
-                    this.lastAutoCaptureAt = now;
-                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), 180);
-                }
+                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> الوجه جاهز - اضغط "التقاط الآن"');
             } else {
-                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك...');
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك ثم اضغط "التقاط الآن"');
             }
         }
     }

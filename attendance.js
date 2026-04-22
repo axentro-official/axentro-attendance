@@ -339,7 +339,11 @@ class AttendanceManager {
         const loadingText = type === 'حضور' ? 'التحقق من الوجه لتسجيل الحضور...' : 'التحقق من الوجه لتسجيل الانصراف...';
 
         try {
-            await this.getCurrentLocation();
+            await this.loadWorksitePolicy(true);
+            const currentLocation = await this.getCurrentLocation();
+            if (!currentLocation || currentLocation.latitude == null || currentLocation.longitude == null) {
+                throw new Error('تعذر تحديد الموقع بدقة، فعّل GPS وحاول مرة أخرى');
+            }
 
             if (btn) {
                 btn.disabled = true;
@@ -406,6 +410,14 @@ class AttendanceManager {
         }
 
         // Check GPS location (من الكود القديم)
+        if (window.currentLat == null || window.currentLon == null) {
+            playSound?.('faceid-error');
+            showToast?.('تعذر قراءة الموقع الحالي، لا يمكن تسجيل العملية بدون موقع دقيق', 'error');
+            setCamStatus?.('مرفوض: الموقع غير متوفر');
+            faceRecognition?.restartCamLoop();
+            return;
+        }
+
         if (window.currentLat && window.currentLon) {
             const policy = this.getAttendancePolicy();
             const dist = this.getDistanceFromLatLonInKm(

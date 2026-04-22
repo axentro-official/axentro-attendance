@@ -732,6 +732,8 @@ window.handleFirstTimeSetupCapture = async function(descriptor) {
 };
 
 window.handleFaceUpdateCapture = async function(descriptor) {
+    if (window.__faceUpdateInFlight) return;
+    window.__faceUpdateInFlight = true;
     try {
         const targetUser = window.faceUpdateTargetUser || window.user;
         if (!descriptor || !targetUser) throw new Error('Missing data');
@@ -758,6 +760,7 @@ window.handleFaceUpdateCapture = async function(descriptor) {
                 window.user.profile_image_url = imageUrl;
             }
             if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
+            try { localStorage.removeItem(app?.getUserAvatarStorageKey?.(window.user)); } catch (_) {}
         }
         showMatchResult?.(true);
         showToast?.('تم تحديث البصمة بنجاح', 'success');
@@ -770,6 +773,8 @@ window.handleFaceUpdateCapture = async function(descriptor) {
         showMatchResult?.(false);
         showToast?.(e.message || 'فشل تحديث البصمة', 'error');
         faceRecognition?.restartCamLoop();
+    } finally {
+        window.__faceUpdateInFlight = false;
     }
 };
 

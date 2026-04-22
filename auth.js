@@ -593,32 +593,32 @@ class AuthManager {
             if (body) {
                 body.innerHTML = `
                     <div class="password-wrapper">
-                        <input type="password" id="oldPassword" placeholder="كلمة السر الحالية">
-                        <button class="toggle-password" onclick="togglePassword('oldPassword')">
+                        <input type="password" id="changePwOldInput" placeholder="كلمة السر الحالية">
+                        <button type="button" class="toggle-password" onclick="togglePassword('changePwOldInput', this)">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
                     <div class="password-wrapper">
-                        <input type="password" id="newPassword" placeholder="كلمة السر الجديدة">
-                        <button class="toggle-password" onclick="togglePassword('newPassword')">
+                        <input type="password" id="changePwNewInput" placeholder="كلمة السر الجديدة">
+                        <button type="button" class="toggle-password" onclick="togglePassword('changePwNewInput', this)">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
-                    <button class="btn btn-change-pw" onclick="submitChangePassword()">تحديث</button>
+                    <button type="button" class="btn btn-change-pw" onclick="submitChangePassword()">تحديث</button>
                 `;
             }
         } else {
             if (title) title.textContent = 'تغيير كلمة سر موظف';
             if (body) {
                 body.innerHTML = `
-                    <input type="text" id="targetEmpCode" placeholder="كود الموظف">
+                    <input type="text" id="changePwTargetCodeInput" placeholder="كود الموظف">
                     <div class="password-wrapper">
-                        <input type="password" id="newPassword" placeholder="كلمة السر الجديدة">
-                        <button class="toggle-password" onclick="togglePassword('newPassword')">
+                        <input type="password" id="changePwAdminNewInput" placeholder="كلمة السر الجديدة">
+                        <button type="button" class="toggle-password" onclick="togglePassword('changePwAdminNewInput', this)">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
-                    <button class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>
+                    <button type="button" class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>
                 `;
             }
         }
@@ -639,8 +639,9 @@ class AuthManager {
 
     async submitChangePassword() {
         if (this.pwChangeMode === 'own') {
-            const oldPw = document.getElementById('oldPassword')?.value?.trim();
-            const newPw = document.getElementById('newPassword')?.value?.trim();
+            const modalScope = document.getElementById('changePwModal');
+            const oldPw = modalScope?.querySelector('#changePwOldInput')?.value?.trim();
+            const newPw = modalScope?.querySelector('#changePwNewInput')?.value?.trim();
 
             if (!oldPw || !newPw) {
                 return this.toast('يرجى ملء الحقول', 'error');
@@ -666,8 +667,9 @@ class AuthManager {
             return;
         }
 
-        const targetCode = document.getElementById('targetEmpCode')?.value?.trim()?.toUpperCase();
-        const newPw = document.getElementById('newPassword')?.value?.trim();
+        const modalScope = document.getElementById('changePwModal');
+        const targetCode = modalScope?.querySelector('#changePwTargetCodeInput')?.value?.trim()?.toUpperCase();
+        const newPw = modalScope?.querySelector('#changePwAdminNewInput')?.value?.trim();
 
         if (!targetCode || !newPw) {
             return this.toast('يرجى إدخال البيانات', 'error');
