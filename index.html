@@ -271,7 +271,7 @@
 
             <!-- Stats Grid -->
             <div class="stats-grid">
-                <div class="stat-card" id="employeeCountCard">
+                <div class="stat-card admin-only" id="employeeCountCard">
                     <i class="fas fa-users"></i>
                     <span class="stat-value" id="totalEmployeesStat">0</span>
                     <span class="stat-label">إجمالي الموظفين</span>
@@ -350,12 +350,12 @@
 
                 <!-- Action Buttons -->
                 <div class="action-buttons">
-                    <button class="btn btn-success btn-lg" id="checkInBtn" onclick="handleAttendance('حضور')">
+                    <button class="btn btn-success btn-lg" id="checkInBtn">
                         <i class="fas fa-sign-in-alt"></i>
                         <span>حضور</span>
                     </button>
                     
-                    <button class="btn btn-danger btn-lg" id="checkOutBtn" onclick="handleAttendance('انصراف')" disabled>
+                    <button class="btn btn-danger btn-lg" id="checkOutBtn" disabled>
                         <i class="fas fa-sign-out-alt"></i>
                         <span>انصراف</span>
                     </button>
@@ -385,21 +385,6 @@
                     </div>
             </div>
 
-            <!-- Bottom Navigation -->
-            <nav class="bottom-nav employee-quick-nav">
-                <a href="#" class="nav-link active" data-page="dashboardPage">
-                    <i class="fas fa-home"></i>
-                    <span>الرئيسية</span>
-                </a>
-                <a href="#" class="nav-link" data-page="reportsPage">
-                    <i class="fas fa-chart-line"></i>
-                    <span>التقارير</span>
-                </a>
-                <a href="#" class="nav-link" data-page="changePasswordPage">
-                    <i class="fas fa-key"></i>
-                    <span>تغيير الرقم السري</span>
-                </a>
-            </nav>
         </section>
 
     <!-- ================================ -->
@@ -482,7 +467,7 @@
         </div>
 
         <!-- Bottom Navigation -->
-        <nav class="bottom-nav employee-quick-nav">
+        <nav class="bottom-nav">
             <a href="#" class="nav-link active" data-page="dashboardPage">
                 <i class="fas fa-home"></i>
                 <span>الرئيسية</span>

@@ -29,7 +29,23 @@ class AttendanceManager {
 
     init() {
         this.loadWorksitePolicy();
+        this.bindUi();
         console.log('✅ Attendance Manager ready');
+    }
+
+    bindUi() {
+        const checkInBtn = document.getElementById('checkInBtn');
+        const checkOutBtn = document.getElementById('checkOutBtn');
+
+        if (checkInBtn && !checkInBtn.dataset.bound) {
+            checkInBtn.addEventListener('click', () => this.handleCheckIn());
+            checkInBtn.dataset.bound = '1';
+        }
+
+        if (checkOutBtn && !checkOutBtn.dataset.bound) {
+            checkOutBtn.addEventListener('click', () => this.handleCheckOut());
+            checkOutBtn.dataset.bound = '1';
+        }
     }
 
     async loadWorksitePolicy(force = false) {
@@ -596,15 +612,16 @@ let attendance;
 
 document.addEventListener('DOMContentLoaded', () => {
     attendance = new AttendanceManager();
-    
+
     // Make globally available
     window.attendance = attendance;
-    
+    attendance.init();
+
     // Setup search if on admin page
     if (typeof attendance.setupSearch === 'function') {
         attendance.setupSearch();
     }
-    
+
     console.log('✅ Attendance Manager initialized');
 });
 
@@ -634,11 +651,8 @@ window.calculateMonthlyHours = async function() {
 window.fetchUserDataInBackground = async function() {
     if (typeof attendance === 'undefined' || !window.user) return;
     if (window.user.role !== 'admin') {
-        await attendance.loadWorksitePolicy(true);
         await attendance.loadTodayRecords();
-        if (typeof attendance.calculateMonthlyHours === 'function') {
-            await attendance.calculateMonthlyHours();
-        }
+        await attendance.calculateMonthlyHours();
     }
     if (typeof db !== 'undefined') {
         try {
@@ -647,8 +661,9 @@ window.fetchUserDataInBackground = async function() {
                 window.sessionDescriptor = ctx.face_descriptor || null;
                 window.userImage = ctx.profile_image_url || '';
                 window.user.face_enrolled = !!ctx.face_enrolled;
-                if (window.userImage && window.app?.syncProfileAvatarUI) {
-                    window.app.syncProfileAvatarUI(window.userImage, window.user);
+                if (window.userImage) {
+                    const profileImg = document.querySelector('.emp-profile-img');
+                    if (profileImg) profileImg.src = window.userImage + '?t=' + Date.now();
                 }
                 if (!ctx.face_enrolled && !document.getElementById('cameraOverlay')?.classList.contains('active')) {
                     showToast?.('يجب تسجيل بصمة الوجه أولاً', 'warning');
@@ -735,7 +750,6 @@ window.adminResetFace = async function(code, name) {
     window.adminVerifyMode = false;
     window.firstTimeSetupMode = false;
     window.adminResetFaceMode = true;
-    window.scrollTo({ top: 0, behavior: 'auto' });
     await openCamera?.();
 };
 

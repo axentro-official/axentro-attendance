@@ -25,11 +25,22 @@ class UIManager {
     init() {
         // Create toast container if not exists
         this.ensureToastContainer();
-        
+        this.normalizeModals();
+
         // Setup global UI event listeners
         this.setupGlobalListeners();
-        
+
         console.log('✅ UI Manager ready');
+    }
+
+    normalizeModals() {
+        document.querySelectorAll('.modal').forEach((modal) => {
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+            modal.style.position = 'fixed';
+            modal.style.inset = '0';
+        });
     }
 
     /**
@@ -413,6 +424,11 @@ class UIManager {
         });
 
         document.querySelectorAll('.confirmation-modal, .prompt-modal').forEach(el => el.remove());
+        if (modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+        modal.style.position = 'fixed';
+        modal.style.inset = '0';
         modal.style.display = 'flex';
         modal.classList.add('active');
         document.body.classList.add('modal-open');

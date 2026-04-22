@@ -583,8 +583,6 @@ class AuthManager {
 
     openChangePwModal(mode) {
         this.pwChangeMode = mode;
-        ui?.closeAllModals?.();
-        window.scrollTo({ top: 0, behavior: 'auto' });
 
         const body = document.getElementById('changePwBody');
         const title = document.getElementById('changePwTitle');
@@ -659,12 +657,6 @@ class AuthManager {
 
                 window.attMode = true;
                 window.attType = 'تغيير كلمة المرور';
-                window.regMode = false;
-                window.updateFaceMode = false;
-                window.adminVerifyMode = false;
-                window.adminResetFaceMode = false;
-                window.firstTimeSetupMode = false;
-                window.scrollTo({ top: 0, behavior: 'auto' });
 
                 await openCamera();
                 return;
