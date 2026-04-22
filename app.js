@@ -835,9 +835,24 @@ class App {
 
         const attendanceSection = document.querySelector('.attendance-section');
         const statsGrid = document.querySelector('.stats-grid');
+        const employeeCountCard = document.getElementById('employeeCountCard');
+        const employeeQuickNavs = document.querySelectorAll('.employee-quick-nav');
+        const appFooter = document.querySelector('.global-app-footer');
         if (attendanceSection) attendanceSection.style.display = isAdmin ? 'none' : '';
-        if (statsGrid && isAdmin && totalEmployeesStat) {
+        if (statsGrid) {
+            statsGrid.classList.toggle('employee-stats', !isAdmin);
+        }
+        if (employeeCountCard) {
+            employeeCountCard.style.display = isAdmin ? '' : 'none';
+        }
+        if (isAdmin && totalEmployeesStat) {
             totalEmployeesStat.textContent = totalEmployeesStat.textContent || '0';
+        }
+        employeeQuickNavs.forEach((nav) => {
+            nav.style.display = isAdmin ? 'none' : 'none';
+        });
+        if (appFooter) {
+            appFooter.style.display = isAdmin ? 'none' : 'flex';
         }
 
         document.querySelectorAll('.nav-link').forEach((link) => {
@@ -911,6 +926,8 @@ class App {
 
 
     openSettingsModal() {
+        ui?.closeAllModals?.();
+        window.scrollTo({ top: 0, behavior: 'auto' });
         const soundToggle = document.getElementById('soundEnabled');
         const vibrationToggle = document.getElementById('vibrationEnabled');
         const dataSaverToggle = document.getElementById('dataSaverMode');
@@ -1000,6 +1017,7 @@ class App {
         window.firstTimeSetupMode = false;
         window.adminResetFaceMode = false;
         ui?.closeModal?.('settingsModal');
+        window.scrollTo({ top: 0, behavior: 'auto' });
         await openCamera?.();
     }
 

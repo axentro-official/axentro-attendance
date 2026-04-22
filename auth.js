@@ -583,6 +583,8 @@ class AuthManager {
 
     openChangePwModal(mode) {
         this.pwChangeMode = mode;
+        ui?.closeAllModals?.();
+        window.scrollTo({ top: 0, behavior: 'auto' });
 
         const body = document.getElementById('changePwBody');
         const title = document.getElementById('changePwTitle');
@@ -657,6 +659,12 @@ class AuthManager {
 
                 window.attMode = true;
                 window.attType = 'تغيير كلمة المرور';
+                window.regMode = false;
+                window.updateFaceMode = false;
+                window.adminVerifyMode = false;
+                window.adminResetFaceMode = false;
+                window.firstTimeSetupMode = false;
+                window.scrollTo({ top: 0, behavior: 'auto' });
 
                 await openCamera();
                 return;
@@ -762,29 +770,16 @@ class AuthManager {
             const result = await db.requestPasswordReset(identifier);
 
             if (result?.success) {
-                if (typeof app !== 'undefined' && app?.playSound) {
-                    app.playSound('login-success');
-                }
-
                 this.toast(
                     result?.message || 'تم إرسال كلمة المرور الجديدة إلى بريدك الإلكتروني',
                     'success'
                 );
                 this.closeForgotPw();
             } else {
-                if (typeof app !== 'undefined' && app?.playSound) {
-                    app.playSound('login-error');
-                }
-
                 this.toast(result?.error || 'تعذر إرسال كلمة المرور', 'error');
             }
         } catch (error) {
             console.error('Forgot password error:', error);
-
-            if (typeof app !== 'undefined' && app?.playSound) {
-                app.playSound('login-error');
-            }
-
             this.toast('حدث خطأ أثناء استعادة كلمة المرور', 'error');
         }
     }

@@ -271,7 +271,7 @@
 
             <!-- Stats Grid -->
             <div class="stats-grid">
-                <div class="stat-card">
+                <div class="stat-card" id="employeeCountCard">
                     <i class="fas fa-users"></i>
                     <span class="stat-value" id="totalEmployeesStat">0</span>
                     <span class="stat-label">إجمالي الموظفين</span>
@@ -350,12 +350,12 @@
 
                 <!-- Action Buttons -->
                 <div class="action-buttons">
-                    <button class="btn btn-success btn-lg" id="checkInBtn">
+                    <button class="btn btn-success btn-lg" id="checkInBtn" onclick="handleAttendance('حضور')">
                         <i class="fas fa-sign-in-alt"></i>
                         <span>حضور</span>
                     </button>
                     
-                    <button class="btn btn-danger btn-lg" id="checkOutBtn" disabled>
+                    <button class="btn btn-danger btn-lg" id="checkOutBtn" onclick="handleAttendance('انصراف')" disabled>
                         <i class="fas fa-sign-out-alt"></i>
                         <span>انصراف</span>
                     </button>
@@ -386,7 +386,7 @@
             </div>
 
             <!-- Bottom Navigation -->
-            <nav class="bottom-nav">
+            <nav class="bottom-nav employee-quick-nav">
                 <a href="#" class="nav-link active" data-page="dashboardPage">
                     <i class="fas fa-home"></i>
                     <span>الرئيسية</span>
@@ -482,7 +482,7 @@
         </div>
 
         <!-- Bottom Navigation -->
-        <nav class="bottom-nav">
+        <nav class="bottom-nav employee-quick-nav">
             <a href="#" class="nav-link active" data-page="dashboardPage">
                 <i class="fas fa-home"></i>
                 <span>الرئيسية</span>

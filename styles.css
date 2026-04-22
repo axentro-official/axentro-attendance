@@ -2197,3 +2197,22 @@ body.auth-mode .global-app-footer{display:none;}
 .confirmation-modal,.prompt-modal,.modal{align-items:center !important;justify-content:center !important;}
 .modal.active{display:flex !important;}
 
+
+
+.employee-stats{grid-template-columns:minmax(0,1fr) !important;}
+.employee-stats .stat-card{min-height:140px;}
+.employee-quick-nav{display:none !important;}
+body.app-mode .global-app-footer{display:flex;position:relative;z-index:5;padding:8px 14px 20px;margin-top:6px;}
+body.app-mode .global-app-footer .global-qr-code{width:88px;height:88px;}
+body.app-mode .global-app-footer .footer-copy{font-size:.86rem;}
+body.app-mode .global-app-footer .footer-scan{font-size:.78rem;}
+.modal{align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(20px,env(safe-area-inset-bottom));}
+.modal.active{display:flex !important;}
+.modal-content{margin:auto 0;}
+#dashboardPage .status-card,#dashboardPage .stats-grid,#dashboardPage .attendance-section{position:relative;z-index:2;}
+#dashboardPage .dashboard-header{position:relative;z-index:3;}
+@media (max-width:768px){
+  body.app-mode .global-app-footer{padding:6px 10px 16px;margin-top:0;}
+  body.app-mode .global-app-footer .global-qr-code{width:78px;height:78px;}
+  #dashboardPage .attendance-section{margin-bottom:8px;}
+}

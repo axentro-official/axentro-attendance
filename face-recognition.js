@@ -348,6 +348,51 @@ class FaceRecognitionManager {
     // 📹 CAMERA OPERATIONS
     // ============================================
 
+    getUnifiedCameraConstraints() {
+        const facingMode = AppConfig?.faceRecognition?.camera?.facingMode || 'user';
+        const width = AppConfig?.faceRecognition?.camera?.width || 1280;
+        const height = AppConfig?.faceRecognition?.camera?.height || 720;
+        const frameRate = AppConfig?.faceRecognition?.camera?.frameRate || 30;
+        return {
+            preferred: {
+                video: {
+                    facingMode,
+                    width: { ideal: width, min: 640 },
+                    height: { ideal: height, min: 480 },
+                    frameRate: { ideal: frameRate, max: frameRate },
+                    aspectRatio: { ideal: width / height },
+                    resizeMode: 'crop-and-scale'
+                },
+                audio: false
+            },
+            fallback: {
+                video: {
+                    facingMode,
+                    width: { ideal: width, min: 640 },
+                    height: { ideal: height, min: 480 },
+                    aspectRatio: { ideal: width / height }
+                },
+                audio: false
+            }
+        };
+    }
+
+    async applyTrackQuality(stream) {
+        try {
+            const track = stream?.getVideoTracks?.()[0];
+            if (!track?.getCapabilities) return;
+            const caps = track.getCapabilities();
+            const adv = {};
+            if (caps.focusMode && caps.focusMode.includes('continuous')) adv.focusMode = 'continuous';
+            if (caps.exposureMode && caps.exposureMode.includes('continuous')) adv.exposureMode = 'continuous';
+            if (caps.whiteBalanceMode && caps.whiteBalanceMode.includes('continuous')) adv.whiteBalanceMode = 'continuous';
+            if (caps.zoom) adv.zoom = Math.min(caps.zoom.max || 1, Math.max(caps.zoom.min || 1, 1));
+            if (Object.keys(adv).length) await track.applyConstraints({ advanced: [adv] });
+        } catch (e) {
+            console.warn('track quality tune skipped', e);
+        }
+    }
+
     async openCamera() {
         try {
             const requestedModes = {
@@ -376,6 +421,7 @@ class FaceRecognitionManager {
                 throw new Error('الكاميرا غير مدعومة في هذا المتصفح');
             }
 
+            window.scrollTo({ top: 0, behavior: 'auto' });
             const overlay = document.getElementById('cameraOverlay');
             if (overlay) {
                 overlay.style.display = 'flex';
@@ -394,32 +440,15 @@ class FaceRecognitionManager {
 
             setCamStatus?.('<i class="fas fa-video"></i> جاري تشغيل الكاميرا...');
 
-            const facingMode = AppConfig?.faceRecognition?.camera?.facingMode || 'user';
-
-            const preferredConstraints = {
-                video: {
-                    facingMode,
-                    width: { ideal: AppConfig?.faceRecognition?.camera?.width || 1280 },
-                    height: { ideal: AppConfig?.faceRecognition?.camera?.height || 720 },
-                    frameRate: { ideal: AppConfig?.faceRecognition?.camera?.frameRate || 30, max: 30 }
-                },
-                audio: false
-            };
-
-            const fallbackConstraints = {
-                video: {
-                    facingMode,
-                    width: { ideal: 480 },
-                    height: { ideal: 360 }
-                },
-                audio: false
-            };
+            const cameraConstraints = this.getUnifiedCameraConstraints();
 
             try {
-                window.currentStream = await navigator.mediaDevices.getUserMedia(preferredConstraints);
+                window.currentStream = await navigator.mediaDevices.getUserMedia(cameraConstraints.preferred);
             } catch (_e) {
-                window.currentStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                window.currentStream = await navigator.mediaDevices.getUserMedia(cameraConstraints.fallback);
             }
+
+            await this.applyTrackQuality(window.currentStream);
 
             const video = this.videoElement || document.getElementById('video');
             if (!video) throw new Error('Video element not found');

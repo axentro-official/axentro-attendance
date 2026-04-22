@@ -391,16 +391,17 @@ class AttendanceManager {
 
         // Check GPS location (من الكود القديم)
         if (window.currentLat && window.currentLon) {
+            const policy = this.getAttendancePolicy();
             const dist = this.getDistanceFromLatLonInKm(
-                window.currentLat, 
+                window.currentLat,
                 window.currentLon,
-                AppConfig?.location?.office?.latitude || 30.1407941,
-                AppConfig?.location?.office?.longitude || 31.3800838
+                policy.latitude,
+                policy.longitude
             );
 
-            const maxDistance = AppConfig?.location?.maxDistanceMeters || 500;
+            const maxDistance = policy.allowedRadiusMeters;
 
-            const maxAccuracy = AppConfig?.location?.maxAccuracyMeters || 50;
+            const maxAccuracy = policy.maxAccuracyMeters;
             if ((this.currentLocation?.accuracy || window.currentAccuracy || 0) > maxAccuracy) {
                 playSound?.('faceid-error');
                 showToast?.(`دقة الموقع غير كافية (${Math.round(this.currentLocation?.accuracy || window.currentAccuracy || 0)} متر)`, 'error');
@@ -633,8 +634,11 @@ window.calculateMonthlyHours = async function() {
 window.fetchUserDataInBackground = async function() {
     if (typeof attendance === 'undefined' || !window.user) return;
     if (window.user.role !== 'admin') {
+        await attendance.loadWorksitePolicy(true);
         await attendance.loadTodayRecords();
-        await attendance.calculateMonthlyHours();
+        if (typeof attendance.calculateMonthlyHours === 'function') {
+            await attendance.calculateMonthlyHours();
+        }
     }
     if (typeof db !== 'undefined') {
         try {
@@ -643,9 +647,8 @@ window.fetchUserDataInBackground = async function() {
                 window.sessionDescriptor = ctx.face_descriptor || null;
                 window.userImage = ctx.profile_image_url || '';
                 window.user.face_enrolled = !!ctx.face_enrolled;
-                if (window.userImage) {
-                    const profileImg = document.querySelector('.emp-profile-img');
-                    if (profileImg) profileImg.src = window.userImage + '?t=' + Date.now();
+                if (window.userImage && window.app?.syncProfileAvatarUI) {
+                    window.app.syncProfileAvatarUI(window.userImage, window.user);
                 }
                 if (!ctx.face_enrolled && !document.getElementById('cameraOverlay')?.classList.contains('active')) {
                     showToast?.('يجب تسجيل بصمة الوجه أولاً', 'warning');
@@ -732,6 +735,7 @@ window.adminResetFace = async function(code, name) {
     window.adminVerifyMode = false;
     window.firstTimeSetupMode = false;
     window.adminResetFaceMode = true;
+    window.scrollTo({ top: 0, behavior: 'auto' });
     await openCamera?.();
 };
 
