@@ -134,13 +134,13 @@ class AdminManager {
             }
 
             row.innerHTML = `
-                <td class="admin-col-index"><div class="cell-scroll cell-center">${index + 1}</div></td>
-                <td class="admin-col-code"><div class="cell-scroll cell-code">${employee.code || '-'}</div></td>
-                <td class="admin-col-name"><div class="cell-scroll cell-strong">${employee.name || '-'}</div></td>
-                <td class="admin-col-email"><div class="cell-scroll">${employee.email || '-'}</div></td>
-                <td class="admin-col-status"><div class="cell-scroll cell-center"><span class="${statusClass}" style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;display:inline-block;">${statusText}</span></div></td>
-                <td class="admin-col-date"><div class="cell-scroll cell-muted">${createdDate}</div></td>
-                <td class="admin-col-actions"><div class="cell-scroll cell-center action-wrap">
+                <td style="font-weight:bold;">${index + 1}</td>
+                <td style="color:#3b82f6;font-weight:bold;font-family:monospace;">${employee.code || '-'}</td>
+                <td><strong>${employee.name || '-'}</strong></td>
+                <td>${employee.email || '-'}</td>
+                <td><span class="${statusClass}" style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;display:inline-block;">${statusText}</span></td>
+                <td style="font-size:12px;color:#94a3b8;">${createdDate}</td>
+                <td>
                     ${!employee.is_admin ? `
                     <button class="btn btn-sm btn-outline" onclick="openEmployeeActionsModal('${employee.code}', '${(employee.name || '').replace(/'/g, "&#39;")}')" title="إعدادات الموظف" style="margin:2px;">
                         <i class="fas fa-gear"></i>
@@ -149,7 +149,7 @@ class AdminManager {
                         <i class="fas fa-trash"></i>
                     </button>
                     ` : '<span style="color:#64748b;font-size:11px;">—</span>'}
-                </div></td>
+                </td>
             `;
             tbody.appendChild(row);
         });

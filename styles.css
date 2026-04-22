@@ -2206,36 +2206,3 @@ body.auth-mode .global-app-footer{display:none;}
 .modal{overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .modal-content{margin:auto;}
 #employeeCountCard{display:flex;}
-
-
-/* v6.4 admin/worksite refinements */
-.settings-modal-content{max-height:min(92vh,980px);display:flex;flex-direction:column;}
-.settings-modal-body{overflow-y:auto;max-height:calc(92vh - 90px);padding-inline-end:6px;}
-#worksiteSettingsSection{scroll-margin-top:16px;border:1px solid rgba(96,165,250,.18);background:linear-gradient(135deg, rgba(10,30,72,.9) 0%, rgba(10,54,120,.78) 100%);}
-#worksiteSettingsSection h4{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-#worksiteSettingsSection h4::after{content:'يفرض تلقائياً على كل الموظفين';font-size:.8rem;color:#93c5fd;font-weight:600;}
-.admin-actions-row .btn{min-height:48px;}
-.admin-table-scroll{overflow:auto;padding:0 12px 12px;}
-.admin-table.admin-employee-table{width:100%;min-width:920px;border-collapse:separate;border-spacing:0 10px;table-layout:fixed;}
-.admin-table.admin-employee-table thead th{position:sticky;top:0;z-index:1;background:rgba(6,18,45,.98);padding:12px 10px;white-space:nowrap;}
-.admin-table.admin-employee-table tbody td{padding:10px 8px;vertical-align:middle;background:rgba(255,255,255,.035);border-top:1px solid rgba(191,219,254,.08);border-bottom:1px solid rgba(191,219,254,.08);}
-.admin-table.admin-employee-table tbody td:first-child{border-right:1px solid rgba(191,219,254,.08);border-radius:14px 0 0 14px;}
-.admin-table.admin-employee-table tbody td:last-child{border-left:1px solid rgba(191,219,254,.08);border-radius:0 14px 14px 0;}
-.admin-col-index{width:64px;}
-.admin-col-code{width:110px;}
-.admin-col-name{width:180px;}
-.admin-col-email{width:250px;}
-.admin-col-status{width:110px;}
-.admin-col-date{width:130px;}
-.admin-col-actions{width:150px;}
-.cell-scroll{display:block;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:thin;padding-bottom:2px;}
-.cell-center{text-align:center;}
-.cell-code{color:#60a5fa;font-weight:700;font-family:monospace;direction:ltr;}
-.cell-strong{font-weight:700;color:#fff;}
-.cell-muted{font-size:12px;color:#94a3b8;}
-.action-wrap{display:flex;align-items:center;justify-content:center;gap:6px;}
-@media (max-width:768px){
-  .settings-modal-content{max-height:94vh;}
-  .settings-modal-body{max-height:calc(94vh - 82px);}
-  .admin-table.admin-employee-table{min-width:860px;}
-}

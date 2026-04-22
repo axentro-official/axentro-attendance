@@ -221,18 +221,12 @@ class SupabaseClient {
                 p_profile_image_url: employeeData.profileImageUrl || null
             };
 
-            let response = null;
+            let response;
             if (sessionToken) {
                 response = await this.rpc(AppConfig.supabase.rpc.createEmployee, { p_session_token: sessionToken, ...baseParams });
-                const sessionError = response?.error?.message || response?.error?.details || '';
-                if (response?.error && /invalid_session|forbidden|session/i.test(String(sessionError))) {
-                    response = null;
-                }
-            }
-            if (!response) {
+            } else {
                 response = await this.rpc(AppConfig.supabase.rpc.createEmployee, baseParams);
             }
-
             const { data, error } = response;
             if (error) throw error;
             const payload = this.normalizePayload(data);

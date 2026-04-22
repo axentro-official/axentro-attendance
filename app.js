@@ -956,7 +956,7 @@ class App {
         }
 
         if (isAdmin && window.attendance?.loadWorksitePolicy) {
-            Promise.resolve(window.attendance.loadWorksitePolicy(true)).then((site) => { this.populateWorksiteFields(site); });
+            Promise.resolve(window.attendance.loadWorksitePolicy(true)).then((site) => { this.populateWorksiteFields(site); setTimeout(() => document.getElementById('worksiteSettingsSection')?.scrollIntoView({behavior:'smooth', block:'start'}), 120); });
         }
 
         const extractBtn = document.getElementById('extractWorksiteMapBtn');
@@ -966,19 +966,6 @@ class App {
 
         this.syncProfileAvatarUI(this.getResolvedProfileImage(window.user), window.user);
         ui?.openModal?.('settingsModal');
-    }
-
-    openWorksiteSettingsModal() {
-        this.openSettingsModal();
-        const modalBody = document.querySelector('#settingsModal .settings-modal-body');
-        const section = document.getElementById('worksiteSettingsSection');
-        setTimeout(() => {
-            if (section && modalBody) {
-                modalBody.scrollTo({ top: Math.max(section.offsetTop - 16, 0), behavior: 'smooth' });
-            } else {
-                section?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-            }
-        }, 180);
     }
 
     populateWorksiteFields(site) {

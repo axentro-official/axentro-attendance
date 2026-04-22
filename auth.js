@@ -549,7 +549,7 @@ password: ''
         const newPw = newPwInput?.value?.trim();
         const firstPwError = document.getElementById('firstNewPwError');
         const validation = Validator?.validatePassword?.(newPw);
-        if (!newPw || validation?.valid !== true) {
+        if (!newPw || !validation?.isValid) {
             if (firstPwError) { firstPwError.style.display = 'block'; firstPwError.textContent = 'كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز'; }
             return this.toast('كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز', 'error');
         }
@@ -771,7 +771,7 @@ password: ''
             }
 
             if (!resetToken || !newPassword) {
-                const result = await db.requestPasswordReset(identifier, true);
+                const result = await db.requestPasswordReset(identifier, false);
                 if (!result?.success) {
                     this.toast(result?.error || 'تعذر إنشاء رمز التعيين', 'error');
                     return;
@@ -779,7 +779,7 @@ password: ''
 
                 const email = result.email || '';
                 if (!email) {
-                    this.toast(result?.error || 'لا يوجد بريد إلكتروني مسجل لهذا الحساب', 'error');
+                    this.toast('لا يوجد بريد إلكتروني مسجل لهذا الحساب', 'error');
                     return;
                 }
 
