@@ -20,6 +20,9 @@ const AppConfig = {
             maxFileSize: 5 * 1024 * 1024,
             allowedTypes: ['image/jpeg', 'image/png', 'image/webp']
         },
+        functions: {
+            requestPasswordResetEmail: 'send-reset-code'
+        },
         rpc: {
             adminLogin: 'admin_login',
             employeeLogin: 'employee_login',

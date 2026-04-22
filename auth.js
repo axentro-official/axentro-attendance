@@ -549,7 +549,7 @@ password: ''
         const newPw = newPwInput?.value?.trim();
         const firstPwError = document.getElementById('firstNewPwError');
         const validation = Validator?.validatePassword?.(newPw);
-        if (!newPw || !validation?.isValid) {
+        if (!newPw || validation?.valid !== true) {
             if (firstPwError) { firstPwError.style.display = 'block'; firstPwError.textContent = 'كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز'; }
             return this.toast('كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز', 'error');
         }
@@ -771,36 +771,14 @@ password: ''
             }
 
             if (!resetToken || !newPassword) {
-                const result = await db.requestPasswordReset(identifier, false);
+                const result = await db.requestPasswordReset(identifier);
                 if (!result?.success) {
-                    this.toast(result?.error || 'تعذر إنشاء رمز التعيين', 'error');
+                    this.toast(result?.error || 'تعذر إرسال رمز إعادة التعيين', 'error');
                     return;
                 }
 
-                const email = result.email || '';
-                if (!email) {
-                    this.toast('لا يوجد بريد إلكتروني مسجل لهذا الحساب', 'error');
-                    return;
-                }
-
-                if (AppConfig?.emailService?.url && result.reset_token) {
-                    await fetch(AppConfig.emailService.url, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            action: 'sendResetCode',
-                            name: result.name || 'مستخدم النظام',
-                            code: result.identifier || identifier,
-                            email,
-                            resetCode: result.reset_token,
-                            accountType: result.role || 'user'
-                        })
-                    }).catch(() => {});
-                }
-
-                if (helper) helper.textContent = `تم إرسال رمز إعادة التعيين إلى البريد الإلكتروني المسجل للحساب. صالح لمدة ${result.expires_in_minutes || 15} دقيقة.`;
-                this.toast('تم إرسال رمز إعادة التعيين إلى البريد الإلكتروني المسجل.', 'success');
+                if (helper) helper.textContent = result?.message || 'إذا كان الحساب موجودًا وتم تسجيل بريد له فسيتم إرسال رمز إعادة التعيين، صالح لمدة 15 دقيقة.';
+                this.toast(result?.message || 'تم إرسال رمز إعادة التعيين إلى البريد الإلكتروني المسجل.', 'success');
                 return;
             }
 

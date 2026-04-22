@@ -221,12 +221,18 @@ class SupabaseClient {
                 p_profile_image_url: employeeData.profileImageUrl || null
             };
 
-            let response;
+            let response = null;
             if (sessionToken) {
                 response = await this.rpc(AppConfig.supabase.rpc.createEmployee, { p_session_token: sessionToken, ...baseParams });
-            } else {
+                const sessionError = response?.error?.message || response?.error?.details || '';
+                if (response?.error && /invalid_session|forbidden|session/i.test(String(sessionError))) {
+                    response = null;
+                }
+            }
+            if (!response) {
                 response = await this.rpc(AppConfig.supabase.rpc.createEmployee, baseParams);
             }
+
             const { data, error } = response;
             if (error) throw error;
             const payload = this.normalizePayload(data);
@@ -488,11 +494,22 @@ class SupabaseClient {
         }
     }
 
-    async requestPasswordReset(identifier, debug = true) {
+    async requestPasswordReset(identifier) {
         try {
             const normalized = String(identifier || '').trim();
             if (!normalized) return { success: false, error: 'يرجى إدخال الكود أو اسم المستخدم' };
-            const { data, error } = await this.rpc(AppConfig.supabase.rpc.requestPasswordReset, { p_identifier: normalized, p_debug: !!debug });
+
+            const fnName = AppConfig?.supabase?.functions?.requestPasswordResetEmail;
+            if (fnName && this.client?.functions?.invoke) {
+                const { data, error } = await this.client.functions.invoke(fnName, {
+                    body: { identifier: normalized }
+                });
+                if (error) throw error;
+                return data || { success: true, message: 'إذا كان الحساب موجودًا وتم تسجيل بريد له فسيتم إرسال رمز إعادة التعيين' };
+            }
+
+            // Fallback only for maintenance mode
+            const { data, error } = await this.rpc(AppConfig.supabase.rpc.requestPasswordReset, { p_identifier: normalized, p_debug: false });
             if (error) throw error;
             return this.normalizePayload(data) || { success: false, error: 'فشل طلب الاستعادة' };
         } catch (error) {
