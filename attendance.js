@@ -117,6 +117,7 @@ class AttendanceManager {
             window.currentLoc = 'غير متوفر';
             window.currentLat = null;
             window.currentLon = null;
+            window.currentAccuracy = null;
             
             return null;
         }
@@ -340,9 +341,15 @@ class AttendanceManager {
 
         try {
             await this.loadWorksitePolicy(true);
-            const currentLocation = await this.getCurrentLocation();
-            if (!currentLocation || currentLocation.latitude == null || currentLocation.longitude == null) {
-                throw new Error('تعذر تحديد الموقع بدقة، فعّل GPS وحاول مرة أخرى');
+            const location = await this.getCurrentLocation();
+            const policy = this.getAttendancePolicy();
+
+            if (!location) {
+                throw new Error('تعذر تحديد الموقع الحالي بدقة. فعّل GPS ثم أعد المحاولة');
+            }
+
+            if (!Number.isFinite(location.accuracy) || location.accuracy > policy.maxAccuracyMeters) {
+                throw new Error(`دقة الموقع الحالية غير كافية (${Math.round(location.accuracy || 0)} متر)`);
             }
 
             if (btn) {
@@ -355,7 +362,7 @@ class AttendanceManager {
                 throw new Error('فشل فتح الكاميرا');
             }
 
-            showToast?.('ثبّت وجهك داخل الإطار. سيتم التحقق ثم تسجيل العملية تلقائياً.', 'info');
+            showToast?.('ثبّت وجهك داخل الإطار ثم اضغط التقاط الآن لإتمام التحقق.', 'info');
         } catch (error) {
             console.error('❌ Start attendance flow error:', error);
             showToast?.(error.message || 'تعذر بدء التحقق بالوجه', 'error');
@@ -410,14 +417,6 @@ class AttendanceManager {
         }
 
         // Check GPS location (من الكود القديم)
-        if (window.currentLat == null || window.currentLon == null) {
-            playSound?.('faceid-error');
-            showToast?.('تعذر قراءة الموقع الحالي، لا يمكن تسجيل العملية بدون موقع دقيق', 'error');
-            setCamStatus?.('مرفوض: الموقع غير متوفر');
-            faceRecognition?.restartCamLoop();
-            return;
-        }
-
         if (window.currentLat && window.currentLon) {
             const policy = this.getAttendancePolicy();
             const dist = this.getDistanceFromLatLonInKm(

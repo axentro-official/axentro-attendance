@@ -480,7 +480,7 @@ class FaceRecognitionManager {
             const ready = this.modelsLoaded ? true : await this.loadModelsWithSafetyNet();
             if (!ready) throw new Error('تعذر تحميل نماذج التعرف على الوجه');
 
-            setCamStatus?.('<i class="fas fa-camera"></i> ضع الوجه داخل الإطار ثم اضغط "التقاط الآن"');
+            setCamStatus?.(enrollmentMode ? '<i class="fas fa-camera"></i> ضع الوجه داخل الإطار ثم اضغط التقاط الآن لحفظ البصمة...' : '<i class="fas fa-camera"></i> وجّه الكاميرا إلى وجهك ثم اضغط التقاط الآن للتحقق...');
             this.startDetectionLoop();
             return true;
         } catch (e) {
@@ -832,7 +832,7 @@ class FaceRecognitionManager {
         if (!faceReady) {
             window.stabilityCounter = 0;
             updateStabilityRing?.(0, stableFramesRequired);
-            setCamStatus?.('<i class="fas fa-face-smile"></i> ضع الوجه داخل الإطار وسيتم الالتقاط تلقائياً...');
+            setCamStatus?.('<i class="fas fa-face-smile"></i> ضع الوجه داخل الإطار ثم اضغط التقاط الآن...');
             return;
         }
 
@@ -842,15 +842,19 @@ class FaceRecognitionManager {
                 return;
             }
 
-            window.stabilityCounter++;
+            window.stabilityCounter = Math.min(stableFramesRequired, window.stabilityCounter + 1);
             updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
 
             if (window.stabilityCounter >= stableFramesRequired) {
-                setCamStatus?.('<i class="fas fa-camera"></i> تم اكتشاف الوجه - اضغط "التقاط الآن"');
+                setCamStatus?.('<i class="fas fa-camera"></i> الوجه جاهز - اضغط التقاط الآن لحفظ البصمة...');
             } else {
-                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك لحظة ثم اضغط "التقاط الآن"');
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك لحظة ثم اضغط التقاط الآن...');
             }
 
+            if (window.autoCaptureTimeout) {
+                clearTimeout(window.autoCaptureTimeout);
+                window.autoCaptureTimeout = null;
+            }
             return;
         }
 
@@ -869,18 +873,24 @@ class FaceRecognitionManager {
 
             if (livenessOk === false) {
                 if (window.autoCaptureTimeout) clearTimeout(window.autoCaptureTimeout);
+                window.autoCaptureTimeout = null;
                 window.stabilityCounter = 0;
                 updateStabilityRing?.(0, stableFramesRequired);
                 return;
             }
 
-            window.stabilityCounter++;
+            window.stabilityCounter = Math.min(stableFramesRequired, window.stabilityCounter + 1);
             updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
 
             if (window.stabilityCounter >= stableFramesRequired) {
-                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> الوجه جاهز - اضغط "التقاط الآن"');
+                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> التحقق الحيوي جاهز - اضغط التقاط الآن...');
             } else {
-                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك ثم اضغط "التقاط الآن"');
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك ثم اضغط التقاط الآن...');
+            }
+
+            if (window.autoCaptureTimeout) {
+                clearTimeout(window.autoCaptureTimeout);
+                window.autoCaptureTimeout = null;
             }
         }
     }
@@ -1187,13 +1197,11 @@ class FaceRecognitionManager {
 
     flashSuccess(message = 'تم التحقق بنجاح') {
         this.showMatchResult(true);
-        playSound?.('faceid-success');
         setCamStatus?.(`<i class="fas fa-check-circle" style="color:#10b981;"></i> ${message}`);
     }
 
     flashFailure(message = 'فشل التحقق') {
         this.showMatchResult(false);
-        playSound?.('faceid-error');
         setCamStatus?.(`<i class="fas fa-times-circle" style="color:#ef4444;"></i> ${message}`);
     }
 

@@ -758,22 +758,29 @@ window.handleFaceUpdateCapture = async function(descriptor) {
             if (imageUrl) {
                 window.userImage = imageUrl;
                 window.user.profile_image_url = imageUrl;
+                try {
+                    const role = window.user?.role || (window.user?.isAdmin ? 'admin' : 'employee');
+                    const identifier = role === 'admin' ? (window.user?.username || 'admin') : (window.user?.code || 'unknown');
+                    localStorage.setItem(`axentro_avatar_${role}_${String(identifier).trim().toLowerCase()}`, imageUrl);
+                } catch (_) {}
+                if (window.app?.syncProfileAvatarUI) window.app.syncProfileAvatarUI(imageUrl, window.user);
             }
             if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
-            try { localStorage.removeItem(app?.getUserAvatarStorageKey?.(window.user)); } catch (_) {}
         }
         showMatchResult?.(true);
         showToast?.('تم تحديث البصمة بنجاح', 'success');
         window.faceUpdateTargetUser = null;
-        setTimeout(() => closeCamera?.(), 800);
-        showApp?.();
+        setTimeout(() => {
+            closeCamera?.();
+            showApp?.();
+            window.__faceUpdateInFlight = false;
+        }, 800);
     } catch (e) {
         console.error('❌ Face update error:', e);
         playSound?.('faceid-error');
         showMatchResult?.(false);
         showToast?.(e.message || 'فشل تحديث البصمة', 'error');
         faceRecognition?.restartCamLoop();
-    } finally {
         window.__faceUpdateInFlight = false;
     }
 };

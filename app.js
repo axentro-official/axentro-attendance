@@ -655,10 +655,11 @@ class App {
         const fallback = (() => {
             try { return localStorage.getItem(this.getUserAvatarStorageKey(user)) || ''; } catch (_) { return ''; }
         })();
-        const serverImage = user?.profile_image_url || '';
-        const runtimeImage = window.userImage || '';
-        if (runtimeImage) return runtimeImage;
-        if (serverImage) return serverImage;
+        const serverImage = window.userImage || user?.profile_image_url || '';
+        if (serverImage) {
+            try { localStorage.setItem(this.getUserAvatarStorageKey(user), serverImage); } catch (_) {}
+            return serverImage;
+        }
         return fallback || '';
     }
 
@@ -1201,16 +1202,10 @@ function setStatus(txt) {
 }
 
 // Password toggle
-function togglePassword(id, trigger = null) {
-    const input = document.getElementById(id);
-    if (!input) return;
-
-    input.type = input.type === 'password' ? 'text' : 'password';
-
-    const button = trigger || document.querySelector(`[onclick*="${id}"]`) || null;
-    const icon = button?.querySelector?.('i');
-    if (icon) {
-        icon.className = input.type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+function togglePassword(id) {
+    const i = document.getElementById(id);
+    if (i) {
+        i.type = i.type === 'password' ? 'text' : 'password';
     }
 }
 

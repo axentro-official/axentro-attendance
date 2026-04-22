@@ -593,32 +593,32 @@ class AuthManager {
             if (body) {
                 body.innerHTML = `
                     <div class="password-wrapper">
-                        <input type="password" id="changePwOldInput" placeholder="كلمة السر الحالية">
-                        <button type="button" class="toggle-password" onclick="togglePassword('changePwOldInput', this)">
+                        <input type="password" id="modalOldPassword" placeholder="كلمة السر الحالية">
+                        <button type="button" class="toggle-password" data-target="modalOldPassword">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
                     <div class="password-wrapper">
-                        <input type="password" id="changePwNewInput" placeholder="كلمة السر الجديدة">
-                        <button type="button" class="toggle-password" onclick="togglePassword('changePwNewInput', this)">
+                        <input type="password" id="modalNewPassword" placeholder="كلمة السر الجديدة">
+                        <button type="button" class="toggle-password" data-target="modalNewPassword">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
-                    <button type="button" class="btn btn-change-pw" onclick="submitChangePassword()">تحديث</button>
+                    <button class="btn btn-change-pw" onclick="submitChangePassword()">تحديث</button>
                 `;
             }
         } else {
             if (title) title.textContent = 'تغيير كلمة سر موظف';
             if (body) {
                 body.innerHTML = `
-                    <input type="text" id="changePwTargetCodeInput" placeholder="كود الموظف">
+                    <input type="text" id="targetEmpCode" placeholder="كود الموظف">
                     <div class="password-wrapper">
-                        <input type="password" id="changePwAdminNewInput" placeholder="كلمة السر الجديدة">
-                        <button type="button" class="toggle-password" onclick="togglePassword('changePwAdminNewInput', this)">
+                        <input type="password" id="modalAdminNewPassword" placeholder="كلمة السر الجديدة">
+                        <button type="button" class="toggle-password" data-target="modalAdminNewPassword">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
-                    <button type="button" class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>
+                    <button class="btn btn-change-pw" onclick="submitChangePassword()">تغيير</button>
                 `;
             }
         }
@@ -638,10 +638,12 @@ class AuthManager {
     }
 
     async submitChangePassword() {
+        const modal = document.getElementById('changePwModal');
+        const scope = modal || document;
+
         if (this.pwChangeMode === 'own') {
-            const modalScope = document.getElementById('changePwModal');
-            const oldPw = modalScope?.querySelector('#changePwOldInput')?.value?.trim();
-            const newPw = modalScope?.querySelector('#changePwNewInput')?.value?.trim();
+            const oldPw = scope.querySelector('#modalOldPassword')?.value?.trim();
+            const newPw = scope.querySelector('#modalNewPassword')?.value?.trim();
 
             if (!oldPw || !newPw) {
                 return this.toast('يرجى ملء الحقول', 'error');
@@ -667,9 +669,8 @@ class AuthManager {
             return;
         }
 
-        const modalScope = document.getElementById('changePwModal');
-        const targetCode = modalScope?.querySelector('#changePwTargetCodeInput')?.value?.trim()?.toUpperCase();
-        const newPw = modalScope?.querySelector('#changePwAdminNewInput')?.value?.trim();
+        const targetCode = scope.querySelector('#targetEmpCode')?.value?.trim()?.toUpperCase();
+        const newPw = scope.querySelector('#modalAdminNewPassword')?.value?.trim();
 
         if (!targetCode || !newPw) {
             return this.toast('يرجى إدخال البيانات', 'error');
