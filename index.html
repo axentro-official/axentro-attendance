@@ -203,7 +203,7 @@
 
             <div class="info-box">
                 <i class="fas fa-info-circle"></i>
-                <p>أدخل كود الموظف أو اسم مستخدم الأدمن وسيتم إرسال كلمة مرور جديدة إلى البريد الإلكتروني المسجل.</p>
+                <p id="forgotPasswordHelper">أدخل الكود أو اسم المستخدم، ثم اطلب رمز إعادة التعيين. بعد ذلك أدخل الرمز وكلمة المرور الجديدة لإكمال العملية.</p>
             </div>
 
             <form id="forgotPasswordForm" class="auth-form">
@@ -212,9 +212,19 @@
                     <input type="text" id="forgotCode" placeholder="مثال: EMP001 أو admin" required>
                 </div>
 
+                <div class="input-group">
+                    <label for="forgotResetToken"><i class="fas fa-key"></i> رمز إعادة التعيين</label>
+                    <input type="text" id="forgotResetToken" placeholder="أدخل الرمز المكوّن من 6 أرقام">
+                </div>
+
+                <div class="input-group">
+                    <label for="forgotNewPassword"><i class="fas fa-lock"></i> كلمة المرور الجديدة</label>
+                    <input type="password" id="forgotNewPassword" placeholder="مثال: Axentro@2026">
+                </div>
+
                 <button type="submit" class="btn btn-primary btn-block" id="forgotPasswordBtn">
                     <i class="fas fa-paper-plane"></i>
-                    إرسال كلمة السر
+                    تنفيذ الاستعادة
                 </button>
             </form>
         </div>

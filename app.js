@@ -966,6 +966,8 @@ class App {
     populateWorksiteFields(site) {
         if (!site) return;
         const mappings = {
+            worksiteName: site.name || 'المقر الرئيسي',
+            worksiteMapUrl: site.map_url || '',
             worksiteLatitude: site.latitude,
             worksiteLongitude: site.longitude,
             worksiteAllowedRadius: site.allowed_radius_meters,
@@ -975,6 +977,49 @@ class App {
             const input = document.getElementById(id);
             if (input) input.value = value ?? '';
         });
+        const summary = document.getElementById('worksiteSummaryCard');
+        if (summary) {
+            summary.innerHTML = `<strong>${site.name || 'المقر الرئيسي'}</strong><br>Latitude: ${site.latitude ?? '-'} | Longitude: ${site.longitude ?? '-'}<br>المسافة المسموح بها: ${site.allowed_radius_meters ?? '-'} متر - أقصى دقة: ${site.max_accuracy_meters ?? '-'} متر`;
+        }
+    }
+
+    extractCoordinatesFromMapUrl(url) {
+        const value = String(url || '').trim();
+        if (!value) return null;
+        const patterns = [/@(-?\d+\.\d+),(-?\d+\.\d+)/, /q=(-?\d+\.\d+),(-?\d+\.\d+)/, /ll=(-?\d+\.\d+),(-?\d+\.\d+)/];
+        for (const pattern of patterns) {
+            const match = value.match(pattern);
+            if (match) return { latitude: parseFloat(match[1]), longitude: parseFloat(match[2]) };
+        }
+        return null;
+    }
+
+    extractWorksiteFromMapUrl() {
+        const url = document.getElementById('worksiteMapUrl')?.value || '';
+        const coords = this.extractCoordinatesFromMapUrl(url);
+        if (!coords || Number.isNaN(coords.latitude) || Number.isNaN(coords.longitude)) {
+            showToast('تعذر استخراج الإحداثيات من الرابط. استخدم رابط Google Maps يحتوي على الإحداثيات.', 'error');
+            return;
+        }
+        const lat = document.getElementById('worksiteLatitude');
+        const lon = document.getElementById('worksiteLongitude');
+        if (lat) lat.value = coords.latitude;
+        if (lon) lon.value = coords.longitude;
+        showToast('تم استخراج الإحداثيات من الرابط بنجاح', 'success');
+    }
+
+    useCurrentLocationForWorksite() {
+        if (!navigator.geolocation) {
+            showToast('المتصفح لا يدعم خدمة الموقع', 'error');
+            return;
+        }
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const lat = document.getElementById('worksiteLatitude');
+            const lon = document.getElementById('worksiteLongitude');
+            if (lat) lat.value = pos.coords.latitude;
+            if (lon) lon.value = pos.coords.longitude;
+            showToast('تم استخدام موقعك الحالي', 'success');
+        }, () => showToast('تعذر الوصول إلى الموقع الحالي', 'error'), { enableHighAccuracy: true, timeout: 15000 });
     }
 
     async promptFaceUpdate() {
@@ -1071,22 +1116,31 @@ class App {
             showToast('هذا الإجراء متاح للأدمن فقط', 'error');
             return;
         }
+        const mapUrl = document.getElementById('worksiteMapUrl')?.value || '';
+        const name = document.getElementById('worksiteName')?.value?.trim() || 'المقر الرئيسي';
+        let latitude = parseFloat(document.getElementById('worksiteLatitude')?.value || '');
+        let longitude = parseFloat(document.getElementById('worksiteLongitude')?.value || '');
+        const extracted = (!Number.isFinite(latitude) || !Number.isFinite(longitude)) ? this.extractCoordinatesFromMapUrl(mapUrl) : null;
+        if (extracted) { latitude = extracted.latitude; longitude = extracted.longitude; }
         const payload = {
-            latitude: parseFloat(document.getElementById('worksiteLatitude')?.value || ''),
-            longitude: parseFloat(document.getElementById('worksiteLongitude')?.value || ''),
+            name,
+            map_url: mapUrl || null,
+            latitude,
+            longitude,
             allowed_radius_meters: parseInt(document.getElementById('worksiteAllowedRadius')?.value || '', 10),
-            max_accuracy_meters: parseInt(document.getElementById('worksiteMaxAccuracy')?.value || '', 10)
+            max_accuracy_meters: parseInt(document.getElementById('worksiteMaxAccuracy')?.value || '', 10),
+            is_active: true
         };
-        if (Object.values(payload).some(v => Number.isNaN(v))) {
-            showToast('يرجى إدخال قيم صحيحة لإعدادات المقر', 'error');
+        if ([payload.latitude, payload.longitude, payload.allowed_radius_meters, payload.max_accuracy_meters].some(v => Number.isNaN(v))) {
+            showToast('يرجى إدخال رابط صحيح أو إحداثيات صحيحة مع المسافة والدقة', 'error');
             return;
         }
-        const result = await db.getWorksiteSettings();
-        const save = await db.updateWorksiteSettings(result?.id, payload);
+        const save = await db.updateWorksiteSettings(null, payload);
         if (!save?.success) {
             showToast(save?.error || 'فشل حفظ إعدادات المقر', 'error');
             return;
         }
+        this.populateWorksiteFields(save.data || payload);
         if (window.attendance?.loadWorksitePolicy) await window.attendance.loadWorksitePolicy(true);
         showToast('تم حفظ إعدادات المقر بنجاح', 'success');
     }

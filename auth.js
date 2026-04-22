@@ -63,7 +63,7 @@ class AuthManager {
                 db.currentUser = session.user;
             }
 
-            window.sessionDescriptor = session.user?.face_descriptor || null;
+            window.sessionDescriptor = null;
             window.forceFaceEnrollment = false;
             window.firstTimeSetupMode = false;
 
@@ -125,7 +125,8 @@ class AuthManager {
 
         const sessionData = {
             user,
-            accessToken: 'local_session',
+            accessToken: user?.session_token || 'local_session',
+            sessionToken: user?.session_token || null,
             expiresAt: new Date(Date.now() + duration).toISOString()
         };
 
@@ -137,7 +138,7 @@ class AuthManager {
 
         this.currentUser = user;
         window.user = user;
-        window.sessionDescriptor = user?.face_descriptor || null;
+        window.sessionDescriptor = null;
         window.forceFaceEnrollment = !user?.face_enrolled;
 
         console.log(`👤 User logged in: ${user.name}`);
@@ -247,7 +248,7 @@ class AuthManager {
 
             this.currentUser = result.user;
             window.user = result.user;
-            window.sessionDescriptor = result.user?.face_descriptor || null;
+            window.sessionDescriptor = null;
             window.sessionRole = result.user?.role || (result.user?.isAdmin ? 'admin' : 'employee');
             this.pendingLoginUser = result.user;
             this.pendingRememberMe = rememberMe;
@@ -349,7 +350,9 @@ class AuthManager {
                     isAdmin: role === 'admin',
                     isFirstLogin: !!(rawUser.is_first_login ?? rawUser.isFirstLogin),
                     face_enrolled: !!(rawUser.face_enrolled ?? rawUser.faceEnrolled),
-                    face_descriptor: rawUser.face_descriptor || null
+                    face_descriptor: null,
+                    session_token: rawUser.session_token || result.session_token || null,
+                    session_expires_at: rawUser.session_expires_at || result.session_expires_at || null
                 };
 
                 return {
@@ -380,20 +383,18 @@ class AuthManager {
                 'axentro_saved_login',
                 JSON.stringify({
                     code: user.code || codeInput?.value?.trim()?.toUpperCase(),
-                    password: passInput?.value || ''
+password: ''
                 })
             );
         }
 
         this.updateLastActivity();
 
-        if (user.face_descriptor || typeof fetchUserDataInBackground === 'function') {
-            window.sessionDescriptor = user.face_descriptor || null;
+        if (typeof fetchUserDataInBackground === 'function') {
+            window.sessionDescriptor = null;
             window.sessionRole = user.role || (user.isAdmin ? 'admin' : 'employee');
 
-            if (!window.sessionDescriptor) {
-                console.log('⚠️ No face descriptor - will prompt for registration');
-            }
+            console.log('✅ Session token stored successfully');
         }
     }
 
@@ -750,8 +751,10 @@ class AuthManager {
     }
 
     async submitForgotPw() {
-        const codeInput = document.getElementById('forgotCode');
-        const identifier = codeInput?.value?.trim();
+        const identifier = document.getElementById('forgotCode')?.value?.trim();
+        const resetToken = document.getElementById('forgotResetToken')?.value?.trim();
+        const newPassword = document.getElementById('forgotNewPassword')?.value || '';
+        const helper = document.getElementById('forgotPasswordHelper');
 
         if (!identifier) {
             return this.toast('يرجى إدخال كود الموظف أو اسم مستخدم الأدمن', 'error');
@@ -762,20 +765,31 @@ class AuthManager {
                 throw new Error('Database service not available');
             }
 
-            const result = await db.requestPasswordReset(identifier);
+            if (!resetToken || !newPassword) {
+                const result = await db.requestPasswordReset(identifier, true);
+                if (!result?.success) {
+                    this.toast(result?.error || 'تعذر إنشاء رمز التعيين', 'error');
+                    return;
+                }
+                const tokenInput = document.getElementById('forgotResetToken');
+                if (tokenInput) tokenInput.value = result.reset_token || '';
+                if (helper) helper.innerHTML = `تم إنشاء رمز إعادة التعيين: <strong>${result.reset_token || '---'}</strong> - صالح لمدة ${result.expires_in_minutes || 15} دقيقة.`;
+                this.toast('تم إنشاء رمز إعادة التعيين. أدخل كلمة المرور الجديدة ثم أعد الضغط على الزر.', 'success');
+                return;
+            }
 
+            const result = await db.completePasswordReset(identifier, resetToken, newPassword);
             if (result?.success) {
-                this.toast(
-                    result?.message || 'تم إرسال كلمة المرور الجديدة إلى بريدك الإلكتروني',
-                    'success'
-                );
+                this.toast('تم تحديث كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.', 'success');
+                document.getElementById('forgotPasswordForm')?.reset?.();
+                if (helper) helper.textContent = 'أدخل الكود أو اسم المستخدم، ثم اطلب رمز إعادة التعيين. بعد ذلك أدخل الرمز وكلمة المرور الجديدة لإكمال العملية.';
                 this.closeForgotPw();
             } else {
-                this.toast(result?.error || 'تعذر إرسال كلمة المرور', 'error');
+                this.toast(result?.error || 'تعذر إكمال إعادة التعيين', 'error');
             }
         } catch (error) {
             console.error('Forgot password error:', error);
-            this.toast('حدث خطأ أثناء استعادة كلمة المرور', 'error');
+            this.toast(error.message || 'حدث خطأ أثناء استعادة كلمة المرور', 'error');
         }
     }
 

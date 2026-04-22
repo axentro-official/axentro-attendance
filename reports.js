@@ -337,7 +337,7 @@ class ReportsManager {
             }
 
             // Prepare data for export
-            const exportData = this.currentRecord.map(record => ({
+            const exportData = this.currentReportData.map(record => ({
                 'التاريخ': Utils.formatDate(record.created_at, 'date'),
                 'الوقت': Utils.formatDate(record.created_at, 'time'),
                 'الحالة': record.type,

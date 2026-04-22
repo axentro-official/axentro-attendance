@@ -27,8 +27,19 @@ const AppConfig = {
             changeOwnPassword: 'change_own_password_secure',
             adminChangeEmployeePassword: 'admin_change_employee_password_secure',
             recordAttendance: 'record_attendance_secure',
-            enrollFace: 'save_face_enrollment',
-            getFaceContext: 'get_face_context',
+            enrollFace: 'save_face_enrollment_secure',
+            getFaceContext: 'get_face_context_secure',
+            logout: 'logout_secure',
+            requestPasswordReset: 'request_password_reset',
+            completePasswordReset: 'complete_password_reset',
+            getWorksiteSettings: 'get_worksite_settings_secure',
+            saveWorksiteSettings: 'save_worksite_settings_secure',
+            listEmployees: 'list_employees_secure',
+            getTodayAttendance: 'get_today_attendance_secure',
+            getAttendanceByRange: 'get_attendance_by_range_secure',
+            updateProfileImage: 'update_profile_image_secure',
+            deleteEmployee: 'delete_employee_secure',
+            updateEmployee: 'update_employee_secure',
             logSensitiveAction: 'log_sensitive_action'
         }
     },
@@ -71,7 +82,7 @@ const AppConfig = {
             quality: 0.96
         },
         antiSpoof: {
-            enabled: true,
+            enabled: false,
             requireBlink: true,
             requireTurnLeftRight: true,
             requireNod: true,
@@ -124,12 +135,12 @@ const AppConfig = {
 
     security: {
         password: {
-            minLength: 4,
-            maxLength: 50,
-            requireUppercase: false,
-            requireLowercase: false,
-            requireNumbers: false,
-            requireSpecialChars: false
+            minLength: 8,
+            maxLength: 64,
+            requireUppercase: true,
+            requireLowercase: true,
+            requireNumbers: true,
+            requireSpecialChars: true
         },
         session: {
             timeout: 10 * 60 * 60 * 1000,
@@ -217,7 +228,7 @@ const AppConfig = {
     },
 
     debug: {
-        enabled: true,
+        enabled: false,
         level: 'info'
     }
 };
