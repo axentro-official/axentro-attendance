@@ -549,7 +549,7 @@ password: ''
         const newPw = newPwInput?.value?.trim();
         const firstPwError = document.getElementById('firstNewPwError');
         const validation = Validator?.validatePassword?.(newPw);
-        if (!newPw || !validation?.isValid) {
+        if (!newPw || validation?.valid !== true) {
             if (firstPwError) { firstPwError.style.display = 'block'; firstPwError.textContent = 'كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز'; }
             return this.toast('كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز', 'error');
         }
