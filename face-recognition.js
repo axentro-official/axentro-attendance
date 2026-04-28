@@ -393,7 +393,7 @@ class FaceRecognitionManager {
                 cameraTitle.textContent = enrollmentMode ? 'تسجيل بصمة الوجه' : 'التحقق ببصمة الوجه';
             }
             if (manualCaptureBtn) {
-                manualCaptureBtn.style.display = 'inline-block';
+                manualCaptureBtn.style.display = enrollmentMode ? 'inline-block' : 'none';
             }
 
             setCamStatus?.('<i class="fas fa-video"></i> جاري تشغيل الكاميرا...');
@@ -470,6 +470,12 @@ class FaceRecognitionManager {
             updateStabilityRing?.(0, 2);
 
             if (window.attMode || window.adminVerifyMode || window.adminResetFaceMode) {
+                window.currentLivenessChallenge = null;
+                if (typeof db !== 'undefined' && typeof db.issueLivenessChallenge === 'function') {
+                    const challenge = await db.issueLivenessChallenge();
+                    if (!challenge?.success) throw new Error(challenge?.error || 'فشل إنشاء تحدي التحقق الحيوي');
+                    window.currentLivenessChallenge = challenge;
+                }
                 resetLiveness?.();
             }
 
@@ -883,14 +889,17 @@ class FaceRecognitionManager {
             updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
 
             if (window.stabilityCounter >= stableFramesRequired) {
-                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> التحقق الحيوي جاهز - اضغط التقاط الآن...');
+                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> تم التحقق الحيوي - سيتم الالتقاط تلقائيًا...');
+                if (!window.autoCaptureTimeout && !window.isProcessingCapture) {
+                    const delay = AppConfig?.faceRecognition?.antiSpoof?.autoCaptureDelayMs || 450;
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), delay);
+                }
             } else {
-                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك ثم اضغط التقاط الآن...');
-            }
-
-            if (window.autoCaptureTimeout) {
-                clearTimeout(window.autoCaptureTimeout);
-                window.autoCaptureTimeout = null;
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك لحظة...');
+                if (window.autoCaptureTimeout) {
+                    clearTimeout(window.autoCaptureTimeout);
+                    window.autoCaptureTimeout = null;
+                }
             }
         }
     }
@@ -938,6 +947,8 @@ class FaceRecognitionManager {
             this.startDetectionLoop();
             return;
         }
+
+        window.currentLivenessProof = this.buildLivenessProof?.() || null;
 
         try {
             if (window.regMode) {
@@ -1062,14 +1073,24 @@ class FaceRecognitionManager {
     }
 
     resetLiveness() {
+        const anti = AppConfig?.faceRecognition?.antiSpoof || {};
         window.livenessActive = true;
         window.livenessState = {
-            stage: 'blink',
+            stage: anti.requireBlink ? 'blink' : 'turn',
             blinkClosed: false,
             blinkCount: 0,
+            yawStart: null,
+            yawMin: 9999,
+            yawMax: -9999,
+            noseYStart: null,
+            noseYMin: 9999,
+            noseYMax: -9999,
             startedAt: Date.now(),
-            passAt: Date.now() + 1800
+            expiresAt: Date.now() + (anti.challengeTimeoutMs || 9000),
+            passedAt: null,
+            challengeToken: window.currentLivenessChallenge?.challenge_token || null
         };
+        window.currentLivenessProof = null;
         window.stabilityCounter = 0;
     }
 
@@ -1077,17 +1098,17 @@ class FaceRecognitionManager {
         if (!window.livenessActive) return true;
 
         const anti = AppConfig?.faceRecognition?.antiSpoof || {};
-        const state = window.livenessState || {
-            stage: 'blink',
-            blinkClosed: false,
-            blinkCount: 0,
-            startedAt: Date.now(),
-            passAt: Date.now() + 1800
-        };
+        const state = window.livenessState || {};
         window.livenessState = state;
 
         if (!landmarks) {
-            setCamStatus?.('<i class="fas fa-spinner fa-spin"></i> تجهيز التحقق...');
+            setCamStatus?.('<i class="fas fa-spinner fa-spin"></i> تجهيز التحقق الحيوي...');
+            return false;
+        }
+
+        if (Date.now() > (state.expiresAt || 0)) {
+            this.resetLiveness();
+            setCamStatus?.('<i class="fas fa-shield-alt"></i> انتهت مهلة التحقق، أعد المحاولة...');
             return false;
         }
 
@@ -1096,31 +1117,64 @@ class FaceRecognitionManager {
         const ear = (leftEAR + rightEAR) / 2;
         const blinkThreshold = anti.earBlinkThreshold || 0.19;
 
+        const nose = landmarks.getNose?.()?.[3] || landmarks.getNose?.()?.[0] || { y: 0 };
+        const yawValue = Number.isFinite(yaw) ? yaw : 0;
+        if (state.yawStart === null || state.yawStart === undefined) state.yawStart = yawValue;
+        if (state.noseYStart === null || state.noseYStart === undefined) state.noseYStart = nose.y || 0;
+        state.yawMin = Math.min(state.yawMin ?? yawValue, yawValue);
+        state.yawMax = Math.max(state.yawMax ?? yawValue, yawValue);
+        state.noseYMin = Math.min(state.noseYMin ?? (nose.y || 0), nose.y || 0);
+        state.noseYMax = Math.max(state.noseYMax ?? (nose.y || 0), nose.y || 0);
+
         if (state.stage === 'blink') {
-            setCamStatus?.('<i class="fas fa-eye"></i> ارمش مرة واحدة أو ثبت وجهك لثانية...');
+            setCamStatus?.('<i class="fas fa-eye"></i> ارمش مرة واحدة للتأكد من أن الوجه حي...');
             if (ear && ear < blinkThreshold && !state.blinkClosed) {
                 state.blinkClosed = true;
             } else if (ear && ear >= blinkThreshold && state.blinkClosed) {
                 state.blinkClosed = false;
-                state.blinkCount += 1;
+                state.blinkCount = (state.blinkCount || 0) + 1;
             }
+            if ((state.blinkCount || 0) < (anti.minBlinks || 1)) return false;
+            state.stage = anti.requireTurnLeftRight ? 'turn' : (anti.requireNod ? 'nod' : 'done');
+        }
 
-            if (state.blinkCount >= 1 || Date.now() >= state.passAt) {
-                state.stage = 'done';
-            } else {
-                return false;
-            }
+        if (state.stage === 'turn') {
+            setCamStatus?.('<i class="fas fa-arrows-alt-h"></i> حرّك رأسك يمين أو شمال حركة بسيطة...');
+            const yawDelta = Math.abs((state.yawMax || 0) - (state.yawMin || 0));
+            if (yawDelta < (anti.yawMovementPx || 12)) return false;
+            state.stage = anti.requireNod ? 'nod' : 'done';
+        }
+
+        if (state.stage === 'nod') {
+            setCamStatus?.('<i class="fas fa-arrows-alt-v"></i> حرّك رأسك لأعلى أو لأسفل حركة بسيطة...');
+            const pitchDelta = Math.abs((state.noseYMax || 0) - (state.noseYMin || 0));
+            if (pitchDelta < (anti.pitchMovementPx || 10)) return false;
+            state.stage = 'done';
         }
 
         if (state.stage === 'done') {
             window.livenessActive = false;
-            setCamStatus?.('<i class="fas fa-check-circle"></i> ممتاز، ثبت وجهك لحظة...');
+            state.passedAt = Date.now();
+            window.currentLivenessProof = this.buildLivenessProof();
+            setCamStatus?.('<i class="fas fa-check-circle"></i> تم اجتياز التحقق الحيوي، ثبت وجهك لحظة...');
             return true;
         }
 
         return false;
     }
 
+    buildLivenessProof() {
+        const state = window.livenessState || {};
+        return {
+            challenge_token: state.challengeToken || window.currentLivenessChallenge?.challenge_token || null,
+            blink_count: state.blinkCount || 0,
+            yaw_delta: Math.round(Math.abs((state.yawMax || 0) - (state.yawMin || 0)) * 100) / 100,
+            pitch_delta: Math.round(Math.abs((state.noseYMax || 0) - (state.noseYMin || 0)) * 100) / 100,
+            started_at: state.startedAt || null,
+            passed_at: state.passedAt || Date.now(),
+            user_agent_hash_hint: String(navigator.userAgent || '').slice(0, 80)
+        };
+    }
     getEyeAspectRatio(points) {
 
         try {

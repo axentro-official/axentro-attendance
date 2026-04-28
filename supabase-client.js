@@ -217,6 +217,7 @@ class SupabaseClient {
                 p_name: employeeData.name?.trim(),
                 p_email: employeeData.email || null,
                 p_plain_password: generatedPassword,
+                        apiKey: AppConfig?.emailService?.apiKey || '',
                 p_face_descriptor: employeeData.faceDescriptor || null,
                 p_profile_image_url: employeeData.profileImageUrl || null
             };
@@ -290,9 +291,22 @@ class SupabaseClient {
         }
     }
 
+    async issueLivenessChallenge() {
+        try {
+            const rpcName = AppConfig?.supabase?.rpc?.issueLivenessChallenge;
+            if (!rpcName) return { success: true, challenge_token: null, mode: 'client_only' };
+            const { data, error } = await this.rpc(rpcName, this.getSessionHeaders());
+            if (error) throw error;
+            return this.normalizePayload(data) || { success: false, error: 'Unknown challenge response' };
+        } catch (error) {
+            console.error('❌ Issue liveness challenge error:', error);
+            return { success: false, error: error.message || 'فشل إنشاء تحدي التحقق الحيوي' };
+        }
+    }
+
     async recordAttendanceSecure(record) {
         try {
-            const { data, error } = await this.rpc(AppConfig.supabase.rpc.recordAttendance, {
+            const params = {
                 ...this.getSessionHeaders(),
                 p_type: record.type,
                 p_shift: record.shift || 'لم يتم التحديد',
@@ -301,8 +315,32 @@ class SupabaseClient {
                 p_longitude: record.longitude ?? null,
                 p_gps_accuracy: record.gps_accuracy ?? null,
                 p_attendance_image_url: record.attendance_image_url || null,
-                p_face_verified: record.face_verified !== false
-            });
+                p_face_descriptor: Array.isArray(record.face_descriptor) ? record.face_descriptor : null,
+                p_liveness_token: record.liveness_token || null,
+                p_liveness_proof: record.liveness_proof || null
+            };
+
+            const primaryRpc = AppConfig?.supabase?.rpc?.recordAttendance || 'record_attendance_enterprise';
+            let response = await this.rpc(primaryRpc, params);
+
+            if (response?.error && AppConfig?.supabase?.rpc?.recordAttendanceLegacy) {
+                const msg = String(response.error.message || response.error.details || '');
+                if (/record_attendance_enterprise|function .* does not exist|schema cache|PGRST202/i.test(msg)) {
+                    response = await this.rpc(AppConfig.supabase.rpc.recordAttendanceLegacy, {
+                        ...this.getSessionHeaders(),
+                        p_type: record.type,
+                        p_shift: record.shift || 'لم يتم التحديد',
+                        p_location_link: record.location_link || null,
+                        p_latitude: record.latitude ?? null,
+                        p_longitude: record.longitude ?? null,
+                        p_gps_accuracy: record.gps_accuracy ?? null,
+                        p_attendance_image_url: record.attendance_image_url || null,
+                        p_face_verified: false
+                    });
+                }
+            }
+
+            const { data, error } = response;
             if (error) throw error;
             return this.normalizePayload(data) || { success: false, error: 'Unknown error' };
         } catch (error) {

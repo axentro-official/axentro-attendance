@@ -475,7 +475,9 @@ class AttendanceManager {
                 latitude: window.currentLat,
                 longitude: window.currentLon,
                 gps_accuracy: this.currentLocation?.accuracy || window.currentAccuracy || null,
-                face_verified: true
+                face_descriptor: descriptor,
+                liveness_token: window.currentLivenessChallenge?.challenge_token || null,
+                liveness_proof: window.currentLivenessProof || null
             });
 
             if (!result?.success) throw new Error(result?.error || 'فشل التسجيل');

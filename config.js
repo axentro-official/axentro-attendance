@@ -29,7 +29,9 @@ const AppConfig = {
             createEmployee: 'create_employee_secure',
             changeOwnPassword: 'change_own_password_secure',
             adminChangeEmployeePassword: 'admin_change_employee_password_secure',
-            recordAttendance: 'record_attendance_secure',
+            recordAttendance: 'record_attendance_enterprise',
+            recordAttendanceLegacy: 'record_attendance_secure',
+            issueLivenessChallenge: 'issue_liveness_challenge_secure',
             enrollFace: 'save_face_enrollment_secure',
             getFaceContext: 'get_face_context_secure',
             logout: 'logout_secure',
@@ -51,7 +53,8 @@ const AppConfig = {
     emailService: {
         url: 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec',
         adminEmail: 'axentroteam@gmail.com',
-        upperMgmtEmail: 'axentroofficial@gmail.com'
+        upperMgmtEmail: 'axentroofficial@gmail.com',
+        apiKey: ''
     },
 
     faceRecognition: {
@@ -86,7 +89,7 @@ const AppConfig = {
             quality: 0.96
         },
         antiSpoof: {
-            enabled: false,
+            enabled: true,
             requireBlink: true,
             requireTurnLeftRight: true,
             requireNod: true,
@@ -95,7 +98,9 @@ const AppConfig = {
             minBlinks: 1,
             yawMovementPx: 12,
             pitchMovementPx: 10,
-            challengeTimeoutMs: 7000,
+            challengeTimeoutMs: 9000,
+            autoCaptureDelayMs: 450,
+            serverVerification: true,
             consecutiveSingleFaceFrames: 6
         }
     },
