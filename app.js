@@ -43,6 +43,26 @@ class App {
         console.log('🏗️ App constructor initialized');
     }
 
+    applyBranding() {
+        try {
+            const branding = AppConfig?.branding || {};
+            const companyName = branding.companyName || AppConfig?.app?.name || 'Axentro System';
+            const tagline = branding.tagline || AppConfig?.app?.description || '';
+            document.title = companyName;
+            document.querySelectorAll('.auth-header h1').forEach((el) => { el.textContent = companyName; });
+            document.querySelectorAll('.auth-header p').forEach((el) => { el.textContent = tagline; });
+            document.querySelectorAll('.footer-copy').forEach((el, idx) => {
+                el.textContent = idx === 0 ? (branding.copyright || '© 2026 Axentro – All Rights Reserved') : (branding.footer || 'By Axentro Team');
+            });
+            document.querySelectorAll('a.qr-link').forEach((el) => { if (branding.websiteUrl) el.href = branding.websiteUrl; });
+            document.querySelectorAll('img.qr-code').forEach((el) => { if (branding.qrImage) el.src = branding.qrImage; });
+            document.documentElement.style.setProperty('--brand-primary', branding.primaryColor || '#2563eb');
+            document.documentElement.style.setProperty('--brand-accent', branding.accentColor || '#10b981');
+        } catch (error) {
+            console.warn('Branding apply skipped:', error);
+        }
+    }
+
     handleOnlineStatus() {
         const isOnline = navigator.onLine;
         window.isOnline = isOnline;
@@ -68,7 +88,8 @@ class App {
         console.log(`🚀 Starting Axentro Application v${AppConfig?.app?.version || '4.2.0'}`);
         
         try {
-            // Step 1: Update progress
+            // Step 1: Apply client branding before the UI becomes visible
+            this.applyBranding();
             this.updateProgress(10, 'تهيئة الواجهة...');
             await this.sleep(100);
 

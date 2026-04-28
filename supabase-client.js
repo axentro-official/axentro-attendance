@@ -217,7 +217,6 @@ class SupabaseClient {
                 p_name: employeeData.name?.trim(),
                 p_email: employeeData.email || null,
                 p_plain_password: generatedPassword,
-                        apiKey: AppConfig?.emailService?.apiKey || '',
                 p_face_descriptor: employeeData.faceDescriptor || null,
                 p_profile_image_url: employeeData.profileImageUrl || null
             };
@@ -246,6 +245,7 @@ class SupabaseClient {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         action: 'sendNewEmpEmails',
+                        apiKey: AppConfig?.emailService?.apiKey || '',
                         name: employeeData.name?.trim(),
                         code: payload.employee_code || payload.employeeCode || payload.code,
                         email: employeeData.email,

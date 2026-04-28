@@ -49,12 +49,23 @@ const AppConfig = {
             logSensitiveAction: 'log_sensitive_action'
         }
     },
+    branding: {
+        companyName: 'Axentro System',
+        productName: 'Axentro Attendance',
+        tagline: 'نظام إدارة الحضور والانصراف المتقدم',
+        copyright: '© 2026 Axentro – All Rights Reserved',
+        footer: 'By Axentro Team',
+        websiteUrl: 'https://axentro-official.github.io/axentro-website/links.html',
+        qrImage: 'qr-links.png',
+        primaryColor: '#2563eb',
+        accentColor: '#10b981'
+    },
 
     emailService: {
         url: 'https://script.google.com/macros/s/AKfycbxnJeFvBSZuH7E_NN3-8Mv5K694rCv_jrGTbT_sl5Tl0UnRmzuKZx8przHd1IuvgiQBMA/exec',
         adminEmail: 'axentroteam@gmail.com',
         upperMgmtEmail: 'axentroofficial@gmail.com',
-        apiKey: ''
+        apiKey: (typeof localStorage !== 'undefined' ? (localStorage.getItem('AXENTRO_EMAIL_API_KEY') || '') : '')
     },
 
     faceRecognition: {
@@ -192,7 +203,7 @@ const AppConfig = {
 
     app: {
         name: 'Axentro System',
-        version: '5.0.1',
+        version: '5.1.0-sellable',
         description: 'نظام حضور وانصراف آمن مع تحقق الوجه والموقع',
         author: 'Axentro Team',
         urls: {

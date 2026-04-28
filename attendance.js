@@ -362,7 +362,7 @@ class AttendanceManager {
                 throw new Error('فشل فتح الكاميرا');
             }
 
-            showToast?.('ثبّت وجهك داخل الإطار ثم اضغط التقاط الآن لإتمام التحقق.', 'info');
+            showToast?.('ثبّت وجهك واتبع تعليمات التحقق الحيوي، وسيتم الالتقاط تلقائيًا.', 'info');
         } catch (error) {
             console.error('❌ Start attendance flow error:', error);
             showToast?.(error.message || 'تعذر بدء التحقق بالوجه', 'error');
@@ -512,6 +512,31 @@ class AttendanceManager {
             setCamStatus?.('حدث خطأ أثناء التسجيل');
             faceRecognition?.restartCamLoop();
         }
+    }
+
+
+    sendAttendanceEmail(type, datetime, shift, hoursWorked, overtime) {
+        if (!AppConfig?.emailService?.url || !window.user) return;
+
+        const payload = {
+            action: 'sendAttAlert',
+            apiKey: AppConfig?.emailService?.apiKey || '',
+            name: window.user.name || window.user.display_name || 'موظف',
+            code: window.user.code || window.user.username || '-',
+            type,
+            datetime,
+            location: window.currentLoc || '-',
+            shift: shift || 'لم يتم التحديد',
+            hoursWorked: hoursWorked || '-',
+            overtime: overtime || 'لا يوجد'
+        };
+
+        fetch(AppConfig.emailService.url, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).catch((error) => console.warn('Attendance email skipped:', error));
     }
 
     async handleChangePasswordWithFace() {
