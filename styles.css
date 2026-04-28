@@ -2239,3 +2239,21 @@ body.auth-mode .global-app-footer{display:none;}
   .settings-modal-body{max-height:calc(94vh - 82px);}
   .admin-table.admin-employee-table{min-width:860px;}
 }
+
+/* Worksite link-only settings enhancement */
+.input-help {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #bfdbfe;
+    line-height: 1.6;
+}
+
+.advanced-worksite-fields summary {
+    user-select: none;
+}
+
+.advanced-worksite-fields input[readonly] {
+    opacity: 0.75;
+    cursor: not-allowed;
+}

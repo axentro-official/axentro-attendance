@@ -1018,33 +1018,55 @@ class App {
         });
         const summary = document.getElementById('worksiteSummaryCard');
         if (summary) {
-            summary.innerHTML = `<strong>${site.name || 'المقر الرئيسي'}</strong><br>${site.map_url ? `رابط الخريطة: <a href="${site.map_url}" target="_blank" style="color:#93c5fd">فتح الموقع</a><br>` : ''}Latitude: ${site.latitude ?? '-'} | Longitude: ${site.longitude ?? '-'}<br>المسافة المسموح بها: ${site.allowed_radius_meters ?? '-'} متر - أقصى دقة: ${site.max_accuracy_meters ?? '-'} متر`;
+            const mapUrl = site.map_url || (Number.isFinite(Number(site.latitude)) && Number.isFinite(Number(site.longitude)) ? this.buildGoogleMapsUrl(site.latitude, site.longitude) : '');
+            summary.innerHTML = `<strong>${site.name || 'المقر الرئيسي'}</strong><br>${mapUrl ? `رابط المقر: <a href="${mapUrl}" target="_blank" rel="noopener" style="color:#93c5fd">فتح Google Maps</a><br>` : ''}المسافة المسموح بها: ${site.allowed_radius_meters ?? '-'} متر - أقصى دقة GPS: ${site.max_accuracy_meters ?? '-'} متر<br><small style="color:#bfdbfe">الإحداثيات محفوظة داخليًا لحساب المسافة ولا يحتاج العميل لكتابتها يدويًا.</small>`;
         }
     }
 
+    normalizeMapUrlValue(url) {
+        return decodeURIComponent(String(url || '').trim().replace(/&amp;/g, '&'));
+    }
+
     extractCoordinatesFromMapUrl(url) {
-        const value = String(url || '').trim();
+        const value = this.normalizeMapUrlValue(url);
         if (!value) return null;
-        const patterns = [/@(-?\d+\.\d+),(-?\d+\.\d+)/, /q=(-?\d+\.\d+),(-?\d+\.\d+)/, /ll=(-?\d+\.\d+),(-?\d+\.\d+)/];
+
+        const patterns = [
+            /[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/i,
+            /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)(?:,|z|\/|$)/i,
+            /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/i,
+            /(-?\d{1,2}\.\d{4,})\s*,\s*(-?\d{1,3}\.\d{4,})/
+        ];
+
         for (const pattern of patterns) {
             const match = value.match(pattern);
-            if (match) return { latitude: parseFloat(match[1]), longitude: parseFloat(match[2]) };
+            if (!match) continue;
+            const latitude = Number(match[1]);
+            const longitude = Number(match[2]);
+            if (Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
+                return { latitude, longitude };
+            }
         }
         return null;
+    }
+
+    buildGoogleMapsUrl(latitude, longitude) {
+        return `https://maps.google.com/?q=${latitude},${longitude}`;
     }
 
     extractWorksiteFromMapUrl() {
         const url = document.getElementById('worksiteMapUrl')?.value || '';
         const coords = this.extractCoordinatesFromMapUrl(url);
-        if (!coords || Number.isNaN(coords.latitude) || Number.isNaN(coords.longitude)) {
-            showToast('تعذر استخراج الإحداثيات من الرابط. استخدم رابط Google Maps يحتوي على الإحداثيات.', 'error');
-            return;
+        if (!coords) {
+            showToast('الرابط لا يحتوي على إحداثيات مباشرة. افتح Google Maps ثم انسخ رابطًا يظهر فيه lat,lng أو استخدم زر موقعي الحالي.', 'error');
+            return null;
         }
         const lat = document.getElementById('worksiteLatitude');
         const lon = document.getElementById('worksiteLongitude');
         if (lat) lat.value = coords.latitude;
         if (lon) lon.value = coords.longitude;
-        showToast('تم استخراج الإحداثيات من الرابط بنجاح', 'success');
+        showToast('تم اختبار الرابط واستخراج موقع المقر بنجاح', 'success');
+        return coords;
     }
 
     useCurrentLocationForWorksite() {
@@ -1053,11 +1075,15 @@ class App {
             return;
         }
         navigator.geolocation.getCurrentPosition((pos) => {
+            const latitude = Number(pos.coords.latitude);
+            const longitude = Number(pos.coords.longitude);
             const lat = document.getElementById('worksiteLatitude');
             const lon = document.getElementById('worksiteLongitude');
-            if (lat) lat.value = pos.coords.latitude;
-            if (lon) lon.value = pos.coords.longitude;
-            showToast('تم استخدام موقعك الحالي', 'success');
+            const mapUrl = document.getElementById('worksiteMapUrl');
+            if (lat) lat.value = latitude;
+            if (lon) lon.value = longitude;
+            if (mapUrl) mapUrl.value = this.buildGoogleMapsUrl(latitude, longitude);
+            showToast('تم إنشاء رابط Google Maps من موقعك الحالي', 'success');
         }, () => showToast('تعذر الوصول إلى الموقع الحالي', 'error'), { enableHighAccuracy: true, timeout: 15000 });
     }
 
@@ -1155,25 +1181,38 @@ class App {
             showToast('هذا الإجراء متاح للأدمن فقط', 'error');
             return;
         }
-        const mapUrl = document.getElementById('worksiteMapUrl')?.value || '';
+        const mapUrl = String(document.getElementById('worksiteMapUrl')?.value || '').trim();
         const name = document.getElementById('worksiteName')?.value?.trim() || 'المقر الرئيسي';
-        let latitude = parseFloat(document.getElementById('worksiteLatitude')?.value || '');
-        let longitude = parseFloat(document.getElementById('worksiteLongitude')?.value || '');
-        const extracted = (!Number.isFinite(latitude) || !Number.isFinite(longitude)) ? this.extractCoordinatesFromMapUrl(mapUrl) : null;
-        if (extracted) { latitude = extracted.latitude; longitude = extracted.longitude; }
-        const payload = {
-            name,
-            map_url: mapUrl || null,
-            latitude,
-            longitude,
-            allowed_radius_meters: parseInt(document.getElementById('worksiteAllowedRadius')?.value || '', 10),
-            max_accuracy_meters: parseInt(document.getElementById('worksiteMaxAccuracy')?.value || '', 10),
-            is_active: true
-        };
-        if ([payload.latitude, payload.longitude, payload.allowed_radius_meters, payload.max_accuracy_meters].some(v => Number.isNaN(v))) {
-            showToast('يرجى إدخال رابط صحيح أو إحداثيات صحيحة مع المسافة والدقة', 'error');
+        const extracted = this.extractCoordinatesFromMapUrl(mapUrl);
+        const radius = Number.parseInt(document.getElementById('worksiteAllowedRadius')?.value || '', 10);
+        const maxAccuracy = Number.parseInt(document.getElementById('worksiteMaxAccuracy')?.value || '', 10);
+
+        if (!mapUrl) {
+            showToast('يرجى إدخال رابط المقر من Google Maps', 'error');
             return;
         }
+        if (!extracted) {
+            showToast('تعذر استخراج الإحداثيات من الرابط. استخدم زر موقعي الحالي أو انسخ رابطًا يحتوي على lat,lng من Google Maps.', 'error');
+            return;
+        }
+        if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(maxAccuracy) || maxAccuracy <= 0) {
+            showToast('يرجى إدخال المسافة المسموحة وأقصى دقة GPS بأرقام صحيحة', 'error');
+            return;
+        }
+
+        const lat = document.getElementById('worksiteLatitude');
+        const lon = document.getElementById('worksiteLongitude');
+        if (lat) lat.value = extracted.latitude;
+        if (lon) lon.value = extracted.longitude;
+
+        const payload = {
+            name,
+            map_url: mapUrl,
+            latitude: extracted.latitude,
+            longitude: extracted.longitude,
+            allowed_radius_meters: radius,
+            max_accuracy_meters: maxAccuracy
+        };
         const save = await db.updateWorksiteSettings(null, payload);
         if (!save?.success) {
             showToast(save?.error || 'فشل حفظ إعدادات المقر', 'error');
@@ -1181,7 +1220,7 @@ class App {
         }
         this.populateWorksiteFields(save.data || payload);
         if (window.attendance?.loadWorksitePolicy) await window.attendance.loadWorksitePolicy(true);
-        showToast('تم حفظ إعدادات المقر بنجاح', 'success');
+        showToast('تم حفظ رابط المقر والمسافة بنجاح', 'success');
     }
 
     clearLocalSettings() {

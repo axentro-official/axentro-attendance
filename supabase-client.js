@@ -520,8 +520,7 @@ class SupabaseClient {
                 p_latitude: updates?.latitude,
                 p_longitude: updates?.longitude,
                 p_allowed_radius_meters: updates?.allowed_radius_meters,
-                p_max_accuracy_meters: updates?.max_accuracy_meters,
-                p_is_active: updates?.is_active !== false
+                p_max_accuracy_meters: updates?.max_accuracy_meters
             });
             if (error) throw error;
             const payload = this.normalizePayload(data);
