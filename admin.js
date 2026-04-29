@@ -208,6 +208,137 @@ class AdminManager {
         }
     }
 
+
+
+    openAddEmployeeModal() {
+        if (!this.canAccessAdmin()) {
+            showToast?.('هذا الإجراء متاح للأدمن فقط', 'error');
+            return;
+        }
+        this.bindAdminUi();
+        const form = document.getElementById('addEmployeeModalForm');
+        if (form) form.reset();
+        if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('addEmployeeModal');
+        else document.getElementById('addEmployeeModal')?.classList.add('active');
+        setTimeout(() => document.getElementById('newEmpName')?.focus(), 120);
+    }
+
+    closeAddEmployeeModal() {
+        if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('addEmployeeModal');
+        else document.getElementById('addEmployeeModal')?.classList.remove('active');
+    }
+
+    async handleAddEmployeeForm(event) {
+        event?.preventDefault?.();
+        if (!this.canAccessAdmin()) {
+            showToast?.('هذا الإجراء متاح للأدمن فقط', 'error');
+            return;
+        }
+
+        const submitBtn = event?.target?.querySelector?.('button[type="submit"]');
+        const originalHtml = submitBtn?.innerHTML;
+        try {
+            const name = String(document.getElementById('newEmpName')?.value || '').trim();
+            const email = String(document.getElementById('newEmpEmail')?.value || '').trim();
+
+            if (!name || name.length < 3) {
+                showToast?.('يرجى إدخال اسم الموظف بشكل صحيح', 'error');
+                return;
+            }
+            if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+                showToast?.('البريد الإلكتروني غير صحيح', 'error');
+                return;
+            }
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري إنشاء الموظف...';
+            }
+
+            const result = await db?.createEmployee?.({ name, email });
+            if (!result?.success) {
+                throw new Error(result?.error || result?.message || 'فشل إنشاء الموظف');
+            }
+
+            this.closeAddEmployeeModal();
+            showToast?.(`تم إنشاء الموظف بنجاح - الكود: ${result.employee_code || result.code || '-'}`, 'success');
+            await this.loadEmployeesList();
+            if (window.app?.refreshData) await window.app.refreshData(true);
+        } catch (error) {
+            console.error('❌ Add employee error:', error);
+            showToast?.(error.message || 'حدث خطأ أثناء إضافة الموظف', 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHtml || '<i class="fas fa-plus-circle"></i> إنشاء الحساب';
+            }
+        }
+    }
+
+    async refreshData() {
+        try {
+            showToast?.('جاري تحديث بيانات الموظفين...', 'info');
+            await this.loadEmployeesList();
+            if (window.app?.refreshData) await window.app.refreshData(true);
+            showToast?.('تم تحديث البيانات بنجاح', 'success');
+        } catch (error) {
+            console.error('❌ Admin refresh error:', error);
+            showToast?.(error.message || 'فشل تحديث البيانات', 'error');
+        }
+    }
+
+    exportEmployeesList() {
+        try {
+            const rows = (this.employeesList || []).filter(emp => !emp.is_deleted);
+            if (!rows.length) {
+                showToast?.('لا توجد بيانات موظفين للتصدير', 'warning');
+                return;
+            }
+
+            const headers = ['#', 'الكود', 'الاسم', 'البريد', 'الحالة', 'تاريخ التسجيل'];
+            const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+            const csvRows = [headers.map(escapeCsv).join(',')];
+            rows.forEach((emp, index) => {
+                csvRows.push([
+                    index + 1,
+                    emp.code || '',
+                    emp.name || '',
+                    emp.email || '',
+                    emp.is_admin ? 'أدمن' : 'نشط',
+                    emp.created_at ? new Date(emp.created_at).toLocaleString('ar-EG') : ''
+                ].map(escapeCsv).join(','));
+            });
+
+            const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `axentro-employees-${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            showToast?.('تم تصدير قائمة الموظفين بنجاح', 'success');
+        } catch (error) {
+            console.error('❌ Export employees error:', error);
+            showToast?.('فشل تصدير قائمة الموظفين', 'error');
+        }
+    }
+
+    openEmployeeActionsModal(code, name) {
+        const cleanCode = String(code || '').trim();
+        const cleanName = String(name || '').trim();
+        if (!cleanCode) return;
+        this.selectedEmployee = { code: cleanCode, name: cleanName };
+        window.selectedEmployeeAdminAction = { code: cleanCode, name: cleanName };
+        const nameEl = document.getElementById('employeeActionsName');
+        const codeEl = document.getElementById('employeeActionsCode');
+        if (nameEl) nameEl.textContent = cleanName || 'موظف';
+        if (codeEl) codeEl.textContent = cleanCode;
+        if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('employeeActionsModal');
+        else document.getElementById('employeeActionsModal')?.classList.add('active');
+    }
+
     // ============================================
     // 🛡️ SECURITY HELPERS
     // ============================================

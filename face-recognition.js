@@ -393,7 +393,7 @@ class FaceRecognitionManager {
                 cameraTitle.textContent = enrollmentMode ? 'تسجيل بصمة الوجه' : 'التحقق ببصمة الوجه';
             }
             if (manualCaptureBtn) {
-                manualCaptureBtn.style.display = enrollmentMode ? 'inline-block' : 'none';
+                manualCaptureBtn.style.display = 'none';
             }
 
             setCamStatus?.('<i class="fas fa-video"></i> جاري تشغيل الكاميرا...');
@@ -852,14 +852,17 @@ class FaceRecognitionManager {
             updateStabilityRing?.(window.stabilityCounter, stableFramesRequired);
 
             if (window.stabilityCounter >= stableFramesRequired) {
-                setCamStatus?.('<i class="fas fa-camera"></i> الوجه جاهز - اضغط التقاط الآن لحفظ البصمة...');
+                setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> الوجه جاهز - سيتم الالتقاط تلقائيًا...');
+                if (!window.autoCaptureTimeout && !window.isProcessingCapture) {
+                    const delay = AppConfig?.faceRecognition?.antiSpoof?.autoCaptureDelayMs || 450;
+                    window.autoCaptureTimeout = setTimeout(() => this.performCapture(), delay);
+                }
             } else {
-                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك لحظة ثم اضغط التقاط الآن...');
-            }
-
-            if (window.autoCaptureTimeout) {
-                clearTimeout(window.autoCaptureTimeout);
-                window.autoCaptureTimeout = null;
+                setCamStatus?.('<i class="fas fa-spinner fa-pulse"></i> ثبت وجهك لحظة واحدة...');
+                if (window.autoCaptureTimeout) {
+                    clearTimeout(window.autoCaptureTimeout);
+                    window.autoCaptureTimeout = null;
+                }
             }
             return;
         }

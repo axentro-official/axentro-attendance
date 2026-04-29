@@ -940,6 +940,7 @@ class App {
 
 
     openSettingsModal() {
+        this.resetSettingsModalView?.();
         const soundToggle = document.getElementById('soundEnabled');
         const vibrationToggle = document.getElementById('vibrationEnabled');
         const dataSaverToggle = document.getElementById('dataSaverMode');
@@ -989,17 +990,49 @@ class App {
         ui?.openModal?.('settingsModal');
     }
 
+    resetSettingsModalView() {
+        const modal = document.getElementById('settingsModal');
+        if (!modal) return;
+        modal.classList.remove('worksite-focus-mode');
+        const title = modal.querySelector('.modal-header h3');
+        if (title) title.innerHTML = '<i class="fas fa-cog"></i> الإعدادات';
+        modal.querySelectorAll('.settings-group').forEach(group => {
+            if (group.id === 'worksiteSettingsSection') return;
+            if (group.dataset.prevDisplay !== undefined) {
+                group.style.display = group.dataset.prevDisplay;
+                delete group.dataset.prevDisplay;
+            } else {
+                group.style.display = '';
+            }
+        });
+    }
+
     openWorksiteSettingsModal() {
         this.openSettingsModal();
-        const modalBody = document.querySelector('#settingsModal .settings-modal-body');
+        const modal = document.getElementById('settingsModal');
+        const modalBody = document.querySelector('#settingsModal .modal-body') || document.querySelector('#settingsModal .settings-modal-body');
         const section = document.getElementById('worksiteSettingsSection');
+
+        if (modal) modal.classList.add('worksite-focus-mode');
+        if (section) {
+            section.style.display = '';
+            section.classList.remove('hidden');
+        }
+
+        // عند فتح إعدادات المقر من زر لوحة الإدارة نعرض هذا القسم فقط حتى لا يختلط على المستخدم مع إعدادات الحساب.
+        modal?.querySelectorAll('.settings-group').forEach(group => {
+            if (group.id === 'worksiteSettingsSection') return;
+            group.dataset.prevDisplay = group.style.display || '';
+            group.style.display = 'none';
+        });
+
+        const title = modal?.querySelector('.modal-header h3');
+        if (title) title.innerHTML = '<i class="fas fa-location-dot"></i> إعدادات المقر والمسافة';
+
         setTimeout(() => {
-            if (section && modalBody) {
-                modalBody.scrollTo({ top: Math.max(section.offsetTop - 16, 0), behavior: 'smooth' });
-            } else {
-                section?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-            }
-        }, 180);
+            if (modalBody) modalBody.scrollTo({ top: 0, behavior: 'smooth' });
+            section?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+        }, 120);
     }
 
     populateWorksiteFields(site) {
