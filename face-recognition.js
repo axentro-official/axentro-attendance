@@ -341,7 +341,31 @@ class FaceRecognitionManager {
     }
 
     areModelsLoaded() {
-        return this.modelsLoaded;
+        const nets = window.faceapi?.nets;
+        const tinyLoaded = !!(nets?.tinyFaceDetector?.isLoaded || nets?.tinyFaceDetector?.params);
+        const landmarkLoaded = !!(nets?.faceLandmark68Net?.isLoaded || nets?.faceLandmark68Net?.params);
+        const recognitionLoaded = !!(nets?.faceRecognitionNet?.isLoaded || nets?.faceRecognitionNet?.params);
+        return !!(this.modelsLoaded && tinyLoaded && landmarkLoaded && recognitionLoaded);
+    }
+
+    async ensureModelsReady(requireHeavy = true) {
+        const nets = window.faceapi?.nets;
+        const tinyLoaded = !!(nets?.tinyFaceDetector?.isLoaded || nets?.tinyFaceDetector?.params);
+        const landmarkLoaded = !!(nets?.faceLandmark68Net?.isLoaded || nets?.faceLandmark68Net?.params);
+        const recognitionLoaded = !!(nets?.faceRecognitionNet?.isLoaded || nets?.faceRecognitionNet?.params);
+        const ready = requireHeavy ? (tinyLoaded && landmarkLoaded && recognitionLoaded) : tinyLoaded;
+
+        if (ready) {
+            window.lightModels = tinyLoaded;
+            window.heavyModels = landmarkLoaded && recognitionLoaded;
+            this.modelsLoaded = tinyLoaded && landmarkLoaded && recognitionLoaded;
+            return true;
+        }
+
+        this.modelsLoaded = false;
+        window.lightModels = false;
+        window.heavyModels = false;
+        return await this.loadModelsWithSafetyNet();
     }
 
     // ============================================
@@ -483,10 +507,10 @@ class FaceRecognitionManager {
             this.isCameraActive = true;
             this.cameraOpenedAt = Date.now();
 
-            const ready = this.modelsLoaded ? true : await this.loadModelsWithSafetyNet();
+            const ready = await this.ensureModelsReady(true);
             if (!ready) throw new Error('تعذر تحميل نماذج التعرف على الوجه');
 
-            setCamStatus?.(enrollmentMode ? '<i class="fas fa-camera"></i> ضع الوجه داخل الإطار ثم اضغط التقاط الآن لحفظ البصمة...' : '<i class="fas fa-camera"></i> وجّه الكاميرا إلى وجهك ثم اضغط التقاط الآن للتحقق...');
+            setCamStatus?.(enrollmentMode ? '<i class="fas fa-camera"></i> ضع الوجه داخل الإطار وسيتم التقاط البصمة تلقائيًا...' : '<i class="fas fa-camera"></i> وجّه الكاميرا إلى وجهك وسيتم التحقق تلقائيًا...');
             this.startDetectionLoop();
             return true;
         } catch (e) {
@@ -691,7 +715,8 @@ class FaceRecognitionManager {
         if (!video?.srcObject || !video.videoWidth || !canvas) return;
         if (!window.lightModels) {
             setCamStatus?.('<i class="fas fa-cog fa-spin"></i> جاري تحميل النماذج...');
-            return;
+            await this.ensureModelsReady(false);
+            if (!window.lightModels) return;
         }
 
         const ctx = canvas.getContext('2d');
@@ -754,7 +779,7 @@ class FaceRecognitionManager {
             this.clearTrackedFace();
             window.stabilityCounter = 0;
             updateStabilityRing?.(0, 2);
-            setCamStatus?.((window.regMode || window.firstTimeSetupMode || window.updateFaceMode || window.adminResetFaceMode) ? '<i class="fas fa-user-plus"></i> قرّب الوجه قليلًا داخل الإطار لحفظ البصمة...' : '<i class="fas fa-spinner fa-spin"></i> وجّه الكاميرا إلى وجهك الأمامي داخل الإطار...');
+            setCamStatus?.((window.regMode || window.firstTimeSetupMode || window.updateFaceMode || window.adminResetFaceMode) ? '<i class="fas fa-user-plus"></i> قرّب الوجه قليلًا داخل الإطار وسيتم حفظ البصمة تلقائيًا...' : '<i class="fas fa-spinner fa-spin"></i> وجّه الكاميرا إلى وجهك الأمامي داخل الإطار...');
         } catch (e) {
             console.error('Face detection error:', e);
         }
@@ -838,13 +863,14 @@ class FaceRecognitionManager {
         if (!faceReady) {
             window.stabilityCounter = 0;
             updateStabilityRing?.(0, stableFramesRequired);
-            setCamStatus?.('<i class="fas fa-face-smile"></i> ضع الوجه داخل الإطار ثم اضغط التقاط الآن...');
+            setCamStatus?.('<i class="fas fa-face-smile"></i> ضع الوجه داخل الإطار وسيتم الالتقاط تلقائيًا...');
             return;
         }
 
         if (enrollmentMode) {
             if (!window.heavyModels) {
                 setCamStatus?.('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف...');
+                this.ensureModelsReady(true);
                 return;
             }
 
@@ -870,6 +896,7 @@ class FaceRecognitionManager {
         if (verificationMode) {
             if (!window.heavyModels) {
                 setCamStatus?.('<i class="fas fa-cog fa-spin"></i> تحميل نموذج التعرف...');
+                this.ensureModelsReady(true);
                 return;
             }
 
@@ -986,6 +1013,8 @@ class FaceRecognitionManager {
     async extractStableDescriptor() {
         const video = this.videoElement || document.getElementById('video');
         if (!video) return null;
+        const ready = await this.ensureModelsReady(true);
+        if (!ready) return null;
 
         if (this.cachedDescriptor && (Date.now() - this.cachedDescriptorAt < 2500)) {
             return this.cachedDescriptor;
@@ -1041,6 +1070,8 @@ class FaceRecognitionManager {
     async extractQuickDescriptor() {
         const video = this.videoElement || document.getElementById('video');
         if (!video) return null;
+        const ready = await this.ensureModelsReady(true);
+        if (!ready) return null;
 
         try {
             const det = await faceapi

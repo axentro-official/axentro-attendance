@@ -1008,35 +1008,90 @@ class App {
     }
 
     openWorksiteSettingsModal() {
-        this.openSettingsModal();
+        // Dedicated, robust worksite screen. This avoids conflicts with older patch.js/settings UI rebuilds.
         const modal = document.getElementById('settingsModal');
-        const modalBody = document.querySelector('#settingsModal .modal-body') || document.querySelector('#settingsModal .settings-modal-body');
-        const section = document.getElementById('worksiteSettingsSection');
-
-        if (modal) modal.classList.add('worksite-focus-mode');
-        if (section) {
-            section.style.display = '';
-            section.classList.remove('hidden');
+        if (!modal) {
+            showToast?.('نافذة الإعدادات غير موجودة في الصفحة', 'error');
+            return;
         }
 
-        // عند فتح إعدادات المقر من زر لوحة الإدارة نعرض هذا القسم فقط حتى لا يختلط على المستخدم مع إعدادات الحساب.
-        modal?.querySelectorAll('.settings-group').forEach(group => {
-            if (group.id === 'worksiteSettingsSection') return;
-            group.dataset.prevDisplay = group.style.display || '';
-            group.style.display = 'none';
-        });
+        modal.classList.add('worksite-focus-mode');
+        modal.innerHTML = `
+            <div class="modal-content settings-modal-content" style="max-width:720px;">
+                <div class="modal-header">
+                    <h3><i class="fas fa-location-dot"></i> إعدادات المقر والمسافة</h3>
+                    <button class="close-modal" type="button" id="closeWorksiteSettingsBtn">&times;</button>
+                </div>
+                <div class="modal-body settings-modal-body">
+                    <div class="settings-group" id="worksiteSettingsSection" style="display:block;">
+                        <h4><i class="fas fa-location-dot"></i> بيانات المقر</h4>
+                        <div class="settings-grid two-columns">
+                            <div class="input-group">
+                                <label for="worksiteName"><i class="fas fa-building"></i> اسم المقر</label>
+                                <input type="text" id="worksiteName" placeholder="المقر الرئيسي">
+                            </div>
+                            <div class="input-group" style="grid-column:1 / -1;">
+                                <label for="worksiteMapUrl"><i class="fas fa-link"></i> رابط المقر من Google Maps</label>
+                                <input type="url" id="worksiteMapUrl" placeholder="الصق رابط Google Maps مثل https://maps.google.com/?q=30.123,31.456">
+                                <small class="input-help">ضع رابط Google Maps فقط، والنظام يستخرج الإحداثيات داخليًا لحساب المسافة.</small>
+                            </div>
+                            <div class="input-group">
+                                <label for="worksiteAllowedRadius"><i class="fas fa-circle-dot"></i> المسافة المسموحة بالمتر</label>
+                                <input type="number" step="1" min="1" id="worksiteAllowedRadius" placeholder="500">
+                            </div>
+                            <div class="input-group">
+                                <label for="worksiteMaxAccuracy"><i class="fas fa-crosshairs"></i> أقصى دقة GPS بالمتر</label>
+                                <input type="number" step="1" min="1" id="worksiteMaxAccuracy" placeholder="50">
+                            </div>
+                            <div class="settings-actions-grid" style="grid-column:1 / -1; margin-bottom:8px;">
+                                <button type="button" class="btn btn-secondary" id="extractWorksiteMapBtn"><i class="fas fa-wand-magic-sparkles"></i> اختبار الرابط واستخراج الموقع</button>
+                                <button type="button" class="btn btn-secondary" id="useCurrentWorksiteLocationBtn"><i class="fas fa-location-crosshairs"></i> استخدام موقعي الحالي كرابط للمقر</button>
+                            </div>
+                            <details class="advanced-worksite-fields" style="grid-column:1 / -1; opacity:.9;">
+                                <summary style="cursor:pointer;color:#93c5fd;margin-bottom:8px;">إعدادات متقدمة - الإحداثيات المستخرجة تلقائيًا</summary>
+                                <div class="settings-grid two-columns">
+                                    <div class="input-group">
+                                        <label for="worksiteLatitude"><i class="fas fa-location-arrow"></i> Latitude</label>
+                                        <input type="number" step="any" id="worksiteLatitude" placeholder="30.000000" readonly>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="worksiteLongitude"><i class="fas fa-location-arrow"></i> Longitude</label>
+                                        <input type="number" step="any" id="worksiteLongitude" placeholder="31.000000" readonly>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                        <div id="worksiteSummaryCard" class="hint-card" style="margin:12px 0 16px;padding:12px 14px;border-radius:14px;background:rgba(59,130,246,0.08);color:#dbeafe;line-height:1.7;">جاري تحميل بيانات المقر...</div>
+                        <button type="button" class="btn btn-primary btn-block" id="saveWorksiteSettingsBtn">
+                            <i class="fas fa-save"></i> حفظ إعدادات المقر
+                        </button>
+                    </div>
+                    <div class="settings-actions-grid settings-footer-actions" style="margin-top:14px;">
+                        <button class="btn btn-text" type="button" id="closeWorksiteSettingsFooterBtn">إغلاق</button>
+                    </div>
+                </div>
+            </div>`;
 
-        const title = modal?.querySelector('.modal-header h3');
-        if (title) title.innerHTML = '<i class="fas fa-location-dot"></i> إعدادات المقر والمسافة';
+        const close = () => ui?.closeModal?.('settingsModal');
+        document.getElementById('closeWorksiteSettingsBtn')?.addEventListener('click', close);
+        document.getElementById('closeWorksiteSettingsFooterBtn')?.addEventListener('click', close);
+        document.getElementById('extractWorksiteMapBtn')?.addEventListener('click', () => this.extractWorksiteFromMapUrl());
+        document.getElementById('useCurrentWorksiteLocationBtn')?.addEventListener('click', () => this.useCurrentLocationForWorksite());
+        document.getElementById('saveWorksiteSettingsBtn')?.addEventListener('click', () => this.saveWorksiteSettings());
 
-        setTimeout(() => {
-            if (modalBody) modalBody.scrollTo({ top: 0, behavior: 'smooth' });
-            section?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-        }, 120);
+        ui?.openModal?.('settingsModal');
+
+        if (window.attendance?.loadWorksitePolicy) {
+            Promise.resolve(window.attendance.loadWorksitePolicy(true))
+                .then((site) => this.populateWorksiteFields(site))
+                .catch(() => this.populateWorksiteFields(null));
+        } else {
+            this.populateWorksiteFields(null);
+        }
     }
 
     populateWorksiteFields(site) {
-        if (!site) return;
+        site = site || {};
         const mappings = {
             worksiteName: site.name || 'المقر الرئيسي',
             worksiteMapUrl: site.map_url || '',

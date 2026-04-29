@@ -570,9 +570,9 @@
     const ready = await waitForAppReady();
     if (!ready) return;
     enhanceLoginLayout();
-    rebuildSettingsModal();
+    // Keep the original settings modal from index.html.
+    // Rebuilding it here removed the worksite fields and caused an empty modal.
     ensureRefreshButtons();
-    wireSettingsButtons();
     patchGlobalLoaders();
     installAdminHelpers();
     patchLogout();
@@ -590,7 +590,6 @@
           patchGlobalLoaders();
           installAdminHelpers();
           ensureRefreshButtons();
-          wireSettingsButtons();
           updateProfileAvatars();
           await applyActiveWorksiteToConfig();
           if (window.user?.role === 'admin' || window.user?.isAdmin) {
