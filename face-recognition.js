@@ -21,6 +21,10 @@ class FaceRecognitionManager {
         this.detectEveryMs = 140;
         this.pendingCaptureTimer = null;
 
+        // Enterprise camera/model state: one unified camera pipeline for enrollment + verification
+        this.landmarkTinyPreferred = false;
+        this.lastModelHealth = null;
+
         this.lastAutoCaptureAt = 0;
         this.cachedDescriptor = null;
         this.cachedDescriptorAt = 0;
@@ -259,8 +263,9 @@ class FaceRecognitionManager {
     // ============================================
 
     async loadModels() {
-        if (this.modelsLoaded) {
-            console.log('✅ Models already loaded');
+        if (this.areModelsLoaded()) {
+            this.modelsLoaded = true;
+            console.log('✅ Face models already loaded and verified');
             return true;
         }
 
@@ -277,10 +282,11 @@ class FaceRecognitionManager {
             for (const source of sources) {
                 try {
                     await loader(source);
+                    console.log(`✅ Loaded ${label} from ${source}`);
                     return true;
                 } catch (err) {
                     lastError = err;
-                    console.warn(`Model source failed for ${label}:`, source, err?.message || err);
+                    console.warn(`⚠️ Model source failed for ${label}:`, source, err?.message || err);
                 }
             }
             if (optional) return false;
@@ -289,35 +295,61 @@ class FaceRecognitionManager {
 
         this.modelLoadPromise = (async () => {
             try {
-                setStatus('جاري تحميل الذكاء الاصطناعي (1/3)...');
+                if (typeof faceapi === 'undefined' || !faceapi?.nets) {
+                    throw new Error('face-api.js غير محمل');
+                }
+
+                setStatus?.('جاري تحميل نموذج اكتشاف الوجه...');
                 updateSplashProgress?.(25);
-                await tryLoad('tinyFaceDetector', (src) => faceapi.nets.tinyFaceDetector.loadFromUri(src));
+                if (!this.isNetLoaded(faceapi.nets.tinyFaceDetector)) {
+                    await tryLoad('tinyFaceDetector', (src) => faceapi.nets.tinyFaceDetector.loadFromUri(src));
+                }
                 window.lightModels = true;
 
-                setStatus('جاري تحميل الذكاء الاصطناعي (2/3)...');
-                updateSplashProgress?.(60);
-                let landmarkLoaded = false;
-                if (faceapi.nets.faceLandmark68Net) {
-                    landmarkLoaded = await tryLoad('faceLandmark68Net', (src) => faceapi.nets.faceLandmark68Net.loadFromUri(src), true);
-                }
-                if (!landmarkLoaded && faceapi.nets.faceLandmark68TinyNet) {
-                    landmarkLoaded = await tryLoad('faceLandmark68TinyNet', (src) => faceapi.nets.faceLandmark68TinyNet.loadFromUri(src), true);
-                }
-                if (!landmarkLoaded) throw new Error('تعذر تحميل نموذج معالم الوجه');
+                setStatus?.('جاري تحميل نموذج معالم الوجه...');
+                updateSplashProgress?.(55);
+                let tinyLandmarkLoaded = this.isNetLoaded(faceapi.nets.faceLandmark68TinyNet);
+                let fullLandmarkLoaded = this.isNetLoaded(faceapi.nets.faceLandmark68Net);
 
-                setStatus('جاري تحميل الذكاء الاصطناعي (3/3)...');
-                updateSplashProgress?.(90);
-                await tryLoad('faceRecognitionNet', (src) => faceapi.nets.faceRecognitionNet.loadFromUri(src));
-                window.heavyModels = true;
+                if (!tinyLandmarkLoaded && faceapi.nets.faceLandmark68TinyNet) {
+                    tinyLandmarkLoaded = await tryLoad('faceLandmark68TinyNet', (src) => faceapi.nets.faceLandmark68TinyNet.loadFromUri(src), true);
+                }
+                if (!fullLandmarkLoaded && faceapi.nets.faceLandmark68Net) {
+                    fullLandmarkLoaded = await tryLoad('faceLandmark68Net', (src) => faceapi.nets.faceLandmark68Net.loadFromUri(src), true);
+                }
 
+                tinyLandmarkLoaded = this.isNetLoaded(faceapi.nets.faceLandmark68TinyNet);
+                fullLandmarkLoaded = this.isNetLoaded(faceapi.nets.faceLandmark68Net);
+
+                if (!tinyLandmarkLoaded && !fullLandmarkLoaded) {
+                    throw new Error('تعذر تحميل نموذج معالم الوجه');
+                }
+                this.landmarkTinyPreferred = !!tinyLandmarkLoaded;
+
+                setStatus?.('جاري تحميل نموذج بصمة الوجه...');
+                updateSplashProgress?.(82);
+                if (!this.isNetLoaded(faceapi.nets.faceRecognitionNet)) {
+                    await tryLoad('faceRecognitionNet', (src) => faceapi.nets.faceRecognitionNet.loadFromUri(src));
+                }
+
+                const health = this.getModelHealth();
+                if (!health.tinyFaceDetector || !health.faceRecognitionNet || !health.landmarkAny) {
+                    throw new Error('بعض نماذج بصمة الوجه لم تكتمل');
+                }
+
+                this.lastModelHealth = health;
                 this.modelsLoaded = true;
-                setStatus('النظام جاهز');
+                window.lightModels = true;
+                window.heavyModels = true;
+                setStatus?.('نظام بصمة الوجه جاهز');
                 updateSplashProgress?.(100);
+                console.log('✅ Face model health:', health);
                 return true;
             } catch (error) {
                 this.modelsLoaded = false;
                 window.lightModels = false;
                 window.heavyModels = false;
+                this.landmarkTinyPreferred = false;
                 console.error('❌ Model loading error:', error);
                 throw error;
             } finally {
@@ -351,42 +383,52 @@ class FaceRecognitionManager {
     isNetLoaded(net) {
         try {
             if (!net) return false;
-            if (typeof net.isLoaded === 'boolean') return net.isLoaded;
             if (typeof net.isLoaded === 'function') return !!net.isLoaded();
-            return !!net.params;
+            if (typeof net.isLoaded === 'boolean') return !!net.isLoaded;
+            return !!(net.params || net._params || net._paramMappings);
         } catch (_) {
             return false;
         }
     }
 
+    getModelHealth() {
+        const nets = window.faceapi?.nets || {};
+        const tinyFaceDetector = this.isNetLoaded(nets.tinyFaceDetector);
+        const faceLandmark68TinyNet = this.isNetLoaded(nets.faceLandmark68TinyNet);
+        const faceLandmark68Net = this.isNetLoaded(nets.faceLandmark68Net);
+        const faceRecognitionNet = this.isNetLoaded(nets.faceRecognitionNet);
+        return {
+            tinyFaceDetector,
+            faceLandmark68TinyNet,
+            faceLandmark68Net,
+            landmarkAny: faceLandmark68TinyNet || faceLandmark68Net,
+            faceRecognitionNet,
+            preferredTinyLandmarks: faceLandmark68TinyNet
+        };
+    }
+
     getLandmarkTinyFlag() {
-        const nets = window.faceapi?.nets;
-        const fullLoaded = this.isNetLoaded(nets?.faceLandmark68Net);
-        const tinyLoaded = this.isNetLoaded(nets?.faceLandmark68TinyNet);
-        if (fullLoaded) return false;
-        if (tinyLoaded) return true;
-        return false;
+        const health = this.getModelHealth();
+        return !!health.faceLandmark68TinyNet;
     }
 
     areModelsLoaded() {
-        const nets = window.faceapi?.nets;
-        const tinyLoaded = this.isNetLoaded(nets?.tinyFaceDetector);
-        const landmarkLoaded = this.isNetLoaded(nets?.faceLandmark68Net) || this.isNetLoaded(nets?.faceLandmark68TinyNet);
-        const recognitionLoaded = this.isNetLoaded(nets?.faceRecognitionNet);
-        return !!(this.modelsLoaded && tinyLoaded && landmarkLoaded && recognitionLoaded);
+        const health = this.getModelHealth();
+        return !!(health.tinyFaceDetector && health.landmarkAny && health.faceRecognitionNet);
     }
 
     async ensureModelsReady(requireHeavy = true) {
-        const nets = window.faceapi?.nets;
-        const tinyLoaded = this.isNetLoaded(nets?.tinyFaceDetector);
-        const landmarkLoaded = this.isNetLoaded(nets?.faceLandmark68Net) || this.isNetLoaded(nets?.faceLandmark68TinyNet);
-        const recognitionLoaded = this.isNetLoaded(nets?.faceRecognitionNet);
-        const ready = requireHeavy ? (tinyLoaded && landmarkLoaded && recognitionLoaded) : tinyLoaded;
+        if (typeof faceapi === 'undefined') return false;
+        const health = this.getModelHealth();
+        const ready = requireHeavy
+            ? (health.tinyFaceDetector && health.landmarkAny && health.faceRecognitionNet)
+            : health.tinyFaceDetector;
 
         if (ready) {
-            window.lightModels = tinyLoaded;
-            window.heavyModels = landmarkLoaded && recognitionLoaded;
-            this.modelsLoaded = tinyLoaded && landmarkLoaded && recognitionLoaded;
+            this.modelsLoaded = health.tinyFaceDetector && health.landmarkAny && health.faceRecognitionNet;
+            this.landmarkTinyPreferred = !!health.faceLandmark68TinyNet;
+            window.lightModels = !!health.tinyFaceDetector;
+            window.heavyModels = !!(health.landmarkAny && health.faceRecognitionNet);
             return true;
         }
 
@@ -447,6 +489,10 @@ class FaceRecognitionManager {
             if (manualCaptureBtn) {
                 manualCaptureBtn.style.display = 'none';
             }
+
+            setCamStatus?.('<i class="fas fa-brain fa-spin"></i> جاري تجهيز نماذج بصمة الوجه...');
+            const modelReadyBeforeCamera = await this.ensureModelsReady(true);
+            if (!modelReadyBeforeCamera) throw new Error('تعذر تحميل نماذج بصمة الوجه');
 
             setCamStatus?.('<i class="fas fa-video"></i> جاري تشغيل الكاميرا...');
 
@@ -543,8 +589,9 @@ class FaceRecognitionManager {
             return true;
         } catch (e) {
             console.error('❌ Camera error:', e);
-            this.flashFailure('فشل الوصول للكاميرا');
-            showToast?.('فشل الوصول للكاميرا', 'error');
+            const msg = e?.message || 'فشل الوصول للكاميرا أو تحميل نماذج بصمة الوجه';
+            this.flashFailure(msg);
+            showToast?.(msg, 'error');
             return false;
         }
     }
@@ -741,16 +788,16 @@ class FaceRecognitionManager {
         const canvas = this.canvasElement || document.getElementById('canvas');
 
         if (!video?.srcObject || !video.videoWidth || !canvas) return;
-        if (!window.lightModels) {
-            setCamStatus?.('<i class="fas fa-cog fa-spin"></i> جاري تحميل النماذج...');
-            await this.ensureModelsReady(false);
-            if (!window.lightModels) return;
+
+        const verificationMode = !!(window.attMode || window.adminVerifyMode);
+        if (!window.lightModels || (verificationMode && !window.heavyModels)) {
+            setCamStatus?.('<i class="fas fa-cog fa-spin"></i> جاري تحميل نماذج بصمة الوجه...');
+            await this.ensureModelsReady(verificationMode);
+            if (!window.lightModels || (verificationMode && !window.heavyModels)) return;
         }
 
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        const verificationMode = !!(window.attMode || window.adminVerifyMode);
 
         try {
             let detection = null;
