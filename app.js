@@ -1032,8 +1032,8 @@ class App {
                             </div>
                             <div class="input-group" style="grid-column:1 / -1;">
                                 <label for="worksiteMapUrl"><i class="fas fa-link"></i> رابط المقر من Google Maps</label>
-                                <input type="url" id="worksiteMapUrl" placeholder="الصق رابط Google Maps مثل https://maps.google.com/?q=30.123,31.456">
-                                <small class="input-help">ضع رابط Google Maps فقط، والنظام يستخرج الإحداثيات داخليًا لحساب المسافة.</small>
+                                <input type="url" id="worksiteMapUrl" placeholder="الصق رابط Google Maps العادي أو المختصر">
+                                <small class="input-help">ضع رابط Google Maps، والنظام يحاول استخراج الإحداثيات تلقائيًا. لن يستخدم موقع جهازك تلقائيًا أبداً.</small>
                             </div>
                             <div class="input-group">
                                 <label for="worksiteAllowedRadius"><i class="fas fa-circle-dot"></i> المسافة المسموحة بالمتر</label>
@@ -1045,7 +1045,7 @@ class App {
                             </div>
                             <div class="settings-actions-grid" style="grid-column:1 / -1; margin-bottom:8px;">
                                 <button type="button" class="btn btn-secondary" id="extractWorksiteMapBtn"><i class="fas fa-wand-magic-sparkles"></i> اختبار الرابط واستخراج الموقع</button>
-                                <button type="button" class="btn btn-secondary" id="useCurrentWorksiteLocationBtn"><i class="fas fa-location-crosshairs"></i> استخدام موقعي الحالي كرابط للمقر</button>
+                                <button type="button" class="btn btn-secondary" id="useCurrentWorksiteLocationBtn"><i class="fas fa-location-crosshairs"></i> استخدام موقعي الحالي كمقر (للأدمن داخل المقر فقط)</button>
                             </div>
                             <details class="advanced-worksite-fields" style="grid-column:1 / -1; opacity:.9;">
                                 <summary style="cursor:pointer;color:#93c5fd;margin-bottom:8px;">إعدادات متقدمة - الإحداثيات المستخرجة تلقائيًا</summary>
@@ -1142,19 +1142,77 @@ class App {
         return `https://maps.google.com/?q=${latitude},${longitude}`;
     }
 
-    extractWorksiteFromMapUrl() {
+    async resolveCoordinatesFromMapUrl(url) {
+        const direct = this.extractCoordinatesFromMapUrl(url);
+        if (direct) return { ...direct, source: 'direct' };
+
+        const cleanUrl = String(url || '').trim();
+        if (!cleanUrl) return null;
+
+        const tryParseText = (text) => this.extractCoordinatesFromMapUrl(text || '');
+        const attempts = [
+            async () => {
+                const response = await fetch(cleanUrl, { method: 'GET', redirect: 'follow', mode: 'cors', credentials: 'omit' });
+                return tryParseText(response?.url || '') || tryParseText(await response.text().catch(() => ''));
+            },
+            async () => {
+                const apiUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(cleanUrl);
+                const response = await fetch(apiUrl, { method: 'GET', mode: 'cors', cache: 'no-store' });
+                const data = await response.json();
+                return tryParseText(data?.status?.url) || tryParseText(data?.contents) || tryParseText(JSON.stringify(data || {}));
+            },
+            async () => {
+                const apiUrl = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(cleanUrl);
+                const response = await fetch(apiUrl, { method: 'GET', mode: 'cors', cache: 'no-store' });
+                return tryParseText(response?.url || '') || tryParseText(await response.text().catch(() => ''));
+            }
+        ];
+
+        for (const attempt of attempts) {
+            try {
+                const coords = await Promise.race([attempt(), new Promise((resolve) => setTimeout(() => resolve(null), 6500))]);
+                if (coords) return { ...coords, source: 'resolved' };
+            } catch (error) {
+                console.warn('Map URL resolve attempt failed:', error?.message || error);
+            }
+        }
+        return null;
+    }
+
+    async extractWorksiteFromMapUrl() {
         const url = document.getElementById('worksiteMapUrl')?.value || '';
-        const coords = this.extractCoordinatesFromMapUrl(url);
-        if (!coords) {
-            showToast('الرابط لا يحتوي على إحداثيات مباشرة. افتح Google Maps ثم انسخ رابطًا يظهر فيه lat,lng أو استخدم زر موقعي الحالي.', 'error');
+        if (!String(url).trim()) {
+            showToast('يرجى إدخال رابط Google Maps أولاً', 'error');
             return null;
         }
+
+        showToast('جاري قراءة إحداثيات المقر من الرابط...', 'info');
+        const coords = await this.resolveCoordinatesFromMapUrl(url);
+
+        if (!coords) {
+            showToast('لم أتمكن من استخراج الإحداثيات من هذا الرابط. استخدم رابط يحتوي على @lat,lng أو ?q=lat,lng، أو اضغط زر موقعي الحالي فقط وأنت داخل المقر.', 'error');
+            return null;
+        }
+
         const lat = document.getElementById('worksiteLatitude');
         const lon = document.getElementById('worksiteLongitude');
         if (lat) lat.value = coords.latitude;
         if (lon) lon.value = coords.longitude;
-        showToast('تم اختبار الرابط واستخراج موقع المقر بنجاح', 'success');
+        showToast(coords.source === 'resolved' ? 'تم استخراج موقع المقر من الرابط بنجاح' : 'تم قراءة إحداثيات المقر من الرابط بنجاح', 'success');
         return coords;
+    }
+
+    getCurrentLocationCoordinates() {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) return resolve(null);
+            navigator.geolocation.getCurrentPosition((pos) => {
+                resolve({
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy
+                });
+            }, () => resolve(null), { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        });
     }
 
     useCurrentLocationForWorksite() {
@@ -1271,7 +1329,7 @@ class App {
         }
         const mapUrl = String(document.getElementById('worksiteMapUrl')?.value || '').trim();
         const name = document.getElementById('worksiteName')?.value?.trim() || 'المقر الرئيسي';
-        const extracted = this.extractCoordinatesFromMapUrl(mapUrl);
+        let extracted = this.extractCoordinatesFromMapUrl(mapUrl);
         const radius = Number.parseInt(document.getElementById('worksiteAllowedRadius')?.value || '', 10);
         const maxAccuracy = Number.parseInt(document.getElementById('worksiteMaxAccuracy')?.value || '', 10);
 
@@ -1280,8 +1338,12 @@ class App {
             return;
         }
         if (!extracted) {
-            showToast('تعذر استخراج الإحداثيات من الرابط. استخدم زر موقعي الحالي أو انسخ رابطًا يحتوي على lat,lng من Google Maps.', 'error');
-            return;
+            showToast('جاري محاولة استخراج الإحداثيات من رابط Google Maps...', 'info');
+            extracted = await this.resolveCoordinatesFromMapUrl(mapUrl);
+            if (!extracted) {
+                showToast('تعذر استخراج الإحداثيات من هذا الرابط. لن يتم استخدام موقع الجهاز تلقائياً حفاظاً على أمان الحضور. استخدم رابط Google Maps يحتوي على إحداثيات أو زر موقعي الحالي وأنت داخل المقر فقط.', 'error');
+                return;
+            }
         }
         if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(maxAccuracy) || maxAccuracy <= 0) {
             showToast('يرجى إدخال المسافة المسموحة وأقصى دقة GPS بأرقام صحيحة', 'error');
@@ -1383,11 +1445,15 @@ class App {
 
 // Toast notification
 function showToast(msg, type = 'info') {
-    const container = document.getElementById('toastContainer');
+    let container = document.getElementById('toastContainer');
     if (!container) {
-        console.log('[TOAST]', type, msg);
-        return;
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
     }
+    if (container.parentElement !== document.body) document.body.appendChild(container);
+    container.style.zIndex = '2147483647';
     const toast = document.createElement('div');
     toast.className = `app-toast app-toast-${type}`;
     const iconMap = { success: 'check-circle', error: 'triangle-exclamation', warning: 'circle-exclamation', info: 'circle-info' };

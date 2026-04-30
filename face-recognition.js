@@ -272,7 +272,7 @@ class FaceRecognitionManager {
         const fallbackBase = (AppConfig?.faceRecognition?.models?.fallbackUrl || modelBase).replace(/\/$/, '');
         const sources = [...new Set([modelBase, fallbackBase])].filter(Boolean);
 
-        const tryLoad = async (label, loader) => {
+        const tryLoad = async (label, loader, optional = false) => {
             let lastError = null;
             for (const source of sources) {
                 try {
@@ -283,6 +283,7 @@ class FaceRecognitionManager {
                     console.warn(`Model source failed for ${label}:`, source, err?.message || err);
                 }
             }
+            if (optional) return false;
             throw lastError || new Error(`Model source unavailable for ${label}`);
         };
 
@@ -295,7 +296,14 @@ class FaceRecognitionManager {
 
                 setStatus('جاري تحميل الذكاء الاصطناعي (2/3)...');
                 updateSplashProgress?.(60);
-                await tryLoad('faceLandmark68Net', (src) => faceapi.nets.faceLandmark68Net.loadFromUri(src));
+                let landmarkLoaded = false;
+                if (faceapi.nets.faceLandmark68Net) {
+                    landmarkLoaded = await tryLoad('faceLandmark68Net', (src) => faceapi.nets.faceLandmark68Net.loadFromUri(src), true);
+                }
+                if (!landmarkLoaded && faceapi.nets.faceLandmark68TinyNet) {
+                    landmarkLoaded = await tryLoad('faceLandmark68TinyNet', (src) => faceapi.nets.faceLandmark68TinyNet.loadFromUri(src), true);
+                }
+                if (!landmarkLoaded) throw new Error('تعذر تحميل نموذج معالم الوجه');
 
                 setStatus('جاري تحميل الذكاء الاصطناعي (3/3)...');
                 updateSplashProgress?.(90);
@@ -340,19 +348,39 @@ class FaceRecognitionManager {
         }
     }
 
+    isNetLoaded(net) {
+        try {
+            if (!net) return false;
+            if (typeof net.isLoaded === 'boolean') return net.isLoaded;
+            if (typeof net.isLoaded === 'function') return !!net.isLoaded();
+            return !!net.params;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    getLandmarkTinyFlag() {
+        const nets = window.faceapi?.nets;
+        const fullLoaded = this.isNetLoaded(nets?.faceLandmark68Net);
+        const tinyLoaded = this.isNetLoaded(nets?.faceLandmark68TinyNet);
+        if (fullLoaded) return false;
+        if (tinyLoaded) return true;
+        return false;
+    }
+
     areModelsLoaded() {
         const nets = window.faceapi?.nets;
-        const tinyLoaded = !!(nets?.tinyFaceDetector?.isLoaded || nets?.tinyFaceDetector?.params);
-        const landmarkLoaded = !!(nets?.faceLandmark68Net?.isLoaded || nets?.faceLandmark68Net?.params);
-        const recognitionLoaded = !!(nets?.faceRecognitionNet?.isLoaded || nets?.faceRecognitionNet?.params);
+        const tinyLoaded = this.isNetLoaded(nets?.tinyFaceDetector);
+        const landmarkLoaded = this.isNetLoaded(nets?.faceLandmark68Net) || this.isNetLoaded(nets?.faceLandmark68TinyNet);
+        const recognitionLoaded = this.isNetLoaded(nets?.faceRecognitionNet);
         return !!(this.modelsLoaded && tinyLoaded && landmarkLoaded && recognitionLoaded);
     }
 
     async ensureModelsReady(requireHeavy = true) {
         const nets = window.faceapi?.nets;
-        const tinyLoaded = !!(nets?.tinyFaceDetector?.isLoaded || nets?.tinyFaceDetector?.params);
-        const landmarkLoaded = !!(nets?.faceLandmark68Net?.isLoaded || nets?.faceLandmark68Net?.params);
-        const recognitionLoaded = !!(nets?.faceRecognitionNet?.isLoaded || nets?.faceRecognitionNet?.params);
+        const tinyLoaded = this.isNetLoaded(nets?.tinyFaceDetector);
+        const landmarkLoaded = this.isNetLoaded(nets?.faceLandmark68Net) || this.isNetLoaded(nets?.faceLandmark68TinyNet);
+        const recognitionLoaded = this.isNetLoaded(nets?.faceRecognitionNet);
         const ready = requireHeavy ? (tinyLoaded && landmarkLoaded && recognitionLoaded) : tinyLoaded;
 
         if (ready) {
@@ -736,7 +764,7 @@ class FaceRecognitionManager {
                             scoreThreshold: AppConfig?.faceRecognition?.detection?.scoreThreshold || 0.52
                         })
                     )
-                    .withFaceLandmarks(true);
+                    .withFaceLandmarks(this.getLandmarkTinyFlag());
             } else {
                 detection = await faceapi.detectSingleFace(
                     video,
@@ -1034,7 +1062,7 @@ class FaceRecognitionManager {
                                 scoreThreshold: 0.22
                             })
                         )
-                        .withFaceLandmarks()
+                        .withFaceLandmarks(this.getLandmarkTinyFlag())
                         .withFaceDescriptor(),
                     new Promise((_, reject) => setTimeout(() => reject(new Error('descriptor-timeout')), 3200))
                 ]);
@@ -1082,7 +1110,7 @@ class FaceRecognitionManager {
                         scoreThreshold: 0.25
                     })
                 )
-                .withFaceLandmarks()
+                .withFaceLandmarks(this.getLandmarkTinyFlag())
                 .withFaceDescriptor();
 
             return det?.descriptor ? Array.from(det.descriptor) : null;
