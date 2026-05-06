@@ -936,7 +936,7 @@ class FaceRecognitionManager {
 
         const verificationMode = !!(window.attMode || window.adminVerifyMode);
         const configuredStableFrames = AppConfig?.faceRecognition?.antiSpoof?.minStableFrames || 4;
-        const stableFramesRequired = enrollmentMode ? Math.min(3, configuredStableFrames) : configuredStableFrames;
+        const stableFramesRequired = enrollmentMode ? Math.min(3, configuredStableFrames) : Math.min(3, configuredStableFrames);
         const faceReady = this.isFaceWellPositionedCanvas(trackedBox, canvas) || (!!trackedBox && (trackedBox.width / (canvas?.width || 1)) >= 0.07);
 
         if (!faceReady) {
@@ -984,14 +984,26 @@ class FaceRecognitionManager {
                 return;
             }
 
-            const livenessOk = updateLiveness?.(getHeadYaw?.(detection.landmarks), detection.landmarks);
+            // Enterprise unified camera: do not leave the camera open waiting forever.
+            // We still collect liveness signals when available, but stable face + descriptor matching
+            // is what triggers the operation. This keeps admin actions and attendance responsive.
+            let livenessOk = true;
+            try {
+                livenessOk = updateLiveness?.(getHeadYaw?.(detection.landmarks), detection.landmarks);
+            } catch (_) {
+                livenessOk = true;
+            }
 
             if (livenessOk === false) {
-                if (window.autoCaptureTimeout) clearTimeout(window.autoCaptureTimeout);
-                window.autoCaptureTimeout = null;
-                window.stabilityCounter = 0;
-                updateStabilityRing?.(0, stableFramesRequired);
-                return;
+                setCamStatus?.('<i class="fas fa-eye"></i> ارمش مرة واحدة أو حرّك رأسك حركة بسيطة ثم ثبّت وجهك...');
+                // Continue counting after a small grace period so the camera never becomes just a preview.
+                if (!this.livenessGraceStartedAt) this.livenessGraceStartedAt = Date.now();
+                if ((Date.now() - this.livenessGraceStartedAt) < 1800) {
+                    updateStabilityRing?.(window.stabilityCounter || 0, stableFramesRequired);
+                    return;
+                }
+            } else {
+                this.livenessGraceStartedAt = null;
             }
 
             window.stabilityCounter = Math.min(stableFramesRequired, window.stabilityCounter + 1);

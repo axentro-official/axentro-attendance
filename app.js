@@ -565,6 +565,42 @@ class App {
         employeeActionPasswordBtn?.addEventListener('click', () => window.adminOpenEmployeeAction?.('تغيير كلمة السر'));
         employeeActionFaceBtn?.addEventListener('click', () => window.adminOpenEmployeeAction?.('تحديث بصمة الوجه'));
 
+        // Delegated settings actions: keeps buttons working after the settings modal is rebuilt/restored.
+        if (!document.body.dataset.axentroSettingsDelegated) {
+            document.body.addEventListener('click', (event) => {
+                const target = event.target?.closest?.('button, [role=button], label');
+                if (!target) return;
+                const id = target.id;
+                if (id === 'openOwnPasswordSettingsBtn') {
+                    event.preventDefault();
+                    ui?.closeModal?.('settingsModal');
+                    auth?.openChangePwModal?.('own');
+                } else if (id === 'openFaceUpdateBtn') {
+                    event.preventDefault();
+                    this.promptFaceUpdate();
+                } else if (id === 'uploadProfileImageBtn') {
+                    event.preventDefault();
+                    document.getElementById('profileImageInput')?.click();
+                } else if (id === 'removeProfileImageBtn') {
+                    event.preventDefault();
+                    this.removeProfileImage();
+                } else if (id === 'saveWorksiteSettingsBtn') {
+                    event.preventDefault();
+                    this.saveWorksiteSettings();
+                } else if (id === 'extractWorksiteMapBtn') {
+                    event.preventDefault();
+                    this.extractWorksiteFromMapUrl();
+                } else if (id === 'useCurrentWorksiteLocationBtn') {
+                    event.preventDefault();
+                    this.useCurrentLocationForWorksite();
+                } else if (id === 'worksiteSearchBtn') {
+                    event.preventDefault();
+                    this.searchWorksiteLocation();
+                }
+            });
+            document.body.dataset.axentroSettingsDelegated = '1';
+        }
+
         // Keyboard shortcuts
         document.addEventListener('DOMContentLoaded', () => {
             // Fingerprint button visibility
@@ -777,6 +813,7 @@ class App {
     }
 
     showLoginScreen() {
+        document.body.classList.remove('authenticated');
         this.updateLayoutMode('auth');
         this.hideAllPages();
         const loginPage = document.getElementById('loginPage');
@@ -791,6 +828,7 @@ class App {
             this.showLoginScreen();
             return;
         }
+        document.body.classList.add('authenticated');
         this.updateLayoutMode('app');
         this.hideAllPages();
         this.applyUserContextToDashboard();

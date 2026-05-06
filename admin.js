@@ -266,7 +266,7 @@ class AdminManager {
             if (window.app?.refreshData) await window.app.refreshData(true);
         } catch (error) {
             console.error('❌ Add employee error:', error);
-            showToast?.(error.message || 'حدث خطأ أثناء إضافة الموظف', 'error');
+            showToast?.(this.translateEmployeeError?.(error.message) || error.message || 'حدث خطأ أثناء إضافة الموظف', 'error');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -337,6 +337,116 @@ class AdminManager {
         if (codeEl) codeEl.textContent = cleanCode;
         if (typeof ui !== 'undefined' && ui?.openModal) ui.openModal('employeeActionsModal');
         else document.getElementById('employeeActionsModal')?.classList.add('active');
+    }
+
+
+
+    translateEmployeeError(message) {
+        const text = String(message || '');
+        if (/email_or_code_already_exists|duplicate|already_exists/i.test(text)) {
+            return 'البريد الإلكتروني أو كود الموظف مستخدم بالفعل. استخدم بريدًا مختلفًا أو احذف الموظف القديم أولًا.';
+        }
+        if (/weak_password/i.test(text)) return 'كلمة المرور المؤقتة لا تطابق سياسة الأمان.';
+        return text || null;
+    }
+
+    async handleAdminVerification(descriptor) {
+        if (!descriptor) {
+            playSound?.('faceid-error');
+            showToast?.('فشل استخراج بصمة الوجه. قرّب وجهك وثبّته ثم حاول مرة أخرى.', 'error');
+            faceRecognition?.restartCamLoop?.();
+            return;
+        }
+
+        if (!window.sessionDescriptor && window.user?.face_descriptor) {
+            window.sessionDescriptor = Array.isArray(window.user.face_descriptor)
+                ? window.user.face_descriptor
+                : Object.values(window.user.face_descriptor || {}).map(Number);
+        }
+
+        if (!window.sessionDescriptor) {
+            playSound?.('faceid-error');
+            showToast?.('لا توجد بصمة أدمن مسجلة. حدّث بصمة وجهك أولًا من الإعدادات.', 'error');
+            closeCamera?.();
+            return;
+        }
+
+        const distance = this.euclideanDistance(descriptor, window.sessionDescriptor);
+        const threshold = AppConfig?.security?.adminVerification?.matchThreshold || 0.58;
+
+        if (distance >= threshold) {
+            playSound?.('faceid-error');
+            showMatchResult?.(false);
+            showToast?.('وجه الأدمن غير مطابق. تم رفض العملية.', 'error');
+            setCamStatus?.('<i class="fas fa-ban" style="color:#ef4444;"></i> وجه الأدمن غير مطابق');
+            faceRecognition?.restartCamLoop?.();
+            return;
+        }
+
+        showMatchResult?.(true);
+        setCamStatus?.('<i class="fas fa-check-circle" style="color:#10b981;"></i> تم التحقق من هوية الأدمن');
+        await this.executeVerifiedOperation();
+    }
+
+    async executeVerifiedOperation() {
+        const targetEmp = window.targetEmpForAdmin;
+        if (!targetEmp) {
+            closeCamera?.();
+            return;
+        }
+
+        try {
+            if (targetEmp.type === 'حذف موظف') {
+                await this.deleteEmployeeWithVerification(targetEmp);
+            } else if (targetEmp.type === 'تغيير كلمة السر') {
+                closeCamera?.();
+                showToast?.('تم التحقق. استخدم شاشة تغيير كلمة المرور للموظف.', 'info');
+            } else if (targetEmp.type === 'تحديث بصمة الوجه') {
+                closeCamera?.();
+                window.faceUpdateTargetUser = { code: targetEmp.code, name: targetEmp.name, role: 'employee' };
+                window.updateFaceMode = true;
+                window.adminVerifyMode = false;
+                setTimeout(() => openCamera?.(), 250);
+            } else {
+                await this.recordManualAttendance(targetEmp);
+            }
+        } catch (error) {
+            console.error('❌ Verified operation error:', error);
+            playSound?.('faceid-error');
+            showToast?.(error.message || 'فشل تنفيذ العملية', 'error');
+            faceRecognition?.restartCamLoop?.();
+        }
+    }
+
+    async deleteEmployeeWithVerification(targetEmp) {
+        const result = await db?.deleteEmployee?.(targetEmp.code);
+        if (!result?.success) {
+            throw new Error(result?.error || 'فشل حذف الموظف');
+        }
+        playSound?.('faceid-success');
+        showToast?.(`تم حذف ${targetEmp.name || targetEmp.code} بنجاح`, 'success');
+        await this.loadEmployeesList();
+        if (window.app?.refreshData) await window.app.refreshData(true);
+        setTimeout(() => closeCamera?.(), 700);
+    }
+
+    async recordManualAttendance(targetEmp) {
+        const employee = (this.employeesList || []).find(e => String(e.code).toUpperCase() === String(targetEmp.code).toUpperCase());
+        const payload = {
+            employee_code: targetEmp.code,
+            employee_name: targetEmp.name || employee?.name || targetEmp.code,
+            type: targetEmp.type,
+            shift: 'تسجيل يدوي بواسطة الأدمن',
+            location_link: 'Manual admin action',
+            created_at: new Date().toISOString(),
+            face_verified: true
+        };
+        const { error } = await db.from('attendance').insert(payload);
+        if (error) throw error;
+        playSound?.('faceid-success');
+        showToast?.(`تم تسجيل ${targetEmp.type} لـ ${targetEmp.name || targetEmp.code} بنجاح`, 'success');
+        await this.updateDashboardStats();
+        setTimeout(() => closeCamera?.(), 700);
     }
 
     // ============================================

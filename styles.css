@@ -2635,3 +2635,39 @@ table.employees-table {
     margin-inline-start: auto !important;
     margin-inline-end: auto !important;
 }
+
+/* AXENTRO HOTFIX v5.9 - admin table: one table scroll only, no per-cell scrollbars */
+.admin-table-shell,
+.employees-table-container {
+  overflow: auto !important;
+  max-width: 100% !important;
+}
+.admin-table.admin-employee-table {
+  min-width: 980px !important;
+  width: max-content !important;
+  table-layout: auto !important;
+}
+.admin-table.admin-employee-table .cell-scroll {
+  overflow: visible !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+  max-width: none !important;
+  padding-bottom: 0 !important;
+}
+.admin-table.admin-employee-table .admin-col-name,
+.admin-table.admin-employee-table .admin-col-email {
+  min-width: 260px !important;
+  width: auto !important;
+}
+.admin-table.admin-employee-table .cell-strong {
+  white-space: normal !important;
+  line-height: 1.7 !important;
+}
+
+/* AXENTRO HOTFIX v5.9 - keep active app/auth pages mutually exclusive */
+body.authenticated #loginPage,
+body.authenticated #registerPage,
+body.authenticated #forgotPasswordPage {
+  display: none !important;
+}
