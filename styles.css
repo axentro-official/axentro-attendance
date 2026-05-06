@@ -2404,54 +2404,234 @@ body.auth-mode .global-app-footer{display:none;}
   }
 }
 
+/* =========================================================
+   AXENTRO HOTFIX v5.7 - Login layout + Toast overlay
+   Scope: Fix desktop login split clipping, prevent partial toast hiding.
+   ========================================================= */
+body.auth-mode {
+  overflow-x: hidden !important;
+}
 
-/* v5.8 targeted fixes: page isolation, settings/worksite modal separation, employee table scrolling */
+body.auth-mode .app-container {
+  max-width: none !important;
+  width: 100% !important;
+  padding: 0 !important;
+}
+
+body.auth-mode .page.auth-split-page,
+#loginPage.auth-split-page {
+  width: 100% !important;
+  min-height: 100vh !important;
+  padding: clamp(12px, 2vw, 24px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: visible !important;
+}
+
+body.auth-mode .login-split-layout,
+#loginPage .login-split-layout {
+  width: min(100%, 920px) !important;
+  min-height: auto !important;
+  display: grid !important;
+  grid-template-columns: minmax(230px, 0.86fr) minmax(360px, 1.14fr) !important;
+  gap: 18px !important;
+  align-items: stretch !important;
+  margin: 0 auto !important;
+}
+
+body.auth-mode .login-side-card,
+#loginPage .login-side-card {
+  min-height: 100% !important;
+  height: auto !important;
+  justify-content: center !important;
+}
+
+body.auth-mode .auth-container.login-card-panel,
+#loginPage .auth-container.login-card-panel {
+  width: 100% !important;
+  max-width: 460px !important;
+  margin: 0 !important;
+  height: auto !important;
+  align-self: center !important;
+}
+
+@media (max-width: 760px) {
+  body.auth-mode .page.auth-split-page,
+  #loginPage.auth-split-page {
+    align-items: flex-start !important;
+    padding: 10px !important;
+  }
+
+  body.auth-mode .login-split-layout,
+  #loginPage .login-split-layout {
+    grid-template-columns: 1fr !important;
+    width: min(100%, 460px) !important;
+    gap: 12px !important;
+  }
+
+  body.auth-mode .login-side-panel,
+  #loginPage .login-side-panel {
+    order: 2 !important;
+  }
+
+  body.auth-mode .login-card-panel,
+  #loginPage .login-card-panel {
+    order: 1 !important;
+    max-width: 100% !important;
+  }
+
+  body.auth-mode .login-side-card,
+  #loginPage .login-side-card {
+    min-height: auto !important;
+    padding: 16px 12px !important;
+  }
+
+  body.auth-mode .login-side-links,
+  #loginPage .login-side-links {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    margin: 0 0 14px !important;
+  }
+}
+
+/* Toasts must always sit above modals, camera overlay, and page content. */
+#toastContainer.toast-container,
+.toast-container {
+  position: fixed !important;
+  top: max(16px, env(safe-area-inset-top)) !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
+  width: min(520px, calc(100vw - 28px)) !important;
+  max-width: calc(100vw - 28px) !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+#toastContainer .toast,
+#toastContainer .app-toast,
+.toast-container .toast,
+.toast-container .app-toast {
+  pointer-events: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  direction: rtl !important;
+}
+
+#toastContainer .app-toast {
+  border-radius: 18px !important;
+  border: 1px solid rgba(96,165,250,.28) !important;
+  background: linear-gradient(135deg, rgba(6,18,45,.98), rgba(12,35,86,.98)) !important;
+  box-shadow: 0 26px 70px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04) inset !important;
+}
+
+
+/* ===== v5.8 HOTFIX - based on v5.7 latest files ===== */
+/* Hard page isolation: prevents login/register/forgot pages from staying visible under admin/dashboard */
 body.app-mode #loginPage,
 body.app-mode #registerPage,
 body.app-mode #forgotPasswordPage {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-body.app-mode #dashboardPage.active,
-body.app-mode #adminPage.active {
-  display: block !important;
-  visibility: visible !important;
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 body.auth-mode #dashboardPage,
 body.auth-mode #adminPage {
-  display: none !important;
-  visibility: hidden !important;
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
-#settingsModal.worksite-focus-mode .settings-modal-content {
-  max-width: min(920px, 94vw) !important;
+body.app-mode #adminPage.active,
+body.app-mode #dashboardPage.active {
+    display: block !important;
+    visibility: visible !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
+    padding: 20px 14px 10px !important;
+    margin: 0 auto !important;
 }
-.admin-table-scroll {
-  overflow: auto !important;
-  max-width: 100%;
+
+/* Employee table: one table-level scroll only; no inner scroll on employee name/email cells */
+.employees-table-container,
+.admin-table-shell,
+.table-responsive,
+.employees-table-wrapper {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch;
 }
-.admin-table.admin-employee-table {
-  table-layout: auto !important;
-  min-width: 980px !important;
+.employees-table,
+.admin-table,
+table.employees-table {
+    min-width: 760px;
+    table-layout: auto !important;
 }
-.admin-table.admin-employee-table .cell-scroll {
-  overflow: visible !important;
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-  white-space: nowrap !important;
+.employees-table td,
+.employees-table th,
+.admin-table td,
+.admin-table th {
+    overflow: visible !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    max-width: none !important;
 }
-.admin-table.admin-employee-table .cell-scroll::-webkit-scrollbar {
-  display: none !important;
+.employees-table td *,
+.admin-table td *,
+.employee-name,
+.employee-email,
+.employee-code,
+.employee-info,
+.employee-cell,
+.user-name,
+.user-email {
+    overflow: visible !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
 }
-.admin-table.admin-employee-table .admin-col-name,
-.admin-table.admin-employee-table td.admin-col-name {
-  width: auto !important;
-  min-width: 240px !important;
+
+/* Keep settings and worksite modal visually stable after switching between both buttons */
+#settingsModal.worksite-focus-mode .modal-content {
+    width: min(920px, 96vw) !important;
+    max-width: 920px !important;
 }
-.admin-table.admin-employee-table .admin-col-name .cell-scroll {
-  min-width: max-content;
+#settingsModal .modal-body {
+    max-height: min(78vh, 760px);
+    overflow: auto;
+    scrollbar-gutter: stable;
 }
-.admin-table.admin-employee-table .admin-col-email,
-.admin-table.admin-employee-table td.admin-col-email {
-  min-width: 260px !important;
+
+/* Toast always above modals/camera and fully visible */
+.toast-container,
+#toastContainer,
+.app-toast-container {
+    z-index: 2147483647 !important;
+    position: fixed !important;
+    top: 18px !important;
+    left: 18px !important;
+    right: 18px !important;
+    pointer-events: none !important;
+}
+.toast,
+.app-toast {
+    pointer-events: auto !important;
+    max-width: min(560px, calc(100vw - 36px)) !important;
+    margin-inline-start: auto !important;
+    margin-inline-end: auto !important;
 }

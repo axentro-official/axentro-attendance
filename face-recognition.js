@@ -308,23 +308,26 @@ class FaceRecognitionManager {
 
                 setStatus?.('جاري تحميل نموذج معالم الوجه...');
                 updateSplashProgress?.(55);
-                let tinyLandmarkLoaded = this.isNetLoaded(faceapi.nets.faceLandmark68TinyNet);
+
+                // Production note:
+                // The deployed /models folder contains the full 68 landmark model only
+                // (face_landmark_68_model-*). Loading faceLandmark68TinyNet causes a 404
+                // and can later make face-api try inference with an unloaded tiny net.
+                // Therefore the unified camera pipeline intentionally uses the full
+                // landmark model for both enrollment and attendance verification.
+                let tinyLandmarkLoaded = false;
                 let fullLandmarkLoaded = this.isNetLoaded(faceapi.nets.faceLandmark68Net);
 
-                if (!tinyLandmarkLoaded && faceapi.nets.faceLandmark68TinyNet) {
-                    tinyLandmarkLoaded = await tryLoad('faceLandmark68TinyNet', (src) => faceapi.nets.faceLandmark68TinyNet.loadFromUri(src), true);
-                }
                 if (!fullLandmarkLoaded && faceapi.nets.faceLandmark68Net) {
-                    fullLandmarkLoaded = await tryLoad('faceLandmark68Net', (src) => faceapi.nets.faceLandmark68Net.loadFromUri(src), true);
+                    fullLandmarkLoaded = await tryLoad('faceLandmark68Net', (src) => faceapi.nets.faceLandmark68Net.loadFromUri(src));
                 }
 
-                tinyLandmarkLoaded = this.isNetLoaded(faceapi.nets.faceLandmark68TinyNet);
                 fullLandmarkLoaded = this.isNetLoaded(faceapi.nets.faceLandmark68Net);
 
-                if (!tinyLandmarkLoaded && !fullLandmarkLoaded) {
+                if (!fullLandmarkLoaded) {
                     throw new Error('تعذر تحميل نموذج معالم الوجه');
                 }
-                this.landmarkTinyPreferred = !!tinyLandmarkLoaded;
+                this.landmarkTinyPreferred = false;
 
                 setStatus?.('جاري تحميل نموذج بصمة الوجه...');
                 updateSplashProgress?.(82);
@@ -343,7 +346,7 @@ class FaceRecognitionManager {
                 window.heavyModels = true;
                 setStatus?.('نظام بصمة الوجه جاهز');
                 updateSplashProgress?.(100);
-                console.log('✅ Face models ready (tiny landmarks optional; full landmarks fallback active):', health);
+                console.log('✅ Face model health (68Tiny=false is normal when full 68 model is loaded):', health);
                 return true;
             } catch (error) {
                 this.modelsLoaded = false;
@@ -403,13 +406,14 @@ class FaceRecognitionManager {
             faceLandmark68Net,
             landmarkAny: faceLandmark68TinyNet || faceLandmark68Net,
             faceRecognitionNet,
-            preferredTinyLandmarks: faceLandmark68TinyNet
+            preferredTinyLandmarks: false
         };
     }
 
     getLandmarkTinyFlag() {
-        const health = this.getModelHealth();
-        return !!health.faceLandmark68TinyNet;
+        // Force full landmark model. The current production bundle does not include
+        // face_landmark_68_tiny_model files, so returning true causes inference errors.
+        return false;
     }
 
     areModelsLoaded() {
@@ -426,7 +430,7 @@ class FaceRecognitionManager {
 
         if (ready) {
             this.modelsLoaded = health.tinyFaceDetector && health.landmarkAny && health.faceRecognitionNet;
-            this.landmarkTinyPreferred = !!health.faceLandmark68TinyNet;
+            this.landmarkTinyPreferred = false;
             window.lightModels = !!health.tinyFaceDetector;
             window.heavyModels = !!(health.landmarkAny && health.faceRecognitionNet);
             return true;
