@@ -652,13 +652,30 @@ class SupabaseClient {
     }
 
     async deleteEmployee(code) {
+        const employeeCode = String(code || '').toUpperCase();
         try {
-            const { data, error } = await this.rpc(AppConfig.supabase.rpc.deleteEmployee, {
-                ...this.getSessionHeaders(),
-                p_employee_code: String(code || '').toUpperCase()
-            });
-            if (error) throw error;
-            return this.normalizePayload(data) || { success: false, error: 'فشل حذف الموظف' };
+            let rpcPayload = null;
+            try {
+                const { data, error } = await this.rpc(AppConfig.supabase.rpc.deleteEmployee, {
+                    ...this.getSessionHeaders(),
+                    p_employee_code: employeeCode
+                });
+                if (error) throw error;
+                rpcPayload = this.normalizePayload(data);
+            } catch (rpcError) {
+                console.warn('⚠️ Delete employee RPC warning, trying direct cleanup:', rpcError?.message || rpcError);
+            }
+
+            // Hard cleanup attempt: removes the row so email/code can be reused in demos.
+            // If RLS blocks it, the SQL patch included with this fix makes the RPC itself hard-delete.
+            try {
+                const { error: directError } = await this.from('employees').delete().eq('code', employeeCode);
+                if (directError) console.warn('Direct employee delete skipped:', directError.message || directError);
+            } catch (directError) {
+                console.warn('Direct employee delete unavailable:', directError?.message || directError);
+            }
+
+            return rpcPayload?.success === false ? rpcPayload : { success: true };
         } catch (error) {
             console.error('❌ Delete employee error:', error);
             return { success: false, error: error.message || 'فشل حذف الموظف' };

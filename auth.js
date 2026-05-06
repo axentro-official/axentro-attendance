@@ -814,9 +814,10 @@ password: ''
         });
         const registerPage = document.getElementById('registerPage');
         if (registerPage) {
-            registerPage.style.display = 'block';
-            registerPage.classList.add('active');
+            registerPage.style.display = 'flex';
+            registerPage.classList.add('active', 'auth-card-overlay');
         }
+        document.body.classList.add('auth-overlay-open');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -831,6 +832,8 @@ password: ''
             const el = document.getElementById(id);
             if (el) { el.classList.remove('active'); el.style.display = 'none'; }
         });
+        document.body.classList.remove('auth-overlay-open');
+        document.querySelectorAll('.auth-card-overlay').forEach(el => el.classList.remove('auth-card-overlay'));
         const loginPage = document.getElementById('loginPage');
         if (loginPage) {
             loginPage.style.display = 'block';
@@ -1093,8 +1096,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('dashboardPage')?.classList.remove('active');
             const forgot = document.getElementById('forgotPasswordPage');
             if (forgot) {
-                forgot.style.display = 'block';
-                forgot.classList.add('active');
+                forgot.style.display = 'flex';
+                forgot.classList.add('active', 'auth-card-overlay');
+                document.body.classList.add('auth-overlay-open');
             }
         }
     });

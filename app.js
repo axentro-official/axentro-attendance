@@ -813,9 +813,10 @@ class App {
     }
 
     showLoginScreen() {
-        document.body.classList.remove('authenticated');
+        document.body.classList.remove('authenticated', 'auth-overlay-open');
         this.updateLayoutMode('auth');
         this.hideAllPages();
+        document.querySelectorAll('.auth-card-overlay').forEach(el => el.classList.remove('auth-card-overlay'));
         const loginPage = document.getElementById('loginPage');
         if (loginPage) {
             loginPage.style.display = 'block';
@@ -925,9 +926,10 @@ class App {
         this.hideAllPages();
         const registerPage = document.getElementById('registerPage');
         if (registerPage) {
-            registerPage.style.display = 'block';
-            registerPage.classList.add('active');
+            registerPage.style.display = 'flex';
+            registerPage.classList.add('active', 'auth-card-overlay');
         }
+        document.body.classList.add('auth-overlay-open');
     }
 
     // ============================================
@@ -1224,6 +1226,11 @@ class App {
                 return tryParseText(response?.url || '') || tryParseText(await response.text().catch(() => ''));
             },
             async () => {
+                const apiUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(cleanUrl);
+                const response = await fetch(apiUrl, { method: 'GET', mode: 'cors', cache: 'no-store', redirect: 'follow' });
+                return tryParseText(response?.url || '') || tryParseText(await response.text().catch(() => ''));
+            },
+            async () => {
                 const apiUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(cleanUrl);
                 const response = await fetch(apiUrl, { method: 'GET', mode: 'cors', cache: 'no-store' });
                 const data = await response.json();
@@ -1335,19 +1342,40 @@ class App {
     }
 
     async geocodeWorksiteText(query) {
-        const clean = String(query || '').trim();
-        if (!clean || clean.length < 3) return null;
-        try {
-            const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=0&q=' + encodeURIComponent(clean);
-            const response = await fetch(url, { method: 'GET', cache: 'no-store' });
-            if (!response.ok) return null;
-            const data = await response.json();
-            const first = Array.isArray(data) ? data[0] : null;
-            const latitude = Number(first?.lat);
-            const longitude = Number(first?.lon);
-            if (Number.isFinite(latitude) && Number.isFinite(longitude)) return { latitude, longitude };
-        } catch (error) {
-            console.warn('Geocode failed:', error?.message || error);
+        const original = String(query || '').trim();
+        if (!original || original.length < 2) return null;
+
+        const clean = original
+            .replace(/^https?:\/\/[^\s]+/i, '')
+            .replace(/^\/maps\/place\//i, '')
+            .replace(/[+]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim() || original;
+
+        const candidates = [];
+        const addCandidate = (value) => {
+            value = String(value || '').trim();
+            if (value && !candidates.includes(value)) candidates.push(value);
+        };
+        addCandidate(clean);
+        if (!/مصر|egypt/i.test(clean)) addCandidate(clean + ' مصر');
+        if (!/القاهرة|cairo/i.test(clean)) addCandidate(clean + ' القاهرة مصر');
+
+        for (const q of candidates) {
+            try {
+                const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=0&accept-language=ar&countrycodes=eg&q=' + encodeURIComponent(q);
+                const response = await fetch(url, { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } });
+                if (!response.ok) continue;
+                const data = await response.json();
+                const first = Array.isArray(data) ? data.find(item => item && item.lat && item.lon) : null;
+                const latitude = Number(first?.lat);
+                const longitude = Number(first?.lon);
+                if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+                    return { latitude, longitude, display_name: first.display_name || q };
+                }
+            } catch (error) {
+                console.warn('Geocode failed:', q, error?.message || error);
+            }
         }
         return null;
     }
@@ -1387,8 +1415,11 @@ class App {
             const lon = Number(document.getElementById('worksiteLongitude')?.value || 31.2357);
             const startLat = Number.isFinite(lat) ? lat : 30.0444;
             const startLon = Number.isFinite(lon) ? lon : 31.2357;
-            this.worksiteMap = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView([startLat, startLon], 14);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(this.worksiteMap);
+            this.worksiteMap = L.map(mapEl, { zoomControl: true, attributionControl: true, scrollWheelZoom: true }).setView([startLat, startLon], 14);
+            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
+            const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '&copy; OpenTopoMap' });
+            standardLayer.addTo(this.worksiteMap);
+            L.control.layers({ 'خريطة الشوارع': standardLayer, 'خريطة تضاريس': topoLayer }, null, { position: 'topright' }).addTo(this.worksiteMap);
             this.worksiteMap.on('click', (e) => {
                 this.setWorksiteMapPoint(e.latlng.lat, e.latlng.lng, true);
             });
@@ -1427,20 +1458,29 @@ class App {
 
     async searchWorksiteOnMap() {
         const input = document.getElementById('worksiteSearchInput');
-        const query = String(input?.value || document.getElementById('worksiteMapUrl')?.value || '').trim();
+        const rawQuery = String(input?.value || '').trim();
+        const mapUrl = String(document.getElementById('worksiteMapUrl')?.value || '').trim();
+        const query = rawQuery || mapUrl;
         if (!query) {
-            showToast('اكتب اسم المكان أو العنوان أولاً', 'error');
+            showToast('اكتب اسم المكان أو الصق رابط Google Maps أولاً', 'error');
             return;
         }
         showToast('جاري البحث عن الموقع...', 'info');
         const direct = this.extractCoordinatesFromMapUrl(query);
-        const coords = direct || await this.geocodeWorksiteText(this.extractLikelyPlaceQuery(query));
+        let coords = direct;
+        if (!coords && /^https?:\/\//i.test(query)) {
+            coords = await this.resolveCoordinatesFromMapUrl(query);
+        }
         if (!coords) {
-            showToast('لم يتم العثور على الموقع. اضغط على الخريطة لتحديده يدويًا.', 'error');
+            const likely = this.extractLikelyPlaceQuery(query);
+            coords = await this.geocodeWorksiteText(likely);
+        }
+        if (!coords) {
+            showToast('لم يتم العثور على الموقع تلقائيًا. حرّك الخريطة واضغط بدقة على مقر العمل.', 'error');
             return;
         }
         this.setWorksiteMapPoint(coords.latitude, coords.longitude, true);
-        showToast('تم تحديد الموقع على الخريطة', 'success');
+        showToast('تم تحديد الموقع على الخريطة. راجع النقطة ثم اضغط حفظ.', 'success');
     }
 
     async promptFaceUpdate() {
@@ -1761,7 +1801,8 @@ if (typeof window !== 'undefined') {
         if (appRoot) appRoot.classList.remove('hidden');
         window.app?.updateLayoutMode?.('auth');
         [loginPage, registerPage, dashboardPage, adminPage].forEach(el => { if (el) { el.classList.remove('active'); el.style.display = 'none'; } });
-        if (forgotPasswordPage) { forgotPasswordPage.style.display = 'block'; forgotPasswordPage.classList.add('active'); }
+        if (forgotPasswordPage) { forgotPasswordPage.style.display = 'flex'; forgotPasswordPage.classList.add('active', 'auth-card-overlay'); }
+        document.body.classList.add('auth-overlay-open');
     };
     window.showApp = () => {
         window.app?.updateLayoutMode?.('app');

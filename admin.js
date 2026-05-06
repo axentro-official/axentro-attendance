@@ -343,8 +343,8 @@ class AdminManager {
 
     translateEmployeeError(message) {
         const text = String(message || '');
-        if (/email_or_code_already_exists|duplicate|already_exists/i.test(text)) {
-            return 'البريد الإلكتروني أو كود الموظف مستخدم بالفعل. استخدم بريدًا مختلفًا أو احذف الموظف القديم أولًا.';
+        if (/email_or_code_already_exists|duplicate|already_exists|مستخدم فعليًا/i.test(text)) {
+            return 'البريد الإلكتروني أو كود الموظف مستخدم بالفعل في قاعدة البيانات. لو تم حذف الموظف من الواجهة فقط، شغّل SQL المرفق لتنظيف السجلات القديمة أو استخدم بريدًا مختلفًا.';
         }
         if (/weak_password/i.test(text)) return 'كلمة المرور المؤقتة لا تطابق سياسة الأمان.';
         return text || null;
