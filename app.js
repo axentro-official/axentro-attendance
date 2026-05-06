@@ -752,7 +752,19 @@ class App {
             if (!el) return;
             el.classList.remove('active');
             el.style.display = 'none';
+            el.hidden = true;
+            el.setAttribute('aria-hidden', 'true');
         });
+    }
+
+    showPageOnly(pageId) {
+        this.hideAllPages();
+        const page = document.getElementById(pageId);
+        if (!page) return;
+        page.hidden = false;
+        page.removeAttribute('aria-hidden');
+        page.style.display = 'block';
+        page.classList.add('active');
     }
 
 
@@ -778,12 +790,8 @@ class App {
 
     showLoginScreen() {
         this.updateLayoutMode('auth');
-        this.hideAllPages();
-        const loginPage = document.getElementById('loginPage');
-        if (loginPage) {
-            loginPage.style.display = 'block';
-            loginPage.classList.add('active');
-        }
+        this.showPageOnly('loginPage');
+        window.scrollTo?.({ top: 0, behavior: 'instant' });
     }
 
     showMainApp() {
@@ -793,26 +801,32 @@ class App {
         }
         this.updateLayoutMode('app');
         this.applyUserContextToDashboard();
-        this.hideAllPages();
 
         const dashboardPage = document.getElementById('dashboardPage');
         const adminPage = document.getElementById('adminPage');
+        this.hideAllPages();
 
         if (window.user?.role === 'admin' || window.user?.isAdmin) {
             if (typeof window.adminManager !== 'undefined' && window.adminManager && typeof window.adminManager.init === 'function') {
                 window.adminManager.init();
             }
             if (adminPage) {
+                adminPage.hidden = false;
+                adminPage.removeAttribute('aria-hidden');
                 adminPage.style.display = 'block';
                 adminPage.classList.add('active');
+                document.getElementById('loginPage')?.classList.remove('active');
             }
             if (typeof loadEmployees === 'function') {
                 Promise.resolve(loadEmployees()).catch(err => console.warn('loadEmployees failed:', err));
             }
         } else {
             if (dashboardPage) {
+                dashboardPage.hidden = false;
+                dashboardPage.removeAttribute('aria-hidden');
                 dashboardPage.style.display = 'block';
                 dashboardPage.classList.add('active');
+                document.getElementById('loginPage')?.classList.remove('active');
             }
         }
     }
@@ -883,12 +897,7 @@ class App {
 
     showRegisterScreen() {
         this.updateLayoutMode('auth');
-        this.hideAllPages();
-        const registerPage = document.getElementById('registerPage');
-        if (registerPage) {
-            registerPage.style.display = 'block';
-            registerPage.classList.add('active');
-        }
+        this.showPageOnly('registerPage');
     }
 
     // ============================================
@@ -939,7 +948,20 @@ class App {
     }
 
 
+    restoreSettingsModalIfNeeded() {
+        const modal = document.getElementById('settingsModal');
+        if (!modal) return;
+        if (modal.dataset.worksiteDedicated === '1' && this.settingsModalOriginalHtml) {
+            modal.innerHTML = this.settingsModalOriginalHtml;
+            delete modal.dataset.worksiteDedicated;
+            modal.classList.remove('worksite-focus-mode');
+            this.worksiteMap = null;
+            this.worksiteMarker = null;
+        }
+    }
+
     openSettingsModal() {
+        this.restoreSettingsModalIfNeeded?.();
         this.resetSettingsModalView?.();
         const soundToggle = document.getElementById('soundEnabled');
         const vibrationToggle = document.getElementById('vibrationEnabled');
@@ -1015,6 +1037,10 @@ class App {
             return;
         }
 
+        if (modal.dataset.worksiteDedicated !== '1') {
+            this.settingsModalOriginalHtml = modal.innerHTML;
+        }
+        modal.dataset.worksiteDedicated = '1';
         modal.classList.add('worksite-focus-mode');
         modal.innerHTML = `
             <div class="modal-content settings-modal-content" style="max-width:720px;">
@@ -1710,8 +1736,8 @@ if (typeof window !== 'undefined') {
         const appRoot = document.getElementById('app');
         if (appRoot) appRoot.classList.remove('hidden');
         window.app?.updateLayoutMode?.('auth');
-        [loginPage, registerPage, dashboardPage, adminPage].forEach(el => { if (el) { el.classList.remove('active'); el.style.display = 'none'; } });
-        if (forgotPasswordPage) { forgotPasswordPage.style.display = 'block'; forgotPasswordPage.classList.add('active'); }
+        [loginPage, registerPage, dashboardPage, adminPage].forEach(el => { if (el) { el.classList.remove('active'); el.style.display = 'none'; el.hidden = true; el.setAttribute('aria-hidden', 'true'); } });
+        if (forgotPasswordPage) { forgotPasswordPage.hidden = false; forgotPasswordPage.removeAttribute('aria-hidden'); forgotPasswordPage.style.display = 'block'; forgotPasswordPage.classList.add('active'); }
     };
     window.showApp = () => window.app?.showMainApp?.();
 }
