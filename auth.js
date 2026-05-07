@@ -720,6 +720,7 @@ password: ''
 
                 this.toast('تم تغيير كلمة المرور', 'success');
                 this.closeChangePwModal();
+                if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('settingsModal');
             } else {
                 if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-error');
@@ -747,6 +748,7 @@ password: ''
 
                 this.toast('تم التغيير بنجاح', 'success');
                 this.closeChangePwModal();
+                if (typeof ui !== 'undefined' && ui?.closeModal) ui.closeModal('settingsModal');
             } else {
                 if (typeof app !== 'undefined' && app?.playSound) {
                     app.playSound('login-error');

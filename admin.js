@@ -638,8 +638,14 @@ window.handleFaceUpdateCapture = async function(descriptor) {
         showMatchResult?.(true);
         showToast?.('تم تحديث البصمة بنجاح', 'success');
         window.faceUpdateTargetUser = null;
+        window.updateFaceMode = false;
+        window.adminResetFaceMode = false;
         setTimeout(() => {
             closeCamera?.();
+            if (typeof ui !== 'undefined' && ui?.closeModal) {
+                ui.closeModal('settingsModal');
+                ui.closeModal('changePwModal');
+            }
             showApp?.();
             window.__faceUpdateInFlight = false;
         }, 800);

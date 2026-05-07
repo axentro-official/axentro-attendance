@@ -1111,6 +1111,7 @@ class App {
                                     </div>
                                 </div>
                                 <div id="worksiteMapPicker" class="worksite-map-picker"><div class="map-loading">جاري تحميل الخريطة...</div></div>
+                                <div id="worksiteSearchResults" class="worksite-search-results" aria-live="polite"></div>
                             </div>
                             <details class="advanced-worksite-fields" style="grid-column:1 / -1; opacity:.9;">
                                 <summary style="cursor:pointer;color:#93c5fd;margin-bottom:8px;">إعدادات متقدمة - الإحداثيات المستخرجة تلقائيًا</summary>
@@ -1209,7 +1210,7 @@ class App {
     }
 
     buildGoogleMapsUrl(latitude, longitude) {
-        return `https://maps.google.com/?q=${latitude},${longitude}`;
+        return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
     }
 
     async resolveCoordinatesFromMapUrl(url) {
@@ -1341,9 +1342,11 @@ class App {
         }
     }
 
-    async geocodeWorksiteText(query) {
+    async geocodeWorksiteText(query, options = {}) {
         const original = String(query || '').trim();
-        if (!original || original.length < 2) return null;
+        const limit = Number(options.limit || 8);
+        const returnAll = options.returnAll === true;
+        if (!original || original.length < 2) return returnAll ? [] : null;
 
         const clean = original
             .replace(/^https?:\/\/[^\s]+/i, '')
@@ -1357,27 +1360,82 @@ class App {
             value = String(value || '').trim();
             if (value && !candidates.includes(value)) candidates.push(value);
         };
+
         addCandidate(clean);
+        addCandidate(original);
         if (!/مصر|egypt/i.test(clean)) addCandidate(clean + ' مصر');
         if (!/القاهرة|cairo/i.test(clean)) addCandidate(clean + ' القاهرة مصر');
 
+        const seen = new Set();
+        const results = [];
+
         for (const q of candidates) {
             try {
-                const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=0&accept-language=ar&countrycodes=eg&q=' + encodeURIComponent(q);
+                const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=' + encodeURIComponent(String(limit)) + '&addressdetails=1&accept-language=ar,en&q=' + encodeURIComponent(q);
                 const response = await fetch(url, { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } });
                 if (!response.ok) continue;
                 const data = await response.json();
-                const first = Array.isArray(data) ? data.find(item => item && item.lat && item.lon) : null;
-                const latitude = Number(first?.lat);
-                const longitude = Number(first?.lon);
-                if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-                    return { latitude, longitude, display_name: first.display_name || q };
+                const list = Array.isArray(data) ? data : [];
+
+                for (const item of list) {
+                    const latitude = Number(item?.lat);
+                    const longitude = Number(item?.lon);
+                    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+                    const key = latitude.toFixed(6) + ',' + longitude.toFixed(6);
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    results.push({
+                        latitude,
+                        longitude,
+                        display_name: item.display_name || q,
+                        type: item.type || item.class || 'place',
+                        importance: Number(item.importance || 0)
+                    });
+                    if (results.length >= limit) break;
                 }
+
+                if (results.length >= limit) break;
             } catch (error) {
                 console.warn('Geocode failed:', q, error?.message || error);
             }
         }
-        return null;
+
+        results.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+        return returnAll ? results : (results[0] || null);
+    }
+
+    renderWorksiteSearchResults(results) {
+        const box = document.getElementById('worksiteSearchResults');
+        if (!box) return;
+        const list = Array.isArray(results) ? results : [];
+        if (!list.length) {
+            box.innerHTML = '';
+            box.classList.remove('active');
+            return;
+        }
+
+        box.classList.add('active');
+        box.innerHTML = list.slice(0, 8).map((item, index) => {
+            const title = String(item.display_name || 'موقع بدون اسم').replace(/[<>&"]/g, (ch) => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[ch]));
+            return `
+                <button type="button" class="worksite-search-result" data-index="${index}">
+                    <span class="result-title"><i class="fas fa-location-dot"></i> ${title}</span>
+                    <small>${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}</small>
+                </button>`;
+        }).join('');
+
+        box.querySelectorAll('.worksite-search-result').forEach((button) => {
+            button.addEventListener('click', () => {
+                const item = list[Number(button.dataset.index || 0)];
+                if (!item) return;
+                const searchInput = document.getElementById('worksiteSearchInput');
+                if (searchInput) searchInput.value = item.display_name || '';
+                this.setWorksiteMapPoint(item.latitude, item.longitude, true);
+                box.innerHTML = '';
+                box.classList.remove('active');
+                showToast('تم اختيار الموقع من نتائج البحث. راجع النقطة ثم اضغط حفظ.', 'success');
+            });
+        });
     }
 
     async ensureLeafletForWorksite() {
@@ -1411,22 +1469,50 @@ class App {
             if (!window.L) throw new Error('Leaflet unavailable');
             mapEl.dataset.initialized = '1';
             mapEl.innerHTML = '';
+
             const lat = Number(document.getElementById('worksiteLatitude')?.value || 30.0444);
             const lon = Number(document.getElementById('worksiteLongitude')?.value || 31.2357);
             const startLat = Number.isFinite(lat) ? lat : 30.0444;
             const startLon = Number.isFinite(lon) ? lon : 31.2357;
-            this.worksiteMap = L.map(mapEl, { zoomControl: true, attributionControl: true, scrollWheelZoom: true }).setView([startLat, startLon], 14);
-            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
-            const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '&copy; OpenTopoMap' });
+
+            this.worksiteMap = L.map(mapEl, {
+                zoomControl: true,
+                attributionControl: true,
+                scrollWheelZoom: true,
+                worldCopyJump: true
+            }).setView([startLat, startLon], 14);
+
+            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
+            });
+            const hotLayer = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap HOT'
+            });
+            const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                maxZoom: 17,
+                attribution: '&copy; OpenTopoMap'
+            });
+
             standardLayer.addTo(this.worksiteMap);
-            L.control.layers({ 'خريطة الشوارع': standardLayer, 'خريطة تضاريس': topoLayer }, null, { position: 'topright' }).addTo(this.worksiteMap);
+            L.control.layers({
+                'شوارع تفصيلية': standardLayer,
+                'خريطة تفصيلية محسّنة': hotLayer,
+                'تضاريس': topoLayer
+            }, null, { position: 'topright' }).addTo(this.worksiteMap);
+
+            L.control.scale({ imperial: false, metric: true, position: 'bottomleft' }).addTo(this.worksiteMap);
+
             this.worksiteMap.on('click', (e) => {
                 this.setWorksiteMapPoint(e.latlng.lat, e.latlng.lng, true);
             });
+
             this.setWorksiteMapPoint(startLat, startLon, false);
             setTimeout(() => this.worksiteMap?.invalidateSize?.(), 250);
+            setTimeout(() => this.worksiteMap?.invalidateSize?.(), 800);
         } catch (error) {
-            mapEl.innerHTML = '<div class="map-loading map-error">تعذر تحميل الخريطة. يمكنك استخدام رابط يحتوي على إحداثيات مباشرة أو زر موقعي الحالي للأدمن داخل المقر فقط.</div>';
+            mapEl.innerHTML = '<div class="map-loading map-error">تعذر تحميل الخريطة. يمكنك البحث بالاسم، أو لصق رابط يحتوي على إحداثيات مباشرة، أو استخدام زر موقعي الحالي وأنت داخل المقر فقط.</div>';
             console.warn('Map picker failed:', error?.message || error);
         }
     }
@@ -1461,26 +1547,44 @@ class App {
         const rawQuery = String(input?.value || '').trim();
         const mapUrl = String(document.getElementById('worksiteMapUrl')?.value || '').trim();
         const query = rawQuery || mapUrl;
+
         if (!query) {
             showToast('اكتب اسم المكان أو الصق رابط Google Maps أولاً', 'error');
             return;
         }
+
         showToast('جاري البحث عن الموقع...', 'info');
+        this.renderWorksiteSearchResults([]);
+
         const direct = this.extractCoordinatesFromMapUrl(query);
-        let coords = direct;
-        if (!coords && /^https?:\/\//i.test(query)) {
-            coords = await this.resolveCoordinatesFromMapUrl(query);
-        }
-        if (!coords) {
-            const likely = this.extractLikelyPlaceQuery(query);
-            coords = await this.geocodeWorksiteText(likely);
-        }
-        if (!coords) {
-            showToast('لم يتم العثور على الموقع تلقائيًا. حرّك الخريطة واضغط بدقة على مقر العمل.', 'error');
+        if (direct) {
+            this.setWorksiteMapPoint(direct.latitude, direct.longitude, true);
+            showToast('تم تحديد الموقع من الإحداثيات مباشرة. راجع النقطة ثم اضغط حفظ.', 'success');
             return;
         }
-        this.setWorksiteMapPoint(coords.latitude, coords.longitude, true);
-        showToast('تم تحديد الموقع على الخريطة. راجع النقطة ثم اضغط حفظ.', 'success');
+
+        let coords = null;
+        if (/^https?:\/\//i.test(query)) {
+            coords = await this.resolveCoordinatesFromMapUrl(query);
+            if (coords) {
+                this.setWorksiteMapPoint(coords.latitude, coords.longitude, true);
+                showToast('تم تحديد الموقع من الرابط. راجع النقطة ثم اضغط حفظ.', 'success');
+                return;
+            }
+        }
+
+        const likely = this.extractLikelyPlaceQuery(query) || query;
+        const results = await this.geocodeWorksiteText(likely, { returnAll: true, limit: 8 });
+
+        if (!results.length) {
+            showToast('لم يتم العثور على الموقع. جرّب كتابة اسم أدق أو اضغط على الخريطة يدويًا.', 'error');
+            return;
+        }
+
+        this.renderWorksiteSearchResults(results);
+        const first = results[0];
+        this.setWorksiteMapPoint(first.latitude, first.longitude, true);
+        showToast(results.length > 1 ? 'تم عرض نتائج متعددة. اختر النتيجة الصحيحة أو احفظ أول نتيجة بعد مراجعتها.' : 'تم تحديد الموقع. راجع النقطة ثم اضغط حفظ.', 'success');
     }
 
     async promptFaceUpdate() {

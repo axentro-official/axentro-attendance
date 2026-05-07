@@ -1672,22 +1672,3 @@ input[type="password"],
 <script src="app.js"></script>
 </body>
 </html>
-
-
-/* AXENTRO PASSWORD TOGGLE RIGHT FIX - keep visibility buttons away from typed password text */
-.password-wrapper { position: relative !important; }
-.password-wrapper input[type="password"],
-.password-wrapper input[type="text"] {
-    direction: ltr !important;
-    text-align: left !important;
-    unicode-bidi: plaintext !important;
-    padding-left: 16px !important;
-    padding-right: 58px !important;
-}
-.password-wrapper .toggle-password,
-.toggle-password,
-.prompt-password-toggle {
-    right: 12px !important;
-    left: auto !important;
-    z-index: 20 !important;
-}
