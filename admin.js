@@ -431,10 +431,29 @@ class AdminManager {
     }
 
     async recordManualAttendance(targetEmp) {
+        const shiftOptions = ['صباحي', 'بعد الظهر', 'مسائي'];
+        let selectedShift = targetEmp.shift || '';
+        if (!selectedShift) {
+            selectedShift = typeof ui !== 'undefined' && ui?.showPrompt
+                ? await ui.showPrompt({
+                    title: 'اختيار الوردية',
+                    message: `اختر/اكتب وردية ${targetEmp.type} للموظف ${targetEmp.name || targetEmp.code}`,
+                    placeholder: 'صباحي / بعد الظهر / مسائي',
+                    confirmText: 'متابعة',
+                    cancelText: 'إلغاء',
+                    type: 'info',
+                    errorMessage: 'الوردية مطلوبة'
+                })
+                : prompt('اكتب الوردية: صباحي / بعد الظهر / مسائي');
+            if (selectedShift === null) return;
+            selectedShift = String(selectedShift || '').trim();
+        }
+        if (!selectedShift) selectedShift = 'تسجيل يدوي بواسطة الأدمن';
+
         const result = await db?.adminManualAttendance?.(
             targetEmp.code,
             targetEmp.type,
-            'تسجيل يدوي بواسطة الأدمن'
+            selectedShift
         );
 
         if (!result?.success) {

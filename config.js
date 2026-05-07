@@ -38,7 +38,7 @@ const AppConfig = {
             requestPasswordReset: 'request_password_reset',
             completePasswordReset: 'complete_password_reset',
             getWorksiteSettings: 'get_worksite_settings_secure',
-            saveWorksiteSettings: 'save_worksite_settings_secure',
+            saveWorksiteSettings: 'save_worksite_settings_app',
             listEmployees: 'list_employees_secure',
             getTodayAttendance: 'get_today_attendance_secure',
             getAttendanceByRange: 'get_attendance_by_range_secure',

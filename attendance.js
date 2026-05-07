@@ -66,7 +66,7 @@ class AttendanceManager {
             latitude: Number(site.latitude ?? AppConfig?.location?.office?.latitude ?? 30.1407941),
             longitude: Number(site.longitude ?? AppConfig?.location?.office?.longitude ?? 31.3800838),
             allowedRadiusMeters: Number(site.allowed_radius_meters ?? AppConfig?.location?.maxDistanceMeters ?? 500),
-            maxAccuracyMeters: Number(site.max_accuracy_meters ?? AppConfig?.location?.maxAccuracyMeters ?? 50),
+            maxAccuracyMeters: Math.max(Number(site.max_accuracy_meters ?? AppConfig?.location?.maxAccuracyMeters ?? 50), 250),
             name: site.name || AppConfig?.location?.office?.name || 'المقر الرئيسي'
         };
     }
@@ -77,37 +77,41 @@ class AttendanceManager {
 
     async getCurrentLocation() {
         try {
-            const location = await new Promise((resolve, reject) => {
+            const readPosition = (timeout = 18000, maximumAge = 0) => new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
                     return;
                 }
-
                 navigator.geolocation.getCurrentPosition(
                     pos => resolve(pos),
                     err => reject(err),
-                    {
-                        enableHighAccuracy: AppConfig?.location?.enableHighAccuracy !== false,
-                        timeout: AppConfig?.location?.timeout || 15000,
-                        maximumAge: AppConfig?.location?.maximumAge || 0
-                    }
+                    { enableHighAccuracy: true, timeout, maximumAge }
                 );
             });
+
+            const attempts = [];
+            for (let i = 0; i < 3; i++) {
+                try { attempts.push(await readPosition(i === 0 ? 20000 : 15000, i === 0 ? 0 : 3000)); } catch (_) {}
+                if (attempts.some(p => Number(p?.coords?.accuracy) <= 80)) break;
+                await new Promise(r => setTimeout(r, 900));
+            }
+            if (!attempts.length) throw new Error('Location unavailable');
+            const location = attempts.sort((a, b) => Number(a.coords.accuracy || 99999) - Number(b.coords.accuracy || 99999))[0];
 
             this.currentLocation = {
                 latitude: location.coords.latitude,
                 longitude: location.coords.longitude,
-                accuracy: location.coords.accuracy
+                accuracy: Number(location.coords.accuracy || 0)
             };
-            window.currentAccuracy = location.coords.accuracy;
+            window.currentAccuracy = this.currentLocation.accuracy;
 
             // Update global state
-            window.currentLat = location.coords.latitude;
-            window.currentLon = location.coords.longitude;
-            window.currentLoc = `https://maps.google.com/?q=${location.coords.latitude},${location.coords.longitude}`;
+            window.currentLat = this.currentLocation.latitude;
+            window.currentLon = this.currentLocation.longitude;
+            window.currentLoc = `https://maps.google.com/?q=${this.currentLocation.latitude},${this.currentLocation.longitude}`;
 
             // Update UI
-            this.updateLocationStatus(true, location.coords.accuracy);
+            this.updateLocationStatus(true, this.currentLocation.accuracy);
 
             return this.currentLocation;
 
@@ -316,9 +320,19 @@ class AttendanceManager {
             return;
         }
 
+        if (!window.sessionDescriptor && typeof db !== 'undefined' && db?.getFaceContext) {
+            const ctx = await db.getFaceContext(window.user);
+            const descriptor = ctx?.face_descriptor || ctx?.descriptor || null;
+            if (Array.isArray(descriptor)) {
+                window.sessionDescriptor = descriptor.map(Number);
+                window.user.face_descriptor = window.sessionDescriptor;
+                window.user.face_enrolled = true;
+            }
+        }
+
         if (!window.sessionDescriptor) {
             window.firstTimeSetupMode = true;
-            showToast?.('لا توجد بصمة وجه مسجلة لهذا الحساب. سنفتح الكاميرا الآن لتسجيلها.', 'warning');
+            showToast?.('لا توجد بصمة وجه مسجلة لهذا الحساب. سنفتح الكاميرا الآن لتسجيلها مرة واحدة فقط.', 'warning');
             const opened = typeof openCamera === 'function' ? await openCamera() : false;
             if (!opened) {
                 showToast?.('تعذر فتح الكاميرا لتسجيل بصمة الوجه', 'error');
@@ -425,7 +439,7 @@ class AttendanceManager {
                 window.currentLon,
                 policy.latitude,
                 policy.longitude
-            );
+            ) * 1000;
 
             const maxDistance = policy.allowedRadiusMeters;
 

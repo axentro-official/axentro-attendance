@@ -1427,7 +1427,7 @@ class App {
 
             // 2) Photon/Komoot: useful fallback for place names and POIs.
             try {
-                const photonUrl = 'https://photon.komoot.io/api/?limit=' + encodeURIComponent(String(limit)) + '&lang=ar&q=' + encodeURIComponent(q);
+                const photonUrl = 'https://photon.komoot.io/api/?limit=' + encodeURIComponent(String(limit)) + '&q=' + encodeURIComponent(q);
                 const data = await timeoutFetchJson(photonUrl);
                 const features = Array.isArray(data?.features) ? data.features : [];
                 features.forEach((feature) => {
@@ -1730,8 +1730,14 @@ class App {
         const maxAccuracy = Number.parseInt(document.getElementById('worksiteMaxAccuracy')?.value || '', 10);
 
         if (!mapUrl) {
-            showToast('يرجى إدخال رابط المقر من Google Maps', 'error');
-            return;
+            const manualLat = Number(document.getElementById('worksiteLatitude')?.value || NaN);
+            const manualLon = Number(document.getElementById('worksiteLongitude')?.value || NaN);
+            if (Number.isFinite(manualLat) && Number.isFinite(manualLon)) {
+                extracted = { latitude: manualLat, longitude: manualLon, source: 'map-picker' };
+            } else {
+                showToast('يرجى إدخال رابط المقر أو تحديده على الخريطة أو استخدام موقعك الحالي', 'error');
+                return;
+            }
         }
         if (!extracted) {
             showToast('جاري محاولة استخراج الإحداثيات من رابط Google Maps...', 'info');
@@ -1759,7 +1765,7 @@ class App {
 
         const payload = {
             name,
-            map_url: mapUrl,
+            map_url: mapUrl || this.buildGoogleMapsUrl(extracted.latitude, extracted.longitude),
             latitude: extracted.latitude,
             longitude: extracted.longitude,
             allowed_radius_meters: radius,
