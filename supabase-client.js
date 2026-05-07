@@ -548,9 +548,9 @@ class SupabaseClient {
             const payload = this.normalizePayload(data) || { success: false, error: 'فشل طلب الاستعادة' };
             if (!payload.success) return payload;
 
-            const resetCode = payload.reset_token || payload.resetCode || payload.token || payload.code;
+            const resetCode = payload.reset_token || payload.resetCode || payload.reset_code || payload.token || payload.code;
             if (!resetCode) {
-                return { success: false, error: 'لم يرجع السيرفر رمز الاستعادة. شغّل باتش SQL المرفق أولاً.' };
+                return { success: false, error: 'لم يرجع السيرفر رمز الاستعادة. شغّل باتش SQL الجديد AXENTRO_PASSWORD_RESET_DIRECT_FIX_v2 أولاً.' };
             }
 
             if (AppConfig?.emailService?.url) {
