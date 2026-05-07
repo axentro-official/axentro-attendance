@@ -431,21 +431,20 @@ class AdminManager {
     }
 
     async recordManualAttendance(targetEmp) {
-        const employee = (this.employeesList || []).find(e => String(e.code).toUpperCase() === String(targetEmp.code).toUpperCase());
-        const payload = {
-            employee_code: targetEmp.code,
-            employee_name: targetEmp.name || employee?.name || targetEmp.code,
-            type: targetEmp.type,
-            shift: 'تسجيل يدوي بواسطة الأدمن',
-            location_link: 'Manual admin action',
-            created_at: new Date().toISOString(),
-            face_verified: true
-        };
-        const { error } = await db.from('attendance').insert(payload);
-        if (error) throw error;
+        const result = await db?.adminManualAttendance?.(
+            targetEmp.code,
+            targetEmp.type,
+            'تسجيل يدوي بواسطة الأدمن'
+        );
+
+        if (!result?.success) {
+            throw new Error(result?.error || result?.message || 'فشل تسجيل الحضور اليدوي');
+        }
+
         playSound?.('faceid-success');
         showToast?.(`تم تسجيل ${targetEmp.type} لـ ${targetEmp.name || targetEmp.code} بنجاح`, 'success');
         await this.updateDashboardStats();
+        if (window.app?.refreshData) await window.app.refreshData(true);
         setTimeout(() => closeCamera?.(), 700);
     }
 

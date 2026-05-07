@@ -554,21 +554,40 @@ class SupabaseClient {
 
     async updateWorksiteSettings(worksiteId, updates) {
         try {
-            const { data, error } = await this.rpc(AppConfig.supabase.rpc.saveWorksiteSettings, {
+            const params = {
                 ...this.getSessionHeaders(),
                 p_name: updates?.name || 'المقر الرئيسي',
                 p_map_url: updates?.map_url || null,
-                p_latitude: updates?.latitude,
-                p_longitude: updates?.longitude,
-                p_allowed_radius_meters: updates?.allowed_radius_meters,
-                p_max_accuracy_meters: updates?.max_accuracy_meters
-            });
+                p_latitude: Number(updates?.latitude),
+                p_longitude: Number(updates?.longitude),
+                p_allowed_radius_meters: Number.parseInt(updates?.allowed_radius_meters ?? 500, 10),
+                p_max_accuracy_meters: Number.parseInt(updates?.max_accuracy_meters ?? 50, 10)
+            };
+
+            const { data, error } = await this.rpc(AppConfig.supabase.rpc.saveWorksiteSettings, params);
             if (error) throw error;
             const payload = this.normalizePayload(data);
             return payload?.success ? { success: true, data: payload.worksite || payload.data || null } : (payload || { success: false, error: 'فشل تحديث إعدادات المقر' });
         } catch (error) {
             console.error('❌ Update worksite settings error:', error);
             return { success: false, error: error.message || 'فشل تحديث إعدادات المقر' };
+        }
+    }
+
+    async adminManualAttendance(employeeCode, type, shift = 'تسجيل يدوي بواسطة الأدمن') {
+        try {
+            const { data, error } = await this.rpc(AppConfig?.supabase?.rpc?.adminManualAttendance || 'admin_manual_attendance_secure', {
+                ...this.getSessionHeaders(),
+                p_employee_code: String(employeeCode || '').toUpperCase(),
+                p_type: type,
+                p_shift: shift
+            });
+            if (error) throw error;
+            const payload = this.normalizePayload(data);
+            return payload || { success: false, error: 'Unknown response' };
+        } catch (error) {
+            console.error('❌ Admin manual attendance error:', error);
+            return { success: false, error: error.message || 'فشل تسجيل الحضور اليدوي' };
         }
     }
 

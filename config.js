@@ -46,7 +46,8 @@ const AppConfig = {
             updateAvatarImage: 'update_avatar_image_secure',
             deleteEmployee: 'delete_employee_secure',
             updateEmployee: 'update_employee_secure',
-            logSensitiveAction: 'log_sensitive_action'
+            logSensitiveAction: 'log_sensitive_action',
+            adminManualAttendance: 'admin_manual_attendance_secure'
         }
     },
     branding: {

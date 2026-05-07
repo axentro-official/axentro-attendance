@@ -1145,6 +1145,12 @@ class App {
         document.getElementById('useCurrentWorksiteLocationBtn')?.addEventListener('click', () => this.useCurrentLocationForWorksite());
         document.getElementById('saveWorksiteSettingsBtn')?.addEventListener('click', () => this.saveWorksiteSettings());
         document.getElementById('searchWorksiteMapBtn')?.addEventListener('click', () => this.searchWorksiteOnMap());
+        document.getElementById('worksiteSearchInput')?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                this.searchWorksiteOnMap();
+            }
+        });
 
         ui?.openModal?.('settingsModal');
         this.initWorksiteMapPicker().catch((error) => console.warn('Worksite map picker init failed:', error));
@@ -1344,17 +1350,18 @@ class App {
 
     async geocodeWorksiteText(query, options = {}) {
         const original = String(query || '').trim();
-        const limit = Number(options.limit || 8);
+        const limit = Number(options.limit || 10);
         const returnAll = options.returnAll === true;
         if (!original || original.length < 2) return returnAll ? [] : null;
 
-        const clean = original
+        const normalizeQuery = (value) => String(value || '')
             .replace(/^https?:\/\/[^\s]+/i, '')
             .replace(/^\/maps\/place\//i, '')
             .replace(/[+]+/g, ' ')
             .replace(/\s+/g, ' ')
-            .trim() || original;
+            .trim();
 
+        const clean = normalizeQuery(original) || original;
         const candidates = [];
         const addCandidate = (value) => {
             value = String(value || '').trim();
@@ -1364,44 +1371,79 @@ class App {
         addCandidate(clean);
         addCandidate(original);
         if (!/مصر|egypt/i.test(clean)) addCandidate(clean + ' مصر');
-        if (!/القاهرة|cairo/i.test(clean)) addCandidate(clean + ' القاهرة مصر');
+        if (!/القاهرة|cairo|الجيزة|giza|القليوبية|qalyubia/i.test(clean)) addCandidate(clean + ' القاهرة الكبرى مصر');
+        if (!/cairo|egypt/i.test(clean)) addCandidate(clean + ' Cairo Egypt');
+
+        const timeoutFetchJson = async (url, timeoutMs = 8500) => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    signal: controller.signal,
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) return null;
+                return await response.json();
+            } finally {
+                clearTimeout(timer);
+            }
+        };
 
         const seen = new Set();
         const results = [];
+        const pushResult = (latitude, longitude, displayName, type = 'place', importance = 0) => {
+            latitude = Number(latitude);
+            longitude = Number(longitude);
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+            if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return;
+            const key = latitude.toFixed(6) + ',' + longitude.toFixed(6);
+            if (seen.has(key)) return;
+            seen.add(key);
+            results.push({
+                latitude,
+                longitude,
+                display_name: displayName || original,
+                type,
+                importance: Number(importance || 0)
+            });
+        };
 
         for (const q of candidates) {
+            if (results.length >= limit) break;
+
+            // 1) OpenStreetMap Nominatim: good Arabic street coverage when the data exists.
             try {
-                const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=' + encodeURIComponent(String(limit)) + '&addressdetails=1&accept-language=ar,en&q=' + encodeURIComponent(q);
-                const response = await fetch(url, { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } });
-                if (!response.ok) continue;
-                const data = await response.json();
+                const nominatimUrl = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=' + encodeURIComponent(String(limit)) + '&addressdetails=1&accept-language=ar,en&countrycodes=eg&q=' + encodeURIComponent(q);
+                const data = await timeoutFetchJson(nominatimUrl);
                 const list = Array.isArray(data) ? data : [];
-
-                for (const item of list) {
-                    const latitude = Number(item?.lat);
-                    const longitude = Number(item?.lon);
-                    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
-                    const key = latitude.toFixed(6) + ',' + longitude.toFixed(6);
-                    if (seen.has(key)) continue;
-                    seen.add(key);
-                    results.push({
-                        latitude,
-                        longitude,
-                        display_name: item.display_name || q,
-                        type: item.type || item.class || 'place',
-                        importance: Number(item.importance || 0)
-                    });
-                    if (results.length >= limit) break;
-                }
-
-                if (results.length >= limit) break;
+                list.forEach((item) => pushResult(item?.lat, item?.lon, item?.display_name || q, item?.type || item?.class || 'place', item?.importance));
             } catch (error) {
-                console.warn('Geocode failed:', q, error?.message || error);
+                console.warn('Nominatim geocode failed:', q, error?.message || error);
+            }
+
+            if (results.length >= limit) break;
+
+            // 2) Photon/Komoot: useful fallback for place names and POIs.
+            try {
+                const photonUrl = 'https://photon.komoot.io/api/?limit=' + encodeURIComponent(String(limit)) + '&lang=ar&q=' + encodeURIComponent(q);
+                const data = await timeoutFetchJson(photonUrl);
+                const features = Array.isArray(data?.features) ? data.features : [];
+                features.forEach((feature) => {
+                    const coords = feature?.geometry?.coordinates || [];
+                    const props = feature?.properties || {};
+                    const name = [props.name, props.street, props.city, props.state, props.country].filter(Boolean).join('، ') || q;
+                    // Photon coordinates are [lon, lat].
+                    pushResult(coords[1], coords[0], name, props.type || 'place', 0.5);
+                });
+            } catch (error) {
+                console.warn('Photon geocode failed:', q, error?.message || error);
             }
         }
 
         results.sort((a, b) => (b.importance || 0) - (a.importance || 0));
-        return returnAll ? results : (results[0] || null);
+        return returnAll ? results.slice(0, limit) : (results[0] || null);
     }
 
     renderWorksiteSearchResults(results) {
@@ -1731,6 +1773,7 @@ class App {
         this.populateWorksiteFields(save.data || payload);
         if (window.attendance?.loadWorksitePolicy) await window.attendance.loadWorksitePolicy(true);
         showToast('تم حفظ رابط المقر والمسافة بنجاح', 'success');
+        setTimeout(() => ui?.closeModal?.('settingsModal'), 350);
     }
 
     clearLocalSettings() {
