@@ -112,40 +112,81 @@ class SupabaseClient {
     async signIn(identifier, password) {
         try {
             if (!this.isConnectedToSupabase()) throw new Error('Database connection not available');
-            const normalized = this.normalizeIdentifier(identifier);
-            const isAdminLogin = normalized.toLowerCase() === 'admin';
-            const fnName = isAdminLogin ? AppConfig.supabase.rpc.adminLogin : AppConfig.supabase.rpc.employeeLogin;
-            const params = isAdminLogin
-                ? { p_username: normalized.toLowerCase(), p_password: password }
-                : { p_code: normalized.toLowerCase(), p_password: password };
 
-            const { data, error } = await this.rpc(fnName, params);
-            if (error) throw error;
+            const normalized = this.normalizeIdentifier(identifier).toLowerCase();
+            const isEmailLogin = normalized.includes('@');
+            const attempts = [];
 
-            const payload = this.normalizePayload(data);
-            if (!payload?.success) {
+            if (isEmailLogin) {
+                attempts.push({
+                    role: 'admin',
+                    fnName: AppConfig.supabase.rpc.adminLogin,
+                    params: { p_username: normalized, p_password: password }
+                });
+                attempts.push({
+                    role: 'employee',
+                    fnName: AppConfig.supabase.rpc.employeeLogin,
+                    params: { p_code: normalized, p_password: password }
+                });
+            } else if (normalized === 'admin') {
+                attempts.push({
+                    role: 'admin',
+                    fnName: AppConfig.supabase.rpc.adminLogin,
+                    params: { p_username: normalized, p_password: password }
+                });
+            } else {
+                attempts.push({
+                    role: 'employee',
+                    fnName: AppConfig.supabase.rpc.employeeLogin,
+                    params: { p_code: normalized, p_password: password }
+                });
+            }
+
+            let lastPayload = null;
+            let lastError = null;
+
+            for (const attempt of attempts) {
+                const { data, error } = await this.rpc(attempt.fnName, attempt.params);
+                if (error) {
+                    lastError = error;
+                    continue;
+                }
+
+                const payload = this.normalizePayload(data);
+                lastPayload = payload;
+
+                if (!payload?.success) {
+                    const hardAuthError = ['invalid_password', 'invalid_credentials', 'wrong_password', 'account_inactive', 'forbidden'];
+                    if (attempt.role === 'admin' && isEmailLogin && hardAuthError.includes(payload?.error)) {
+                        break;
+                    }
+                    continue;
+                }
+
+                const rawUser = payload.user || {};
+                const user = {
+                    ...rawUser,
+                    role: payload.role || rawUser.role || (rawUser.is_admin ? 'admin' : attempt.role),
+                    session_token: payload.session_token || rawUser.session_token || null,
+                    session_expires_at: payload.session_expires_at || rawUser.session_expires_at || null
+                };
+
+                await this.setUserContext(user);
+
                 return {
-                    success: false,
-                    error: payload?.error || ErrorCodes.AUTH_INVALID_CREDENTIALS.message
+                    success: true,
+                    user,
+                    requiresPasswordChange: !!payload.requires_password_change,
+                    requiresFaceEnrollment: !!payload.requires_face_enrollment,
+                    role: user.role
                 };
             }
 
-            const rawUser = payload.user || {};
-            const user = {
-                ...rawUser,
-                role: payload.role || rawUser.role || (rawUser.is_admin ? 'admin' : 'employee'),
-                session_token: payload.session_token || null,
-                session_expires_at: payload.session_expires_at || null
-            };
-
-            await this.setUserContext(user);
+            if (lastError) throw lastError;
 
             return {
-                success: true,
-                user,
-                requiresPasswordChange: !!payload.requires_password_change,
-                requiresFaceEnrollment: !!payload.requires_face_enrollment,
-                role: user.role
+                success: false,
+                error: lastPayload?.error || ErrorCodes.AUTH_INVALID_CREDENTIALS.message
             };
         } catch (error) {
             console.error('❌ Sign in error:', error);
