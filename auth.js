@@ -160,6 +160,11 @@ class AuthManager {
                 parsed.user = { ...(parsed.user || {}), ...(user || {}) };
                 sessionStorage.setItem('user', JSON.stringify(parsed));
             }
+
+            if (user) {
+                sessionStorage.setItem('current_user', JSON.stringify(user));
+                if (typeof db !== 'undefined' && db) db.currentUser = user;
+            }
         } catch (error) {
             console.warn('Session sync warning:', error);
         }
@@ -350,16 +355,25 @@ class AuthManager {
                     isAdmin: role === 'admin',
                     isFirstLogin: !!(rawUser.is_first_login ?? rawUser.isFirstLogin),
                     face_enrolled: !!(rawUser.face_enrolled ?? rawUser.faceEnrolled),
-                    face_descriptor: null,
+                    face_descriptor: Array.isArray(rawUser.face_descriptor) ? rawUser.face_descriptor : null,
                     session_token: rawUser.session_token || result.session_token || null,
                     session_expires_at: rawUser.session_expires_at || result.session_expires_at || null
                 };
+
+                if (!user.face_descriptor && user.session_token && typeof db?.getFaceContext === 'function') {
+                    const ctx = await db.getFaceContext(user);
+                    if (ctx?.success !== false && ctx) {
+                        user.face_descriptor = Array.isArray(ctx.face_descriptor) ? ctx.face_descriptor : null;
+                        user.face_enrolled = !!(ctx.face_enrolled || user.face_descriptor);
+                        user.profile_image_url = ctx.profile_image_url || user.profile_image_url || null;
+                    }
+                }
 
                 return {
                     success: true,
                     user,
                     requiresPasswordChange: !!(result.requiresPasswordChange ?? result.requires_password_change),
-                    requiresFaceEnrollment: !!(result.requiresFaceEnrollment ?? result.requires_face_enrollment) || !user.face_enrolled
+                    requiresFaceEnrollment: (!!(result.requiresFaceEnrollment ?? result.requires_face_enrollment) || !user.face_enrolled) && !user.face_descriptor
                 };
             }
 

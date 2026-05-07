@@ -99,6 +99,7 @@ class AttendanceManager {
                 longitude: location.coords.longitude,
                 accuracy: location.coords.accuracy
             };
+            window.currentAccuracy = location.coords.accuracy;
 
             // Update global state
             window.currentLat = location.coords.latitude;
@@ -491,7 +492,7 @@ class AttendanceManager {
                 this.isProcessing = false;
                 this.lastActionTime = Date.now();
                 await this.loadTodayRecords();
-                this.calculateMonthlyHours();
+                await this.calculateMonthlyHours();
             }, 800);
 
             // Send email notification
@@ -595,6 +596,37 @@ class AttendanceManager {
         return `${hours.toFixed(1)} ساعة`;
     }
 
+    async calculateMonthlyHours() {
+        try {
+            if (!window.user || window.user.role === 'admin') return 0;
+
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const startStr = start.toISOString().slice(0, 10);
+            const endStr = end.toISOString().slice(0, 10);
+
+            let records = [];
+            if (typeof db !== 'undefined' && typeof db.getAttendanceByRange === 'function') {
+                records = await db.getAttendanceByRange(startStr, endStr);
+            }
+
+            if (!Array.isArray(records)) records = [];
+            const myCode = String(window.user.code || '').toUpperCase();
+            const myRecords = records.filter(r => String(r.employee_code || r.code || '').toUpperCase() === myCode);
+            const total = myRecords.reduce((sum, r) => sum + (parseFloat(r.hours_worked) || 0), 0);
+
+            const monthlyEl = document.getElementById('monthlyHours') || document.getElementById('monthHours') || document.getElementById('totalMonthHours');
+            if (monthlyEl) monthlyEl.textContent = total.toFixed(1);
+
+            return total;
+        } catch (error) {
+            console.warn('⚠️ Monthly hours calculation skipped:', error?.message || error);
+            return 0;
+        }
+    }
+
+
     getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
         const R = 6371;
         const dLat = this.deg2rad(lat2 - lat1);
@@ -668,23 +700,33 @@ window.calculateMonthlyHours = async function() {
 
 window.fetchUserDataInBackground = async function() {
     if (typeof attendance === 'undefined' || !window.user) return;
+
     if (window.user.role !== 'admin') {
         await attendance.loadTodayRecords();
         await attendance.calculateMonthlyHours();
     }
+
     if (typeof db !== 'undefined') {
         try {
             const ctx = await db.getFaceContext(window.user);
+
             if (ctx?.success !== false && ctx) {
-                window.sessionDescriptor = ctx.face_descriptor || null;
-                window.userImage = ctx.profile_image_url || '';
-                window.user.face_enrolled = !!ctx.face_enrolled;
+                const descriptor = ctx.face_descriptor || window.user.face_descriptor || window.sessionDescriptor || null;
+                window.sessionDescriptor = Array.isArray(descriptor) ? descriptor : null;
+                window.userImage = ctx.profile_image_url || window.user.profile_image_url || '';
+                window.user.face_enrolled = !!(ctx.face_enrolled || window.sessionDescriptor);
+                if (window.sessionDescriptor) window.user.face_descriptor = window.sessionDescriptor;
+
                 if (window.userImage) {
                     const profileImg = document.querySelector('.emp-profile-img');
                     if (profileImg) profileImg.src = window.userImage + '?t=' + Date.now();
                 }
-                if (!ctx.face_enrolled && !document.getElementById('cameraOverlay')?.classList.contains('active')) {
-                    showToast?.('يجب تسجيل بصمة الوجه أولاً', 'warning');
+
+                if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
+                if (db?.setUserContext) await db.setUserContext(window.user);
+
+                if (!window.user.face_enrolled && !window.sessionDescriptor && !document.getElementById('cameraOverlay')?.classList.contains('active')) {
+                    showToast?.('لا توجد بصمة وجه مسجلة لهذا الحساب. سيتم فتح الكاميرا لتسجيلها.', 'warning');
                     window.firstTimeSetupMode = true;
                     await openCamera?.();
                 }

@@ -572,9 +572,14 @@ window.handleFirstTimeSetupCapture = async function(descriptor) {
         window.sessionDescriptor = descriptor;
         window.user.face_enrolled = true;
         window.user.face_descriptor = descriptor;
+        if (imageUrl) {
+            window.user.profile_image_url = imageUrl;
+            window.userImage = imageUrl;
+        }
         window.forceFaceEnrollment = false;
         window.firstTimeSetupMode = false;
         if (window.auth?.updateStoredSession) window.auth.updateStoredSession(window.user);
+        if (db?.setUserContext) await db.setUserContext(window.user);
         showMatchResult?.(true);
         showToast?.('تم تسجيل البصمة بنجاح!', 'success');
         setTimeout(async () => {
@@ -613,7 +618,7 @@ window.handleFaceUpdateCapture = async function(descriptor) {
         const result = await db.saveFaceEnrollment(targetUser, descriptor, imageUrl);
         if (!result?.success) throw new Error(result?.error || 'فشل تحديث البصمة');
         playSound?.('faceid-success');
-        if (window.user && targetUser.code === window.user.code && targetUser.role === window.user.role) {
+        if (window.user && (targetUser.code === window.user.code || targetUser.username === window.user.username) && targetUser.role === window.user.role) {
             window.sessionDescriptor = descriptor;
             window.user.face_enrolled = true;
             window.user.face_descriptor = descriptor;
