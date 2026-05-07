@@ -183,36 +183,41 @@ class Validator {
             };
         }
 
-        const minLength = AppConfig?.security?.password?.minLength || 4;
-        
-        if (value.length < minLength) {
+        const config = AppConfig?.security?.password || {};
+        const maxLength = config.maxLength || 64;
+
+        if (value.length > maxLength) {
             return {
                 valid: false,
-                message: `كلمة المرور يجب أن تكون ${minLength} أحرف على الأقل`
+                message: `كلمة المرور يجب ألا تزيد عن ${maxLength} حرفًا`
             };
         }
 
-        // Additional strength checks (optional based on config)
-        const config = AppConfig?.security?.password;
-        
-        if (config?.requireUppercase && !/[A-Z]/.test(value)) {
+        if (config.requireFirstUppercase !== false && !/^[A-Z]/.test(value)) {
+            return {
+                valid: false,
+                message: 'كلمة المرور يجب أن تبدأ بحرف كابيتال إنجليزي'
+            };
+        }
+
+        if (config.requireSpecialChars !== false && !/[^A-Za-z0-9]/.test(value)) {
+            return {
+                valid: false,
+                message: 'كلمة المرور يجب أن تحتوي على رمز مميز مثل ! أو @ أو #'
+            };
+        }
+
+        if (config.requireUppercase && !/[A-Z]/.test(value)) {
             return {
                 valid: false,
                 message: 'كلمة المرور يجب أن تحتوي على حرف كبير'
             };
         }
 
-        if (config?.requireNumbers && !/\d/.test(value)) {
+        if (config.requireNumbers && !/\d/.test(value)) {
             return {
                 valid: false,
                 message: 'كلمة المرور يجب أن تحتوي على رقم'
-            };
-        }
-
-        if (config?.requireSpecialChars && !/[!@#$%^&*(),.?":{}|<>]/.test(value)) {
-            return {
-                valid: false,
-                message: 'كلمة المرور يجب أن تحتوي على رمز خاص'
             };
         }
 

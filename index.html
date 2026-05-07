@@ -532,9 +532,9 @@
                     </label>
                     <div class="password-wrapper">
                         <input type="password" id="newPassword" 
-                               placeholder="الأقل 4 أحرف" 
+                               placeholder="مثال: Axentro! أو T@1" 
                                required 
-                               minlength="4"
+                               minlength="1"
                                autocomplete="new-password">
                         <button type="button" class="toggle-password" data-target="newPassword">
                             <i class="fas fa-eye"></i>
@@ -551,15 +551,15 @@
                         <ul class="requirements-list" style="background: rgba(59,130,246,0.05); border-radius: 8px; padding: 12px 16px; margin: 20px 0;">
                             <li id="req-length" style="padding: 6px 0; color: #94a3b8; font-size: 13px;">
                                 <i class="fas fa-times" style="color: #ef4444; margin-left: 8px;" id="req-length-icon"></i>
-                                4 أحرف على الأقل
+                                لا يوجد حد أدنى لعدد الحروف
                             </li>
                             <li id="req-upper" style="padding: 6px 0; color: #94a3b8; font-size: 13px;">
                                 <i class="fa-check" style="color: #10b981; margin-left: 8px;" id="req-upper-icon"></i>
-                                حرف كبير واحد على الأقل (اختياري)
+                                أول حرف يجب أن يكون كابيتال إنجليزي
                             </li>
                             <li id="req-number" style="padding: 6px 0; color: #94a3b8; font-size: 13px;">
                                 <i class="fa-hashtag" style="color: #f59e0b; margin-left: 8px;" id="req-number-icon"></i>
-                                رقم واحد على الأقل (اختياري)
+                                رمز مميز واحد على الأقل مثل ! أو @ أو #
                             </li>
                         </ul>
                     </div>
@@ -573,7 +573,7 @@
                         <input type="password" id="confirmNewPassword" 
                                placeholder="أعد كتابة كلمة السر مرة أخرى"
                                required 
-                               minlength="4"
+                               minlength="1"
                                autocomplete="new-password">
                         <button type="button" class="toggle-password" data-target="confirmNewPassword">
                             <i class="fas fa-eye"></i>

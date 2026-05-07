@@ -445,7 +445,7 @@ password: ''
                     <div class="modal-body force-pw-body">
                         <p style="margin-bottom:0;color:#cbd5e1;line-height:1.8;">تم التحقق من بيانات الدخول، ولكن يجب تغيير كلمة المرور الحالية أولاً، ثم سيتم استكمال تسجيل بصمة الوجه إذا لزم.</p>
                         <div class="password-wrapper">
-                            <input type="password" id="firstNewPw" placeholder="أدخل كلمة المرور الجديدة">
+                            <input type="password" id="firstNewPw" placeholder="مثال: Axentro! أو T@1">
                             <button type="button" class="toggle-password" data-target="firstNewPw">
                                 <i class="fas fa-eye"></i>
                             </button>
@@ -550,8 +550,9 @@ password: ''
         const firstPwError = document.getElementById('firstNewPwError');
         const validation = Validator?.validatePassword?.(newPw);
         if (!newPw || validation?.valid !== true) {
-            if (firstPwError) { firstPwError.style.display = 'block'; firstPwError.textContent = 'كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز'; }
-            return this.toast('كلمة السر يجب أن تكون قوية: 8 أحرف على الأقل وتحتوي على حرف كبير وصغير ورقم ورمز', 'error');
+            const message = validation?.message || 'كلمة المرور يجب أن تبدأ بحرف كابيتال وتحتوي على رمز مميز مثل ! أو @ أو #';
+            if (firstPwError) { firstPwError.style.display = 'block'; firstPwError.textContent = message; }
+            return this.toast(message, 'error');
         }
         if (firstPwError) { firstPwError.style.display = 'none'; firstPwError.textContent = ''; }
         this.setStatus('جاري التغيير...');

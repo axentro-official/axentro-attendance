@@ -155,11 +155,14 @@ const AppConfig = {
 
     security: {
         password: {
-            minLength: 8,
+            // Axentro policy: first character must be capital + at least one special symbol.
+            // No minimum length and numbers are optional by client request.
+            minLength: 1,
             maxLength: 64,
-            requireUppercase: true,
-            requireLowercase: true,
-            requireNumbers: true,
+            requireFirstUppercase: true,
+            requireUppercase: false,
+            requireLowercase: false,
+            requireNumbers: false,
             requireSpecialChars: true
         },
         session: {
