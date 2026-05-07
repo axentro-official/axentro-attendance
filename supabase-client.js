@@ -117,7 +117,7 @@ class SupabaseClient {
             const fnName = isAdminLogin ? AppConfig.supabase.rpc.adminLogin : AppConfig.supabase.rpc.employeeLogin;
             const params = isAdminLogin
                 ? { p_username: normalized.toLowerCase(), p_password: password }
-                : { p_code: normalized.toUpperCase(), p_password: password };
+                : { p_code: normalized.toLowerCase(), p_password: password };
 
             const { data, error } = await this.rpc(fnName, params);
             if (error) throw error;
@@ -533,22 +533,49 @@ class SupabaseClient {
 
     async requestPasswordReset(identifier) {
         try {
-            const normalized = String(identifier || '').trim();
-            if (!normalized) return { success: false, error: 'يرجى إدخال الكود أو اسم المستخدم' };
-
-            const fnName = AppConfig?.supabase?.functions?.requestPasswordResetEmail;
-            if (fnName && this.client?.functions?.invoke) {
-                const { data, error } = await this.client.functions.invoke(fnName, {
-                    body: { identifier: normalized }
-                });
-                if (error) throw error;
-                return data || { success: true, message: 'إذا كان الحساب موجودًا وتم تسجيل بريد له فسيتم إرسال رمز إعادة التعيين' };
+            const normalized = String(identifier || '').trim().toLowerCase();
+            if (!normalized) return { success: false, error: 'يرجى إدخال البريد الإلكتروني المسجل' };
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+                return { success: false, error: 'يرجى إدخال بريد إلكتروني صحيح' };
             }
 
-            // Fallback only for maintenance mode
-            const { data, error } = await this.rpc(AppConfig.supabase.rpc.requestPasswordReset, { p_identifier: normalized, p_debug: false });
+            const { data, error } = await this.rpc(AppConfig.supabase.rpc.requestPasswordReset, {
+                p_identifier: normalized,
+                p_debug: true
+            });
             if (error) throw error;
-            return this.normalizePayload(data) || { success: false, error: 'فشل طلب الاستعادة' };
+
+            const payload = this.normalizePayload(data) || { success: false, error: 'فشل طلب الاستعادة' };
+            if (!payload.success) return payload;
+
+            const resetCode = payload.reset_token || payload.resetCode || payload.token || payload.code;
+            if (!resetCode) {
+                return { success: false, error: 'لم يرجع السيرفر رمز الاستعادة. شغّل باتش SQL المرفق أولاً.' };
+            }
+
+            if (AppConfig?.emailService?.url) {
+                await fetch(AppConfig.emailService.url, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'sendResetCode',
+                        apiKey: AppConfig?.emailService?.apiKey || '',
+                        name: payload.name || 'مستخدم النظام',
+                        code: payload.identifier || normalized,
+                        email: payload.email || normalized,
+                        resetCode,
+                        accountType: payload.role || payload.account_type || 'employee'
+                    })
+                }).catch(() => {});
+            }
+
+            return {
+                success: true,
+                email: payload.email || normalized,
+                identifier: payload.identifier || normalized,
+                message: 'تم إرسال رمز إعادة التعيين إلى البريد الإلكتروني المسجل. أدخل الرمز وكلمة المرور الجديدة.'
+            };
         } catch (error) {
             console.error('❌ Password reset request error:', error);
             return { success: false, error: error.message || 'فشل طلب استعادة كلمة المرور' };
@@ -558,7 +585,7 @@ class SupabaseClient {
     async completePasswordReset(identifier, resetToken, newPassword) {
         try {
             const { data, error } = await this.rpc(AppConfig.supabase.rpc.completePasswordReset, {
-                p_identifier: String(identifier || '').trim(),
+                p_identifier: String(identifier || '').trim().toLowerCase(),
                 p_reset_token: String(resetToken || '').trim(),
                 p_new_password: String(newPassword || '')
             });

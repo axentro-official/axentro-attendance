@@ -197,7 +197,7 @@ class AuthManager {
             document.getElementById('loginPass');
         const rememberMeCheckbox = document.getElementById('rememberMe');
 
-        const code = (codeInput?.value || '').trim().toUpperCase();
+        const code = (codeInput?.value || '').trim().toLowerCase();
         const password = passwordInput?.value || '';
         const rememberMe = rememberMeCheckbox?.checked || false;
 
@@ -709,8 +709,7 @@ password: ''
             }
         } catch (error) {
             console.error('Password change error:', error);
-            this.toast('خطأ في التحديث', 'error');
-        }
+                    }
     }
 
     async adminPasswordChange(code, newPassword) {
@@ -748,7 +747,13 @@ password: ''
     showForgotPw() {
         const codeInput = document.getElementById('forgotCode');
         if (typeof app !== 'undefined' && app?.navigateTo) app.navigateTo('forgotPasswordPage');
-        if (codeInput) codeInput.value = '';
+        document.getElementById('forgotPasswordForm')?.reset?.();
+        document.querySelectorAll('.reset-step-fields').forEach(el => { el.style.display = 'none'; });
+        if (codeInput) { codeInput.value = ''; codeInput.readOnly = false; }
+        const helper = document.getElementById('forgotPasswordHelper');
+        if (helper) helper.textContent = 'أدخل البريد الإلكتروني المسجل فقط، وسيتم إرسال رمز إعادة التعيين. بعد ذلك ستنتقل لخطوة إدخال الرمز وكلمة المرور الجديدة.';
+        const btn = document.getElementById('forgotPasswordBtn');
+        if (btn) btn.innerHTML = '<i class="fas fa-paper-plane"></i> تنفيذ الاستعادة';
     }
 
     closeForgotPw() {
@@ -762,7 +767,10 @@ password: ''
         const helper = document.getElementById('forgotPasswordHelper');
 
         if (!identifier) {
-            return this.toast('يرجى إدخال كود الموظف أو اسم مستخدم الأدمن', 'error');
+            return this.toast('يرجى إدخال البريد الإلكتروني المسجل', 'error');
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
+            return this.toast('يرجى إدخال بريد إلكتروني صحيح', 'error');
         }
 
         try {
@@ -777,7 +785,13 @@ password: ''
                     return;
                 }
 
-                if (helper) helper.textContent = result?.message || 'إذا كان الحساب موجودًا وتم تسجيل بريد له فسيتم إرسال رمز إعادة التعيين، صالح لمدة 15 دقيقة.';
+                if (helper) helper.textContent = result?.message || 'تم إرسال الرمز. أدخل الرمز وكلمة المرور الجديدة لإكمال العملية.';
+                document.querySelectorAll('.reset-step-fields').forEach(el => { el.style.display = ''; });
+                const emailInput = document.getElementById('forgotCode');
+                if (emailInput) emailInput.readOnly = true;
+                const btn = document.getElementById('forgotPasswordBtn');
+                if (btn) btn.innerHTML = '<i class="fas fa-key"></i> تحديث كلمة المرور';
+                document.getElementById('forgotResetToken')?.focus?.();
                 this.toast(result?.message || 'تم إرسال رمز إعادة التعيين إلى البريد الإلكتروني المسجل.', 'success');
                 return;
             }
@@ -786,7 +800,12 @@ password: ''
             if (result?.success) {
                 this.toast('تم تحديث كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.', 'success');
                 document.getElementById('forgotPasswordForm')?.reset?.();
-                if (helper) helper.textContent = 'أدخل الكود أو اسم المستخدم، ثم اطلب رمز إعادة التعيين. بعد ذلك أدخل الرمز وكلمة المرور الجديدة لإكمال العملية.';
+                document.querySelectorAll('.reset-step-fields').forEach(el => { el.style.display = 'none'; });
+                const emailInput = document.getElementById('forgotCode');
+                if (emailInput) emailInput.readOnly = false;
+                const btn = document.getElementById('forgotPasswordBtn');
+                if (btn) btn.innerHTML = '<i class="fas fa-paper-plane"></i> تنفيذ الاستعادة';
+                if (helper) helper.textContent = 'أدخل البريد الإلكتروني المسجل فقط، وسيتم إرسال رمز إعادة التعيين. بعد ذلك ستنتقل لخطوة إدخال الرمز وكلمة المرور الجديدة.';
                 this.closeForgotPw();
             } else {
                 this.toast(result?.error || 'تعذر إكمال إعادة التعيين', 'error');

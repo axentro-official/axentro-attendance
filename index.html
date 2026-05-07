@@ -109,8 +109,8 @@
 
                 <form id="loginForm" class="auth-form" novalidate>
                     <div class="input-group">
-                        <label for="loginCode"><i class="fas fa-id-badge"></i> كود الموظف</label>
-                        <input type="text" id="loginCode" placeholder="أدخل كود الموظف" autocomplete="username" required pattern="[A-Z0-9]{4,10}" maxlength="10">
+                        <label for="loginCode"><i class="fas fa-envelope"></i> البريد الإلكتروني</label>
+                        <input type="email" id="loginCode" placeholder="example@gmail.com" autocomplete="username" required maxlength="120">
                         <span class="error-message" id="loginCodeError"></span>
                     </div>
 
@@ -203,23 +203,23 @@
 
             <div class="info-box">
                 <i class="fas fa-info-circle"></i>
-                <p id="forgotPasswordHelper">أدخل الكود أو اسم المستخدم، ثم اطلب رمز إعادة التعيين. بعد ذلك أدخل الرمز وكلمة المرور الجديدة لإكمال العملية.</p>
+                <p id="forgotPasswordHelper">أدخل البريد الإلكتروني المسجل فقط، وسيتم إرسال رمز إعادة التعيين. بعد ذلك ستنتقل لخطوة إدخال الرمز وكلمة المرور الجديدة.</p>
             </div>
 
             <form id="forgotPasswordForm" class="auth-form">
                 <div class="input-group">
-                    <label for="forgotCode"><i class="fas fa-id-badge"></i> كود الموظف أو اسم مستخدم الأدمن</label>
-                    <input type="text" id="forgotCode" placeholder="مثال: EMP001 أو admin" required>
+                    <label for="forgotCode"><i class="fas fa-envelope"></i> البريد الإلكتروني المسجل</label>
+                    <input type="email" id="forgotCode" placeholder="example@gmail.com" autocomplete="email" required>
                 </div>
 
-                <div class="input-group">
+                <div class="input-group reset-step-fields" style="display:none;">
                     <label for="forgotResetToken"><i class="fas fa-key"></i> رمز إعادة التعيين</label>
-                    <input type="text" id="forgotResetToken" placeholder="أدخل الرمز المكوّن من 6 أرقام">
+                    <input type="text" id="forgotResetToken" placeholder="أدخل الرمز المكوّن من 6 أرقام" inputmode="numeric" maxlength="6">
                 </div>
 
-                <div class="input-group">
+                <div class="input-group reset-step-fields" style="display:none;">
                     <label for="forgotNewPassword"><i class="fas fa-lock"></i> كلمة المرور الجديدة</label>
-                    <input type="password" id="forgotNewPassword" placeholder="مثال: Axentro@2026">
+                    <input type="password" id="forgotNewPassword" placeholder="مثال: Axentro@2026" autocomplete="new-password">
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block" id="forgotPasswordBtn">
