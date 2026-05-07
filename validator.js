@@ -173,10 +173,18 @@ class Validator {
     }
 
     /**
-     * Password strength validation
+     * Password validation - Axentro relaxed policy
+     * Required:
+     * 1) First real character must be an English capital letter A-Z.
+     * 2) Must contain at least one special symbol.
+     * 3) No minimum length / no number requirement.
      */
     validatePassword(value) {
-        if (!value) {
+        const password = String(value || '')
+            .replace(/[‎‏‪-‮⁦-⁩]/g, '')
+            .trim();
+
+        if (!password) {
             return {
                 valid: false,
                 message: ErrorCodes.VALIDATION_REQUIRED_FIELD.message || 'كلمة المرور مطلوبة'
@@ -184,40 +192,26 @@ class Validator {
         }
 
         const config = AppConfig?.security?.password || {};
-        const maxLength = config.maxLength || 64;
+        const maxLength = Number(config.maxLength || 64);
 
-        if (value.length > maxLength) {
+        if (password.length > maxLength) {
             return {
                 valid: false,
-                message: `كلمة المرور يجب ألا تزيد عن ${maxLength} حرفًا`
+                message: `كلمة المرور يجب ألا تتجاوز ${maxLength} حرفًا`
             };
         }
 
-        if (config.requireFirstUppercase !== false && !/^[A-Z]/.test(value)) {
+        if (!/^[A-Z]/.test(password)) {
             return {
                 valid: false,
-                message: 'كلمة المرور يجب أن تبدأ بحرف كابيتال إنجليزي'
+                message: 'كلمة المرور يجب أن تبدأ بحرف إنجليزي كبير مثل Tamer@ أو Axentro@'
             };
         }
 
-        if (config.requireSpecialChars !== false && !/[^A-Za-z0-9]/.test(value)) {
+        if (!/[^A-Za-z0-9]/.test(password)) {
             return {
                 valid: false,
                 message: 'كلمة المرور يجب أن تحتوي على رمز مميز مثل ! أو @ أو #'
-            };
-        }
-
-        if (config.requireUppercase && !/[A-Z]/.test(value)) {
-            return {
-                valid: false,
-                message: 'كلمة المرور يجب أن تحتوي على حرف كبير'
-            };
-        }
-
-        if (config.requireNumbers && !/\d/.test(value)) {
-            return {
-                valid: false,
-                message: 'كلمة المرور يجب أن تحتوي على رقم'
             };
         }
 

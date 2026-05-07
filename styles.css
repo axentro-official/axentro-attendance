@@ -2754,3 +2754,22 @@ body.auth-mode #forgotPasswordPage:not(.auth-card-overlay) {
   top: max(18px, env(safe-area-inset-top)) !important;
   z-index: 2147483647 !important;
 }
+
+
+/* AXENTRO PASSWORD LTR FIX - keep password values exact inside RTL interface */
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"],
+input[type="password"],
+#firstNewPw,
+#modalOldPassword,
+#modalNewPassword,
+#modalAdminNewPassword,
+#forgotNewPassword,
+#loginPassword,
+#currentPassword,
+#newPassword,
+#confirmNewPassword {
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: plaintext !important;
+}

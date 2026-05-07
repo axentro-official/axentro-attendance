@@ -117,7 +117,7 @@
                     <div class="input-group">
                         <label for="loginPassword"><i class="fas fa-lock"></i> كلمة السر</label>
                         <div class="password-wrapper">
-                            <input type="password" id="loginPassword" placeholder="كلمة السر" autocomplete="current-password" required minlength="4">
+                            <input type="password" id="loginPassword" placeholder="كلمة السر" autocomplete="current-password" required minlength="4" dir="ltr" autocomplete="new-password" autocapitalize="none" spellcheck="false">
                             <button type="button" class="toggle-password" data-target="loginPassword">
                                 <i class="fas fa-eye"></i>
                             </button>
@@ -220,7 +220,7 @@
                 <div class="input-group reset-step-fields" style="display:none;">
                     <label for="forgotNewPassword"><i class="fas fa-lock"></i> كلمة المرور الجديدة</label>
                     <div class="password-wrapper">
-                        <input type="password" id="forgotNewPassword" placeholder="مثال: Axentro@2026" autocomplete="new-password">
+                        <input type="password" id="forgotNewPassword" placeholder="مثال: Axentro@2026" autocomplete="new-password" dir="ltr" autocomplete="new-password" autocapitalize="none" spellcheck="false">
                         <button type="button" class="toggle-password" data-target="forgotNewPassword" aria-label="إظهار أو إخفاء كلمة المرور">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -516,7 +516,7 @@
                         <span id="currentPasswordLabel">كلمة السر الحالية</span>
                     </label>
                     <div class="password-wrapper">
-                        <input type="password" id="currentPassword" placeholder="أدخل كلمة السر الحالية">
+                        <input type="password" id="currentPassword" placeholder="أدخل كلمة السر الحالية" dir="ltr" autocomplete="new-password" autocapitalize="none" spellcheck="false">
                         <button type="button" class="toggle-password" data-target="currentPassword">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -535,7 +535,7 @@
                                placeholder="الأقل 4 أحرف" 
                                required 
                                minlength="4"
-                               autocomplete="new-password">
+                               autocomplete="new-password" dir="ltr" autocomplete="new-password" autocapitalize="none" spellcheck="false">
                         <button type="button" class="toggle-password" data-target="newPassword">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -574,7 +574,7 @@
                                placeholder="أعد كتابة كلمة السر مرة أخرى"
                                required 
                                minlength="4"
-                               autocomplete="new-password">
+                               autocomplete="new-password" dir="ltr" autocomplete="new-password" autocapitalize="none" spellcheck="false">
                         <button type="button" class="toggle-password" data-target="confirmNewPassword">
                             <i class="fas fa-eye"></i>
                         </button>
@@ -1621,6 +1621,25 @@
     letter-spacing: 1px;
     margin-top: 8px;
 }
+
+/* AXENTRO PASSWORD LTR FIX - password values must not be visually reversed in RTL UI */
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"],
+input[type="password"],
+#firstNewPw,
+#modalOldPassword,
+#modalNewPassword,
+#modalAdminNewPassword,
+#forgotNewPassword,
+#loginPassword,
+#currentPassword,
+#newPassword,
+#confirmNewPassword {
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: plaintext !important;
+}
+
 </style>
 
 
